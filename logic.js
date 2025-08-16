@@ -3958,7 +3958,7 @@ window.MDP3 = (function () {
     generateSummaryTable = customGenerateSummary;
   }
 })();
-<!-- Sau script logic gốc của bạn -->
+//<!-- Sau script logic gốc của bạn -->
 <script>
 (function(){
   const $$ = (s, r=document) => r.querySelector(s);
