@@ -133,7 +133,10 @@ function formatCurrency(value, suffix = '') {
     const rounded = roundDownTo1000(num);
     return rounded.toLocaleString('vi-VN') + (suffix || '');
 }
-
+function formatDisplayCurrency(value) {
+    const num = Number(value) || 0;
+    return num.toLocaleString('vi-VN');
+}
 function sanitizeHtml(str) {
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
