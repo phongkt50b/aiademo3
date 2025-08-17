@@ -1307,7 +1307,6 @@ function buildSupplementSummaryRows(personInfo, container, targetAge) {
 
   return rows.join('');
 }
-
 window.MDP3 = (function () {
     let selectedId = null;
     let lastSelectedId = null;
@@ -1482,6 +1481,7 @@ window.MDP3 = (function () {
         return premium;
     }
     
+    // HÀM BỊ THIẾU ĐÃ ĐƯỢC THÊM VÀO ĐÂY
     function generateSupplementaryPersonHtmlForMdp3() {
       return `
         <h3 class="text-lg font-bold text-gray-700 mb-2 border-t pt-4">Người được miễn đóng phí</h3>
