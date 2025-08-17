@@ -406,21 +406,35 @@ function renderUI() {
         }
     });
     
+    // Lấy dữ liệu phí đã được tính toán
+    const fees = appState.fees;
+
+    // Các element trên giao diện cần cập nhật
+    const summaryTotalEl = document.getElementById('summary-total');
+    const mainFeeEl = document.getElementById('main-insured-main-fee');
+    const extraFeeEl = document.getElementById('main-insured-extra-fee');
+    const suppFeeEl = document.getElementById('summary-supp-fee');
+
     if (!isValid) {
-        updateSummaryUI({ totalMain: 0, totalSupp: 0, total: 0 });
-        if (window.renderSection6V2) window.renderSection6V2();
+        // Nếu dữ liệu không hợp lệ, reset tất cả về 0
+        if (summaryTotalEl) summaryTotalEl.textContent = "0";
+        if (mainFeeEl) mainFeeEl.textContent = "0";
+        if (extraFeeEl) extraFeeEl.textContent = "0";
+        if (suppFeeEl) suppFeeEl.textContent = "0";
+        updateMainProductFeeDisplay(0, 0);
         return;
     }
     
-    updateMainProductFeeDisplay(appState.fees.baseMain, appState.fees.extra);
-    updatePaymentFrequencyOptions(appState.fees.baseMain);
-    updateSummaryUI(appState.fees);
+    // TRỰC TIẾP CẬP NHẬT BẢNG TÓM TẮT PHÍ
+    if (summaryTotalEl) summaryTotalEl.textContent = formatDisplayCurrency(fees.total);
+    if (mainFeeEl) mainFeeEl.textContent = formatDisplayCurrency(fees.baseMain);
+    if (extraFeeEl) extraFeeEl.textContent = formatDisplayCurrency(fees.extra);
+    if (suppFeeEl) suppFeeEl.textContent = formatDisplayCurrency(fees.totalSupp);
 
-    if (window.renderSection6V2) {
-        window.renderSection6V2();
-    }
+    // Cập nhật các hiển thị phụ khác
+    updateMainProductFeeDisplay(fees.baseMain, fees.extra);
+    updatePaymentFrequencyOptions(fees.baseMain);
 }
-
 let lastRenderedProductKey = null;
 let lastRenderedAge = null;
 function renderMainProductSection(customer, mainProductKey) {
