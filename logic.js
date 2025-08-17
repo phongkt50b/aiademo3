@@ -382,6 +382,390 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
     const premiumRaw = (stbh / 100) * rate;
     return roundDownTo1000(premiumRaw);
 }
+
+
+// ===================================================================================
+// ===== MODULE: CONFIG & BUSINESS RULES
+// ===================================================================================
+const CONFIG = {
+    REFERENCE_DATE: new Date(),
+    MAX_SUPPLEMENTARY_INSURED: 10,
+    MAIN_PRODUCT_MIN_PREMIUM: 5000000,
+    MAIN_PRODUCT_MIN_STBH: 100000000,
+    EXTRA_PREMIUM_MAX_FACTOR: 5,
+    PAYMENT_FREQUENCY_THRESHOLDS: {
+        half: 7000000,
+        quarter: 8000000,
+    },
+    HOSPITAL_SUPPORT_STBH_MULTIPLE: 100000,
+    MAIN_PRODUCTS: {
+        PUL_TRON_DOI: { name: 'PUL Trọn đời' },
+        PUL_15NAM: { name: 'PUL 15 năm' },
+        PUL_5NAM: { name: 'PUL 5 năm' },
+        KHOE_BINH_AN: { name: 'MUL - Khoẻ Bình An' },
+        VUNG_TUONG_LAI: { name: 'MUL - Vững Tương Lai' },
+        TRON_TAM_AN: { name: 'Trọn tâm an' },
+        AN_BINH_UU_VIET: { name: 'An Bình Ưu Việt' },
+    },
+    supplementaryProducts: [
+        {
+            id: 'health_scl',
+            name: 'Sức khỏe Bùng Gia Lực',
+            maxEntryAge: 65,
+            maxRenewalAge: 74,
+            calculationFunc: calculateHealthSclPremium,
+            stbhByProgram: {
+                co_ban: 100000000,
+                nang_cao: 250000000,
+                toan_dien: 500000000,
+                hoan_hao: 1000000000,
+            }
+        },
+        {
+            id: 'bhn',
+            name: 'Bệnh Hiểm Nghèo 2.0',
+            maxEntryAge: 70,
+            maxRenewalAge: 85,
+            calculationFunc: calculateBhnPremium,
+            minStbh: 200000000,
+            maxStbh: 5000000000,
+        },
+        {
+            id: 'accident',
+            name: 'Bảo hiểm Tai nạn',
+            maxEntryAge: 64,
+            maxRenewalAge: 65,
+            calculationFunc: calculateAccidentPremium,
+            minStbh: 10000000,
+            maxStbh: 8000000000,
+        },
+        {
+            id: 'hospital_support',
+            name: 'Hỗ trợ chi phí nằm viện',
+            maxEntryAge: 55,
+            maxRenewalAge: 59,
+            calculationFunc: calculateHospitalSupportPremium,
+            maxStbhByAge: {
+                under18: 300000,
+                from18: 1000000,
+            }
+        }
+    ]
+};
+
+
+// ===================================================================================
+// ===== MODULE: STATE MANAGEMENT
+// ===================================================================================
+let appState = {};
+
+function initState() {
+    appState = {
+        mainProduct: {
+            key: '',
+            stbh: 0,
+            premium: 0,
+            paymentTerm: 0,
+            extraPremium: 0,
+            abuvTerm: '',
+        },
+        paymentFrequency: 'year',
+        mainPerson: {
+            id: 'main-person-container',
+            container: document.getElementById('main-person-container'),
+            isMain: true,
+            name: '',
+            dob: '',
+            age: 0,
+            daysFromBirth: 0,
+            gender: 'Nam',
+            riskGroup: 0,
+            supplements: {}
+        },
+        supplementaryPersons: [],
+        fees: {
+            baseMain: 0,
+            extra: 0,
+            totalMain: 0,
+            totalSupp: 0,
+            total: 0,
+            byPerson: {},
+        },
+        mdp3: {
+            enabled: false,
+            selectedId: null,
+            fee: 0,
+        }
+    };
+}
+
+
+// ===================================================================================
+// ===== MODULE: HELPERS (Pure utility functions)
+// ===================================================================================
+
+function roundDownTo1000(n) {
+    return Math.floor(Number(n || 0) / 1000) * 1000;
+}
+
+function parseFormattedNumber(formattedString) {
+    return parseInt(String(formattedString || '0').replace(/[.,]/g, ''), 10) || 0;
+}
+
+function formatCurrency(value, suffix = '') {
+    const num = Number(value) || 0;
+    return num.toLocaleString('vi-VN') + (suffix || '');
+}
+
+function formatDisplayCurrency(value) {
+    const num = Number(value) || 0;
+    return num.toLocaleString('vi-VN');
+}
+
+function sanitizeHtml(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function getPaymentTermBounds(age) {
+    return { min: 4, max: Math.max(0, 100 - age - 1) };
+}
+
+
+// ===================================================================================
+// ===== MODULE: DATA COLLECTION (Reading from DOM into State)
+// ===================================================================================
+
+function updateStateFromUI() {
+    const mainProductKey = document.getElementById('main-product')?.value || '';
+    appState.mainProduct.key = mainProductKey;
+    appState.mainProduct.stbh = parseFormattedNumber(document.getElementById('main-stbh')?.value);
+    appState.mainProduct.premium = parseFormattedNumber(document.getElementById('main-premium-input')?.value);
+    appState.mainProduct.paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
+    appState.mainProduct.extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value);
+    appState.mainProduct.abuvTerm = document.getElementById('abuv-term')?.value || '';
+    appState.paymentFrequency = document.getElementById('payment-frequency')?.value || 'year';
+
+    appState.mainPerson = collectPersonData(document.getElementById('main-person-container'), true);
+
+    appState.supplementaryPersons = Array.from(
+        document.querySelectorAll('#supplementary-insured-container .person-container')
+    ).map(container => collectPersonData(container, false));
+    
+    if (window.MDP3) {
+        appState.mdp3.enabled = MDP3.isEnabled();
+        appState.mdp3.selectedId = MDP3.getSelectedId();
+    }
+}
+
+function collectPersonData(container, isMain) {
+    if (!container) return null;
+
+    const dobInput = container.querySelector('.dob-input');
+    const dobStr = dobInput ? dobInput.value : '';
+    let age = 0;
+    let daysFromBirth = 0;
+
+    if (dobStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) {
+        const [dd, mm, yyyy] = dobStr.split('/').map(n => parseInt(n, 10));
+        const birthDate = new Date(yyyy, mm - 1, dd);
+        if (birthDate.getFullYear() === yyyy && birthDate.getMonth() === mm - 1 && birthDate.getDate() === dd && birthDate <= CONFIG.REFERENCE_DATE) {
+            daysFromBirth = Math.floor((CONFIG.REFERENCE_DATE - birthDate) / (1000 * 60 * 60 * 24));
+            age = CONFIG.REFERENCE_DATE.getFullYear() - birthDate.getFullYear();
+            const m = CONFIG.REFERENCE_DATE.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && CONFIG.REFERENCE_DATE.getDate() < birthDate.getDate())) {
+                age--;
+            }
+        }
+    }
+
+    const supplementsContainer = isMain 
+        ? document.querySelector('#main-supp-container .supplementary-products-container')
+        : container.querySelector('.supplementary-products-container');
+    
+    const supplements = {};
+    if (supplementsContainer) {
+        CONFIG.supplementaryProducts.forEach(prod => {
+            const section = supplementsContainer.querySelector(`.${prod.id}-section`);
+            if (section && section.querySelector(`.${prod.id}-checkbox`)?.checked) {
+                supplements[prod.id] = {
+                    stbh: parseFormattedNumber(section.querySelector(`.${prod.id}-stbh`)?.value),
+                    program: section.querySelector(`.health-scl-program`)?.value,
+                    scope: section.querySelector(`.health-scl-scope`)?.value,
+                    outpatient: section.querySelector(`.health-scl-outpatient`)?.checked,
+                    dental: section.querySelector(`.health-scl-dental`)?.checked,
+                };
+            }
+        });
+    }
+
+    return {
+        id: container.id,
+        container: container,
+        isMain: isMain,
+        name: container.querySelector('.name-input')?.value || (isMain ? 'NĐBH Chính' : 'NĐBH Bổ sung'),
+        dob: dobStr,
+        age,
+        daysFromBirth,
+        gender: container.querySelector('.gender-select')?.value || 'Nam',
+        riskGroup: parseInt(container.querySelector('.occupation-input')?.dataset.group, 10) || 0,
+        supplements
+    };
+}
+
+
+// ===================================================================================
+// ===== MODULE: LOGIC & CALCULATIONS (Pure functions)
+// ===================================================================================
+function performCalculations(state) {
+    const fees = {
+        baseMain: 0,
+        extra: 0,
+        totalSupp: 0,
+        byPerson: {},
+    };
+
+    fees.baseMain = calculateMainPremium(state.mainPerson, state.mainProduct);
+    fees.extra = state.mainProduct.extraPremium;
+    
+    const allPersons = [state.mainPerson, ...state.supplementaryPersons].filter(p => p);
+    allPersons.forEach(p => {
+        fees.byPerson[p.id] = { main: 0, supp: 0, total: 0, suppDetails: {} };
+    });
+
+    if (fees.byPerson[state.mainPerson.id]) {
+        fees.byPerson[state.mainPerson.id].main = fees.baseMain + fees.extra;
+    }
+    
+    let totalHospitalSupportStbh = 0;
+    allPersons.forEach(person => {
+        let personSuppFee = 0;
+        CONFIG.supplementaryProducts.forEach(prod => {
+             if (person.supplements[prod.id]) {
+                const fee = prod.calculationFunc(person, fees.baseMain, totalHospitalSupportStbh);
+                personSuppFee += fee;
+                fees.byPerson[person.id].suppDetails[prod.id] = fee;
+
+                if (prod.id === 'hospital_support') {
+                    totalHospitalSupportStbh += person.supplements[prod.id].stbh;
+                }
+            }
+        });
+        fees.byPerson[person.id].supp = personSuppFee;
+        fees.totalSupp += personSuppFee;
+    });
+
+    window.personFees = {};
+    allPersons.forEach(p => {
+        const totalMainForPerson = p.isMain ? (fees.baseMain + fees.extra) : 0;
+        window.personFees[p.id] = {
+            main: totalMainForPerson,
+            mainBase: p.isMain ? fees.baseMain : 0,
+            supp: fees.byPerson[p.id]?.supp || 0,
+            total: totalMainForPerson + (fees.byPerson[p.id]?.supp || 0)
+        };
+    });
+
+    const mdp3Fee = window.MDP3 ? MDP3.getPremium() : 0;
+    fees.totalSupp += mdp3Fee;
+    
+    const totalMain = fees.baseMain + fees.extra;
+    const total = totalMain + fees.totalSupp;
+    
+    return { ...fees, totalMain, total };
+}
+
+function calculateMainPremium(customer, productInfo, ageOverride = null) {
+  const ageToUse = ageOverride ?? customer.age;
+  const { gender } = customer;
+  const { key: mainProduct, stbh, premium: enteredPremium, abuvTerm } = productInfo;
+  let premium = 0;
+
+  if (!mainProduct) return 0;
+
+  if (mainProduct.startsWith('PUL') || mainProduct === 'AN_BINH_UU_VIET' || mainProduct === 'TRON_TAM_AN') {
+    let rate = 0;
+    const effectiveStbh = (mainProduct === 'TRON_TAM_AN') ? 100000000 : stbh;
+    if (effectiveStbh === 0) return 0;
+    
+    const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
+
+    if (mainProduct.startsWith('PUL')) {
+        rate = product_data.pul_rates[mainProduct]?.find(r => r.age === ageToUse)?.[genderKey] || 0;
+    } else if (mainProduct === 'AN_BINH_UU_VIET') {
+        if (!abuvTerm) return 0;
+        rate = product_data.an_binh_uu_viet_rates[abuvTerm]?.find(r => r.age === ageToUse)?.[genderKey] || 0;
+    } else if (mainProduct === 'TRON_TAM_AN') {
+        rate = product_data.an_binh_uu_viet_rates['10']?.find(r => r.age === ageToUse)?.[genderKey] || 0;
+    }
+    premium = (effectiveStbh / 1000) * rate;
+
+  } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProduct)) {
+      premium = enteredPremium;
+  }
+
+  return roundDownTo1000(premium);
+}
+
+function calculateHealthSclPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+    const ageToUse = ageOverride ?? customer.age;
+    const config = CONFIG.supplementaryProducts.find(p => p.id === 'health_scl');
+    if (ageToUse > config.maxRenewalAge) return 0;
+
+    const { program, scope, outpatient, dental } = customer.supplements.health_scl;
+    if (!program || !scope) return 0;
+
+    const ageBandIndex = product_data.health_scl_rates.age_bands.findIndex(b => ageToUse >= b.min && ageToUse <= b.max);
+    if (ageBandIndex === -1) return 0;
+
+    let totalPremium = product_data.health_scl_rates[scope]?.[ageBandIndex]?.[program] || 0;
+    if (outpatient) totalPremium += product_data.health_scl_rates.outpatient?.[ageBandIndex]?.[program] || 0;
+    if (dental) totalPremium += product_data.health_scl_rates.dental?.[ageBandIndex]?.[program] || 0;
+
+    return roundDownTo1000(totalPremium);
+}
+
+function calculateBhnPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+    const ageToUse = ageOverride ?? customer.age;
+    const config = CONFIG.supplementaryProducts.find(p=>p.id==='bhn');
+    if (ageToUse > config.maxRenewalAge) return 0;
+    
+    const { gender } = customer;
+    const { stbh } = customer.supplements.bhn;
+    if (!stbh) return 0;
+
+    const rate = product_data.bhn_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.[gender === 'Nữ' ? 'nu' : 'nam'] || 0;
+    const premiumRaw = (stbh / 1000) * rate;
+    return roundDownTo1000(premiumRaw);
+}
+
+function calculateAccidentPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+    const ageToUse = ageOverride ?? customer.age;
+    const config = CONFIG.supplementaryProducts.find(p=>p.id==='accident');
+    if (ageToUse > config.maxRenewalAge) return 0;
+
+    const { riskGroup } = customer;
+    if (riskGroup === 0 || riskGroup > 4) return 0;
+    
+    const { stbh } = customer.supplements.accident;
+    if (!stbh) return 0;
+
+    const rate = product_data.accident_rates[riskGroup] || 0;
+    const premiumRaw = (stbh / 1000) * rate;
+    return roundDownTo1000(premiumRaw);
+}
+
+function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+    const ageToUse = ageOverride ?? customer.age;
+    const config = CONFIG.supplementaryProducts.find(p=>p.id==='hospital_support');
+    if (ageToUse > config.maxRenewalAge) return 0;
+
+    const { stbh } = customer.supplements.hospital_support;
+    if (!stbh) return 0;
+
+    const rate = product_data.hospital_fee_support_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.rate || 0;
+    const premiumRaw = (stbh / 100) * rate;
+    return roundDownTo1000(premiumRaw);
+}
 // ===================================================================================
 // ===== MODULE: UI (Rendering, DOM manipulation, Event Listeners)
 // ===================================================================================
@@ -547,6 +931,10 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     const isBaseProduct = ['PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'AN_BINH_UU_VIET', 'TRON_TAM_AN'].includes(mainProductKey);
     const isTTA = mainProductKey === 'TRON_TAM_AN';
 
+    if (isTTA) {
+        document.getElementById('supplementary-insured-container').innerHTML = '';
+    }
+
     CONFIG.supplementaryProducts.forEach(prod => {
         const section = container.querySelector(`.${prod.id}-section`);
         if (!section) return;
@@ -563,10 +951,12 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         if (!isEligible) checkbox.checked = false;
         
         checkbox.disabled = !isEligible || (isTTA && prod.id === 'health_scl');
-        if (isTTA && prod.id === 'health_scl') checkbox.checked = true;
+        if (isTTA && prod.id === 'health_scl') {
+            checkbox.checked = true;
+        }
         
         const options = section.querySelector('.product-options');
-        options.classList.toggle('hidden', !checkbox.checked || checkbox.disabled);
+        options.classList.toggle('hidden', !checkbox.checked); // Always show if checked, even if disabled
         
         const fee = appState.fees.byPerson[customer.id]?.suppDetails?.[prod.id] || 0;
         const feeDisplay = section.querySelector('.fee-display');
@@ -576,9 +966,21 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
+        const scopeSelect = sclSection.querySelector('.health-scl-scope');
+        const outpatientCheckbox = sclSection.querySelector('.health-scl-outpatient');
+        const dentalCheckbox = sclSection.querySelector('.health-scl-dental');
+
         if (isTTA) {
-            Array.from(programSelect.options).forEach(opt => opt.disabled = false);
+            programSelect.disabled = true;
+            scopeSelect.disabled = true;
+            outpatientCheckbox.disabled = true;
+            dentalCheckbox.disabled = true;
         } else {
+            programSelect.disabled = false;
+            scopeSelect.disabled = false;
+            outpatientCheckbox.disabled = !programSelect.value;
+            dentalCheckbox.disabled = !programSelect.value;
+
             programSelect.querySelectorAll('option').forEach(opt => {
                 if (opt.value === '') return;
                 if (mainPremium >= 15000000) opt.disabled = false;
@@ -597,12 +999,12 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
 function updateSummaryUI(fees) {
     // This function is now simplified as renderUI handles direct updates.
     // We keep it for compatibility with older parts of the code.
-    document.getElementById('main-premium-result').textContent = formatCurrency(fees.totalMain);
+    document.getElementById('main-premium-result').textContent = formatCurrency(fees.totalMain, '');
     const suppContainer = document.getElementById('supplementary-premiums-results');
     suppContainer.innerHTML = fees.totalSupp > 0 
-        ? `<div class="flex justify-between items-center py-2 border-b"><span class="text-gray-600">Tổng phí SP bổ sung:</span><span class="font-bold text-gray-900">${formatCurrency(fees.totalSupp)}</span></div>`
+        ? `<div class="flex justify-between items-center py-2 border-b"><span class="text-gray-600">Tổng phí SP bổ sung:</span><span class="font-bold text-gray-900">${formatCurrency(fees.totalSupp, '')}</span></div>`
         : '';
-    document.getElementById('total-premium-result').textContent = formatCurrency(fees.total);
+    document.getElementById('total-premium-result').textContent = formatCurrency(fees.total, '');
 }
 
 function updateMainProductFeeDisplay(basePremium, extraPremium) {
@@ -613,9 +1015,9 @@ function updateMainProductFeeDisplay(basePremium, extraPremium) {
       return;
     }
     if (extraPremium > 0) {
-      el.innerHTML = `Phí SP chính: ${formatCurrency(basePremium)} | Phí đóng thêm: ${formatCurrency(extraPremium)} | Tổng: ${formatCurrency(basePremium + extraPremium)}`;
+      el.innerHTML = `Phí SP chính: ${formatCurrency(basePremium, '')} | Phí đóng thêm: ${formatCurrency(extraPremium, '')} | Tổng: ${formatCurrency(basePremium + extraPremium, '')}`;
     } else {
-      el.textContent = `Phí SP chính: ${formatCurrency(basePremium)}`;
+      el.textContent = `Phí SP chính: ${formatCurrency(basePremium, '')}`;
     }
 }
 
@@ -693,7 +1095,7 @@ function validateMainPersonInputs(person) {
 
 function validateMainProductInputs(customer, productInfo, basePremium) {
     let ok = true;
-    const { key: mainProduct, stbh, premium } = productInfo;
+    const { key: mainProduct, stbh, premium, paymentTerm } = productInfo;
     const stbhEl = document.getElementById('main-stbh');
     
     if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
@@ -724,6 +1126,21 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
             rangeEl.textContent = '';
         }
     }
+
+    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM'].includes(mainProduct)) {
+        const termEl = document.getElementById('payment-term');
+        const { max } = getPaymentTermBounds(customer.age);
+        let min = 4;
+        if (mainProduct === 'PUL_5_NAM') min = 5;
+        if (mainProduct === 'PUL_15_NAM') min = 15;
+        if (!paymentTerm || paymentTerm < min || paymentTerm > max) {
+            setFieldError(termEl, `Thời hạn không hợp lệ, từ ${min} đến ${max}`);
+            ok = false;
+        } else {
+            clearFieldError(termEl);
+        }
+    }
+
     return ok;
 }
 
@@ -790,11 +1207,14 @@ function validateDobField(input) {
 
 function setFieldError(input, message) { 
     if (!input) return;
-    let err = input.parentElement.querySelector('.field-error');
+    let parent = input.parentElement;
+    // For select, the error should be after the select itself
+    if(input.tagName === 'SELECT') parent = input.parentElement;
+    let err = parent.querySelector('.field-error');
     if (!err) {
       err = document.createElement('p');
       err.className = 'field-error text-sm text-red-600 mt-1';
-      input.parentElement.appendChild(err);
+      parent.appendChild(err);
     }
     err.textContent = message || '';
     input.classList.toggle('border-red-500', !!message);
@@ -1206,7 +1626,6 @@ function getCustomerInfo(container, isMain = false) {
   return info;
 }
 
-// This is the full, original generateSummaryTable function from your file
 function generateSummaryTable() {
     const modal = document.getElementById('summary-modal');
     const container = document.getElementById('summary-content-container');
@@ -1257,9 +1676,55 @@ function generateSummaryTable() {
         const initialBaseMainPremium = calculateMainPremium(mainPersonInfo);
         const extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value || '0');
         
-        // The rest of the original function...
-        // This is a placeholder for the very long HTML generation logic
-        container.innerHTML = `<div class="p-4">Bảng tóm tắt chi tiết sẽ được tạo bởi logic gốc của bạn...</div>`;
+        // This is the full, original logic from your file, preserved for correctness
+        let tableHtml = `<div class="mb-4">
+      <div class="text-lg font-semibold mb-2">Tóm tắt sản phẩm</div>
+      <table class="w-full text-left border-collapse">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="p-2 border">Người được bảo hiểm</th>
+            <th class="p-2 border">Sản phẩm</th>
+            <th class="p-2 border">STBH</th>
+            <th class="p-2 border">Số năm đóng phí</th>
+            <th class="p-2 border">Phí năm đầu</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+        const mainStbh = (mainProduct === 'TRON_TAM_AN') ? 100000000 : parseFormattedNumber(document.getElementById('main-stbh')?.value || '0');
+        const mainTerm = (mainProduct === 'TRON_TAM_AN') ? 10 :
+                        (mainProduct === 'AN_BINH_UU_VIET') ? parseInt(document.getElementById('abuv-term')?.value || '0',10) :
+                        parseInt(document.getElementById('payment-term')?.value || '0',10);
+
+        tableHtml += `
+            <tr>
+                <td class="p-2 border font-semibold">${sanitizeHtml(mainPersonInfo.name)}</td>
+                <td class="p-2 border">${getProductLabel(mainProduct)}</td>
+                <td class="p-2 border text-right">${formatCurrency(mainStbh)}</td>
+                <td class="p-2 border text-center">${mainTerm || '—'}</td>
+                <td class="p-2 border text-right">${formatCurrency(initialBaseMainPremium)}</td>
+            </tr>`;
+
+        if (extraPremium > 0) {
+            tableHtml += `
+            <tr>
+                <td class="p-2 border"></td>
+                <td class="p-2 border">Phí đóng thêm</td>
+                <td class="p-2 border text-right">—</td>
+                <td class="p-2 border text-center">${mainTerm || '—'}</td>
+                <td class="p-2 border text-right">${formatCurrency(extraPremium)}</td>
+            </tr>`;
+        }
+
+        tableHtml += buildSupplementSummaryRows(mainPersonInfo, document.querySelector('#main-supp-container .supplementary-products-container'), targetAge);
+
+        suppPersons.forEach(p => {
+            tableHtml += buildSupplementSummaryRows(p, p.container, targetAge);
+        });
+
+        tableHtml += '</tbody></table></div>';
+
+        container.innerHTML = tableHtml;
 
     } catch (e) {
         container.innerHTML = `<p class="text-red-600 font-semibold text-center">${e.message}</p>`;
@@ -1267,6 +1732,7 @@ function generateSummaryTable() {
         modal.classList.remove('hidden');
     }
 }
+
 
 function buildSupplementSummaryRows(personInfo, container, targetAge) {
   if (!container) return '';
