@@ -40,7 +40,8 @@ const PRODUCT_STRATEGIES = {
     _basePUL: {
         isRateBased: true,
         getRate: (state, age) => {
-            const genderKey = state.persons['main-person'].gender === 'Nữ' ? 'nu' : 'nam';
+            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
+            const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.pul_rates[state.mainProduct.key]?.find(r => r.age === age)?.[genderKey] || 0;
         },
         getPaymentTermBounds: (age) => ({ min: 4, max: Math.max(0, 100 - age - 1) }),
@@ -59,7 +60,8 @@ const PRODUCT_STRATEGIES = {
     TRON_TAM_AN: {
         isRateBased: true, stbh: 100000000,
         getRate: (state, age) => {
-            const genderKey = state.persons['main-person'].gender === 'Nữ' ? 'nu' : 'nam';
+            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
+            const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.an_binh_uu_viet_rates['10']?.find(r => r.age === age)?.[genderKey] || 0;
         },
         getPaymentTermBounds: () => ({ min: 10, max: 10 }),
@@ -74,7 +76,8 @@ const PRODUCT_STRATEGIES = {
         getRate: (state, age) => {
             const { abuvTerm } = state.mainProduct;
             if (!abuvTerm) return 0;
-            const genderKey = state.persons['main-person'].gender === 'Nữ' ? 'nu' : 'nam';
+            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
+            const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.an_binh_uu_viet_rates[abuvTerm]?.find(r => r.age === age)?.[genderKey] || 0;
         },
         getPaymentTermOptions: (age) => {
@@ -170,7 +173,6 @@ function updateSupplementDetails(personId, suppId, props) {
 function roundDownTo1000(n) { return Math.floor(Number(n || 0) / 1000) * 1000; }
 function parseFormattedNumber(s) { return parseInt(String(s || '0').replace(/[.,]/g, ''), 10) || 0; }
 function formatCurrency(v, s = '') { return (Number(v) || 0).toLocaleString('vi-VN') + (s || ''); }
-function sanitizeHtml(str) { return String(str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 function calculateAge(dobStr) {
     if (!dobStr || !/^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) return { age: 0, daysFromBirth: 0 };
@@ -288,7 +290,7 @@ function renderPerson(personState) {
 function renderSupplementaryPersons(state) {
     const container = $('#supplementary-insured-container');
     const template = $('#supplementary-person-template');
-    container.innerHTML = ''; // Clear existing
+    container.innerHTML = '';
     state.supplementaryPersonIds.forEach((id, index) => {
         const person = state.persons[id];
         const clone = template.content.cloneNode(true);
@@ -300,7 +302,7 @@ function renderSupplementaryPersons(state) {
         clone.querySelector('.gender-select').value = person.gender;
         clone.querySelector('.occupation-input').value = person.occupationName;
         container.appendChild(clone);
-        renderPerson(person); // Update age/risk group
+        renderPerson(person);
     });
 }
 
@@ -318,26 +320,29 @@ function renderMainProductSection(state) {
     const container = $('#main-product-options');
     const strategy = PRODUCT_STRATEGIES[mainProduct.key];
     if (!strategy) { container.innerHTML = ''; $('#main-product-fee-display').innerHTML = ''; return; }
+    
     let html = '';
-    if (strategy.stbh) {
-        html += `<div><label class="font-medium">STBH</label><input type="text" class="form-input bg-gray-100" value="${formatCurrency(strategy.stbh)}" disabled></div>`;
+    // KHÔI PHỤC HƯỚNG DẪN & PLACEHOLDER
+    if (strategy.stbh) { // Trọn Tâm An
+        html += `<div><label class="font-medium">STBH</label><input type="text" class="form-input bg-gray-100" value="${formatCurrency(strategy.stbh)}" disabled> <p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí và bảo vệ: 10 năm.</p></div>`;
     } else {
-        html += `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input" value="${formatCurrency(mainProduct.stbh)}"></div>`;
+        html += `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input" value="${formatCurrency(mainProduct.stbh)}" placeholder="VD: 1.000.000.000"></div>`;
     }
     if (!strategy.isRateBased) {
-        html += `<div><label class="font-medium">Phí sản phẩm chính</label><input type="text" id="main-premium-input" class="form-input" value="${formatCurrency(mainProduct.premium)}"></div>`;
+        html += `<div><label class="font-medium">Phí sản phẩm chính</label><input type="text" id="main-premium-input" class="form-input" value="${formatCurrency(mainProduct.premium)}" placeholder="Nhập phí"></div>`;
     }
-    if (strategy.getPaymentTermOptions) {
+    if (strategy.getPaymentTermOptions) { // An Bình Ưu Việt
         const optionsHtml = strategy.getPaymentTermOptions(mainPerson.age).map(opt => `<option value="${opt.value}" ${mainProduct.abuvTerm === opt.value ? 'selected' : ''}>${opt.text}</option>`).join('');
-        html += `<div><label class="font-medium">Thời hạn đóng phí</label><select id="abuv-term" class="form-select"><option value="">-- Chọn --</option>${optionsHtml}</select></div>`;
+        html += `<div><label class="font-medium">Thời hạn đóng phí</label><select id="abuv-term" class="form-select"><option value="">-- Chọn --</option>${optionsHtml}</select><p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí bằng thời hạn hợp đồng.</p></div>`;
     }
     if (strategy.getPaymentTermBounds) {
         const bounds = strategy.getPaymentTermBounds(mainPerson.age);
-        html += `<div><label class="font-medium">Thời gian đóng phí</label><input type="number" id="payment-term" class="form-input" value="${mainProduct.paymentTerm}" min="${bounds.min}" max="${bounds.max}"></div>`;
+        html += `<div><label class="font-medium">Thời gian đóng phí (năm)</label><input type="number" id="payment-term" class="form-input" value="${mainProduct.paymentTerm}" min="${bounds.min}" max="${bounds.max}" placeholder="VD: 20"><div class="text-sm text-gray-500 mt-1">Nhập từ ${bounds.min} đến ${bounds.max} năm.</div></div>`;
     }
     if (mainProduct.key && mainProduct.key !== 'TRON_TAM_AN') {
-        html += `<div><label class="font-medium">Phí đóng thêm</label><input type="text" id="extra-premium-input" class="form-input" value="${formatCurrency(mainProduct.extraPremium)}"></div>`;
+        html += `<div><label class="font-medium">Phí đóng thêm</label><input type="text" id="extra-premium-input" class="form-input" value="${formatCurrency(mainProduct.extraPremium)}" placeholder="VD: 10.000.000"><div class="text-sm text-gray-500 mt-1">Tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí chính.</div></div>`;
     }
+    
     container.innerHTML = html;
     const feeDisplay = $('#main-product-fee-display');
     if (state.fees.baseMain > 0) {
@@ -407,11 +412,27 @@ function updateSupplementaryAddButtonState(state) {
 }
 
 function generateBaseSupplementaryHtml() {
-    return CONFIG.supplementaryProducts.map(prod => `
-        <div class="product-section ${prod.id}-section hidden pt-4 border-t mt-4">
+    // This function creates the initial HTML for supplementary product sections.
+    // It's called once per person to populate their supplementary product container.
+    return CONFIG.supplementaryProducts.map(prod => {
+        let optionsHtml = '';
+        if (prod.id === 'health_scl') {
+            optionsHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><label class="font-medium text-sm">Quyền lợi</label><select class="form-select health-scl-program"><option value="">-- Chọn --</option><option value="co_ban">Cơ bản</option><option value="nang_cao">Nâng cao</option><option value="toan_dien">Toàn diện</option><option value="hoan_hao">Hoàn hảo</option></select></div>
+                <div><label class="font-medium text-sm">Phạm vi</label><select class="form-select health-scl-scope"><option value="main_vn">Việt Nam</option></select></div>
+            </div>
+            <div class="mt-2"><div class="space-y-1">
+                <label class="flex items-center"><input type="checkbox" class="form-checkbox health-scl-outpatient"> <span class="ml-2 text-sm">Ngoại trú</span></label>
+                <label class="flex items-center"><input type="checkbox" class="form-checkbox health-scl-dental"> <span class="ml-2 text-sm">Nha khoa</span></label>
+            </div></div>`;
+        } else {
+            optionsHtml = `<div><label class="font-medium text-sm">STBH</label><input type="text" class="form-input ${prod.id}-stbh" placeholder="Nhập STBH"></div>`;
+        }
+        return `<div class="product-section ${prod.id}-section hidden pt-4 border-t mt-4">
             <label class="flex items-center"><input type="checkbox" class="form-checkbox ${prod.id}-checkbox"><span class="ml-2 font-semibold text-gray-700">${prod.name}</span></label>
-            <div class="product-options hidden mt-2 pl-6 space-y-2">...</div>
-        </div>`).join('');
+            <div class="product-options hidden mt-2 pl-6 space-y-2">${optionsHtml}<div class="text-right font-bold text-aia-red fee-display min-h-[1.5rem]"></div></div>
+        </div>`;
+    }).join('');
 }
 // ===================================================================================
 // ===== INITIALIZATION & EVENT BINDING
@@ -425,7 +446,6 @@ function runWorkflow() {
 function attachGlobalListeners() {
     const body = document.body;
 
-    // SỰ KIỆN KHI THAY ĐỔI LỰA CHỌN (VD: dropdown, checkbox)
     body.addEventListener('change', e => {
         const target = e.target;
         const personContainer = target.closest('.person-container');
@@ -445,34 +465,24 @@ function attachGlobalListeners() {
         }
     });
 
-    // SỰ KIỆN KHI NHẬP LIỆU (VD: gõ chữ, gõ số)
     body.addEventListener('input', e => {
         const target = e.target;
-
-        // ===== SỬA LỖI 1: TỰ ĐỘNG ĐỊNH DẠNG NGÀY THÁNG =====
         if (target.classList.contains('dob-input')) {
             let value = target.value.replace(/\D/g, '');
             if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
             if (value.length > 5) value = `${value.slice(0, 5)}/${value.slice(5, 9)}`;
             target.value = value.slice(0, 10);
-            return; // Dừng lại, không xử lý gì thêm cho ô ngày sinh
+            return;
         }
-
-        // ===== SỬA LỖI 2: HIỂN THỊ DANH SÁCH GỢI Ý NGHỀ NGHIỆP =====
         if (target.classList.contains('occupation-input')) {
             const list = target.nextElementSibling;
             const value = target.value.toLowerCase();
-            if (value.length < 2) {
-                list.classList.add('hidden');
-                return;
-            }
+            if (value.length < 2) { list.classList.add('hidden'); return; }
             const filtered = product_data.occupations.filter(o => o.name.toLowerCase().includes(value));
             list.innerHTML = filtered.map(o => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-action="select-occupation" data-name="${o.name}" data-group="${o.group}">${o.name} (Nhóm ${o.group})</div>`).join('');
             list.classList.remove('hidden');
             return;
         }
-
-        // Xử lý debounce cho các ô nhập số tiền/thời hạn
         clearTimeout(target.debounce);
         target.debounce = setTimeout(() => {
             const value = target.type === 'number' ? parseInt(target.value, 10) || 0 : target.value;
@@ -487,31 +497,23 @@ function attachGlobalListeners() {
         }, 400);
     });
     
-    // SỰ KIỆN KHI BẤM CHUỘT
     body.addEventListener('click', e => {
         const target = e.target;
         if (target.id === 'add-supp-insured-btn') addSupplementaryPerson();
         if (target.classList.contains('remove-supp-btn')) removeSupplementaryPerson(target.closest('.person-container').id);
         
-        // ===== SỬA LỖI 2: XỬ LÝ KHI CHỌN NGHỀ NGHIỆP TỪ DANH SÁCH =====
         if (target.dataset.action === 'select-occupation') {
             const personId = target.closest('.person-container').id;
             const occupationName = target.dataset.name;
             const riskGroup = parseInt(target.dataset.group, 10);
-            
-            // Cập nhật state (dữ liệu nền)
             updatePerson(personId, { occupationName, riskGroup });
-
-            // Cập nhật giao diện ngay lập tức để người dùng thấy
             const input = target.closest('.relative').querySelector('.occupation-input');
-            input.value = occupationName; // Hiển thị tên nghề nghiệp đã chọn
-            target.parentElement.classList.add('hidden'); // Ẩn danh sách gợi ý đi
+            input.value = occupationName;
+            target.parentElement.classList.add('hidden');
         }
-
-        // Xử lý các nút bấm khác
         if (target.id === 'view-summary-btn') {
             const errorEl = $('#error-message');
-            errorEl.textContent = ''; // Xóa lỗi cũ
+            errorEl.textContent = '';
             try {
                 alert("Chức năng 'Xem Bảng Minh Họa Chi Tiết' đang được phát triển.");
             } catch (err) {
@@ -521,6 +523,7 @@ function attachGlobalListeners() {
         if (target.id === 'close-summary-modal-btn') { $('#summary-modal').classList.add('hidden'); }
     });
 }
+
 document.addEventListener('DOMContentLoaded', () => {
     appState = createInitialState();
     attachGlobalListeners();
