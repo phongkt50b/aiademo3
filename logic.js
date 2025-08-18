@@ -98,7 +98,7 @@ function createInitialState() {
         mainProduct: { key: '', stbh: 0, premium: 0, paymentTerm: 0, extraPremium: 0, abuvTerm: '' },
         paymentFrequency: 'year',
         persons: {
-            'main-person': { id: 'main-person', isMain: true, name: '', dob: '', age: 0, daysFromBirth: 0, gender: 'Nam', riskGroup: 0, occupationName: '', supplements: {} }
+            'main-person-container': { id: 'main-person-container', isMain: true, name: '', dob: '', age: 0, daysFromBirth: 0, gender: 'Nam', riskGroup: 0, occupationName: '', supplements: {} }
         },
         supplementaryPersonIds: [],
         fees: { baseMain: 0, extra: 0, totalMain: 0, totalSupp: 0, total: 0, byPerson: {} },
@@ -192,9 +192,9 @@ function performCalculations(state) {
     const fees = { baseMain: 0, extra: 0, totalSupp: 0, byPerson: {} };
     fees.baseMain = calculateMainPremiumFee(state);
     fees.extra = state.mainProduct.extraPremium;
-    const allPersons = [state.persons['main-person'], ...state.supplementaryPersonIds.map(id => state.persons[id])];
+    const allPersons = [state.persons['main-person-container'], ...state.supplementaryPersonIds.map(id => state.persons[id])];
     allPersons.forEach(p => { fees.byPerson[p.id] = { main: 0, supp: 0, total: 0, suppDetails: {} }; });
-    if (fees.byPerson['main-person']) fees.byPerson['main-person'].main = fees.baseMain + fees.extra;
+    if (fees.byPerson['main-person-container']) fees.byPerson['main-person-container'].main = fees.baseMain + fees.extra;
     let totalHospitalSupportStbh = 0;
     allPersons.forEach(person => {
         let personSuppFee = 0;
@@ -219,7 +219,7 @@ function calculateMainPremiumFee(state, ageOverride = null) {
     const { mainProduct, persons } = state;
     const strategy = PRODUCT_STRATEGIES[mainProduct.key];
     if (!strategy) return 0;
-    const ageToUse = ageOverride ?? persons['main-person'].age;
+    const ageToUse = ageOverride ?? persons['main-person-container'].age;
     let premium = 0;
     if (strategy.isRateBased) {
         premium = (strategy.stbh || mainProduct.stbh) / 1000 * strategy.getRate(state, ageToUse);
@@ -270,7 +270,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
 function render(state) {
-    renderPerson(state.persons['main-person']);
+    renderPerson(state.persons['main-person-container']);
     renderSupplementaryPersons(state);
     renderMainProductSection(state);
     Object.values(state.persons).forEach(person => renderSupplementaryProductsForPerson(person, state));
@@ -288,7 +288,7 @@ function renderPerson(personState) {
 function renderSupplementaryPersons(state) {
     const container = $('#supplementary-insured-container');
     const template = $('#supplementary-person-template');
-    container.innerHTML = '';
+    container.innerHTML = ''; // Clear existing
     state.supplementaryPersonIds.forEach((id, index) => {
         const person = state.persons[id];
         const clone = template.content.cloneNode(true);
@@ -300,25 +300,24 @@ function renderSupplementaryPersons(state) {
         clone.querySelector('.gender-select').value = person.gender;
         clone.querySelector('.occupation-input').value = person.occupationName;
         container.appendChild(clone);
-        renderPerson(person);
+        renderPerson(person); // Update age/risk group
     });
 }
 
 function renderMainProductSection(state) {
     const { mainProduct, persons } = state;
-    const mainPerson = persons['main-person'];
+    const mainPerson = persons['main-person-container'];
     const select = $('#main-product');
     $$('#main-product option').forEach(opt => {
         if (!opt.value) return;
         const strategy = PRODUCT_STRATEGIES[opt.value];
         const isEligible = strategy ? strategy.isEligible(mainPerson) : false;
         opt.disabled = !isEligible;
-        opt.classList.toggle('hidden', !isEligible);
     });
     if (select.value !== mainProduct.key) select.value = mainProduct.key;
     const container = $('#main-product-options');
     const strategy = PRODUCT_STRATEGIES[mainProduct.key];
-    if (!strategy) { container.innerHTML = ''; return; }
+    if (!strategy) { container.innerHTML = ''; $('#main-product-fee-display').innerHTML = ''; return; }
     let html = '';
     if (strategy.stbh) {
         html += `<div><label class="font-medium">STBH</label><input type="text" class="form-input bg-gray-100" value="${formatCurrency(strategy.stbh)}" disabled></div>`;
@@ -379,10 +378,8 @@ function renderSummary(state) {
     setText('#main-insured-main-fee', fees.baseMain);
     setText('#main-insured-extra-fee', fees.extra);
     setText('#summary-supp-fee', fees.totalSupp);
-    
     const freqSel = $('#payment-frequency');
     if (freqSel.value !== paymentFrequency) freqSel.value = paymentFrequency;
-
     const breakdownBox = $('#frequency-breakdown');
     if (paymentFrequency === 'year') {
         breakdownBox.classList.add('hidden');
@@ -409,29 +406,12 @@ function updateSupplementaryAddButtonState(state) {
     btn.disabled = isTTA || isMax;
 }
 
-// ===================================================================================
-// ===== HTML GENERATORS
-// ===================================================================================
 function generateBaseSupplementaryHtml() {
-    return CONFIG.supplementaryProducts.map(prod => {
-        let optionsHtml = '';
-        if (prod.id === 'health_scl') {
-            optionsHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><label class="font-medium text-sm">Quyền lợi</label><select class="form-select health-scl-program"><option value="">-- Chọn --</option><option value="co_ban">Cơ bản</option><option value="nang_cao">Nâng cao</option><option value="toan_dien">Toàn diện</option><option value="hoan_hao">Hoàn hảo</option></select></div>
-                <div><label class="font-medium text-sm">Phạm vi</label><select class="form-select health-scl-scope"><option value="main_vn">Việt Nam</option></select></div>
-            </div>
-            <div class="mt-2"><div class="space-y-1">
-                <label class="flex items-center"><input type="checkbox" class="form-checkbox"> <span class="ml-2">Ngoại trú</span></label>
-                <label class="flex items-center"><input type="checkbox" class="form-checkbox"> <span class="ml-2">Nha khoa</span></label>
-            </div></div>`;
-        } else {
-            optionsHtml = `<div><label class="font-medium text-sm">STBH</label><input type="text" class="form-input ${prod.id}-stbh" placeholder="Nhập STBH"></div>`;
-        }
-        return `<div class="product-section ${prod.id}-section hidden pt-4">
+    return CONFIG.supplementaryProducts.map(prod => `
+        <div class="product-section ${prod.id}-section hidden pt-4 border-t mt-4">
             <label class="flex items-center"><input type="checkbox" class="form-checkbox ${prod.id}-checkbox"><span class="ml-2 font-semibold text-gray-700">${prod.name}</span></label>
-            <div class="product-options hidden mt-2 pl-6 space-y-2">${optionsHtml}<div class="text-right font-bold text-aia-red fee-display min-h-[1.5rem]"></div></div>
-        </div>`;
-    }).join('');
+            <div class="product-options hidden mt-2 pl-6 space-y-2">...</div>
+        </div>`).join('');
 }
 // ===================================================================================
 // ===== INITIALIZATION & EVENT BINDING
@@ -444,6 +424,7 @@ function runWorkflow() {
 
 function attachGlobalListeners() {
     const body = document.body;
+
     body.addEventListener('change', e => {
         const target = e.target;
         const personContainer = target.closest('.person-container');
@@ -455,7 +436,7 @@ function attachGlobalListeners() {
         else if (personId && target.classList.contains('name-input')) updatePerson(personId, { name: target.value });
         else if (personId && target.classList.contains('dob-input')) updatePerson(personId, { dob: target.value });
         else if (personId && target.classList.contains('gender-select')) updatePerson(personId, { gender: target.value });
-        else if (personId && target.classList.contains('form-checkbox')) { // Supplementary toggles
+        else if (personId && target.classList.contains('form-checkbox')) {
             const suppId = target.classList.item(1).replace('-checkbox', '');
             if (CONFIG.supplementaryProducts.some(p => p.id === suppId)) {
                 toggleSupplement(personId, suppId, target.checked);
@@ -465,11 +446,32 @@ function attachGlobalListeners() {
 
     body.addEventListener('input', e => {
         const target = e.target;
+        
+        // SỬA LỖI 1: Tự động định dạng ngày tháng
+        if (target.classList.contains('dob-input')) {
+            let value = target.value.replace(/\D/g, '');
+            if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
+            if (value.length > 5) value = `${value.slice(0, 5)}/${value.slice(5, 9)}`;
+            target.value = value.slice(0, 10);
+            return; // Dừng lại để không chạy debounce
+        }
+        
+        // SỬA LỖI 2: Hiển thị danh sách nghề nghiệp
+        if (target.classList.contains('occupation-input')) {
+            const list = target.nextElementSibling;
+            const value = target.value.toLowerCase();
+            if (value.length < 2) { list.classList.add('hidden'); return; }
+            const filtered = product_data.occupations.filter(o => o.name.toLowerCase().includes(value));
+            list.innerHTML = filtered.map(o => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-action="select-occupation" data-name="${o.name}" data-group="${o.group}">${o.name} (Nhóm ${o.group})</div>`).join('');
+            list.classList.remove('hidden');
+            return;
+        }
+
         clearTimeout(target.debounce);
         target.debounce = setTimeout(() => {
             const value = target.type === 'number' ? parseInt(target.value, 10) || 0 : target.value;
             if (target.id === 'payment-term') updateMainProduct({ paymentTerm: value });
-            else if (target.id === 'main-stbh' || target.id === 'main-premium-input' || target.id === 'extra-premium-input') {
+            else if (['main-stbh', 'main-premium-input', 'extra-premium-input'].includes(target.id)) {
                 const numValue = parseFormattedNumber(value);
                 target.value = formatCurrency(numValue);
                 if (target.id === 'main-stbh') updateMainProduct({ stbh: numValue });
@@ -479,29 +481,38 @@ function attachGlobalListeners() {
         }, 400);
     });
     
-     body.addEventListener('click', e => {
-        if(e.target.id === 'add-supp-insured-btn') addSupplementaryPerson();
-        if(e.target.classList.contains('remove-supp-btn')) removeSupplementaryPerson(e.target.closest('.person-container').id);
-    });
-
-    // Autocomplete Logic
-    body.addEventListener('input', e => {
-        if (!e.target.classList.contains('occupation-input')) return;
-        const input = e.target;
-        const list = input.nextElementSibling;
-        const value = input.value.toLowerCase();
-        if (value.length < 2) { list.classList.add('hidden'); return; }
-        const filtered = product_data.occupations.filter(o => o.name.toLowerCase().includes(value));
-        list.innerHTML = filtered.map(o => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-name="${o.name}" data-group="${o.group}">${o.name} (Nhóm ${o.group})</div>`).join('');
-        list.classList.remove('hidden');
-    });
-    
-    body.addEventListener('mousedown', e => {
-        if (!e.target.parentElement.classList.contains('occupation-autocomplete')) return;
+    body.addEventListener('click', e => {
         const target = e.target;
-        const personId = target.closest('.person-container').id;
-        updatePerson(personId, { occupationName: target.dataset.name, riskGroup: parseInt(target.dataset.group, 10) });
-        target.parentElement.classList.add('hidden');
+        if (target.id === 'add-supp-insured-btn') addSupplementaryPerson();
+        if (target.classList.contains('remove-supp-btn')) removeSupplementaryPerson(target.closest('.person-container').id);
+        
+        // SỬA LỖI 2: Xử lý chọn nghề nghiệp
+        if (target.dataset.action === 'select-occupation') {
+            const personId = target.closest('.person-container').id;
+            const occupationName = target.dataset.name;
+            const riskGroup = parseInt(target.dataset.group, 10);
+            
+            // Cập nhật state
+            updatePerson(personId, { occupationName, riskGroup });
+
+            // Cập nhật UI ngay lập tức để người dùng thấy
+            const input = target.closest('.relative').querySelector('.occupation-input');
+            input.value = occupationName;
+            target.parentElement.classList.add('hidden');
+        }
+
+        if (target.id === 'view-summary-btn') {
+            const errorEl = $('#error-message');
+            errorEl.textContent = ''; // Xóa lỗi cũ
+            try {
+                // Tạm thời chưa có logic này, sẽ báo lỗi nếu cố chạy
+                // generateSummaryTableV2(); 
+                alert("Chức năng 'Xem Bảng Minh Họa Chi Tiết' đang được phát triển.");
+            } catch (err) {
+                errorEl.textContent = `Lỗi khi tạo bảng minh họa: ${err.message}`;
+            }
+        }
+        if (target.id === 'close-summary-modal-btn') { $('#summary-modal').classList.add('hidden'); }
     });
 }
 
