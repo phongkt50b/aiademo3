@@ -40,7 +40,6 @@ const PRODUCT_STRATEGIES = {
     _basePUL: {
         isRateBased: true,
         getRate: (state, age) => {
-            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
             const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.pul_rates[state.mainProduct.key]?.find(r => r.age === age)?.[genderKey] || 0;
         },
@@ -60,7 +59,6 @@ const PRODUCT_STRATEGIES = {
     TRON_TAM_AN: {
         isRateBased: true, stbh: 100000000,
         getRate: (state, age) => {
-            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
             const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.an_binh_uu_viet_rates['10']?.find(r => r.age === age)?.[genderKey] || 0;
         },
@@ -76,7 +74,6 @@ const PRODUCT_STRATEGIES = {
         getRate: (state, age) => {
             const { abuvTerm } = state.mainProduct;
             if (!abuvTerm) return 0;
-            // SỬA LỖI: Sử dụng đúng key 'main-person-container'
             const genderKey = state.persons['main-person-container'].gender === 'Nữ' ? 'nu' : 'nam';
             return product_data.an_binh_uu_viet_rates[abuvTerm]?.find(r => r.age === age)?.[genderKey] || 0;
         },
@@ -113,6 +110,7 @@ function updateMainProduct(props) {
     Object.assign(appState.mainProduct, props);
     if (props.key !== undefined && props.key !== oldKey) {
         Object.assign(appState.mainProduct, { stbh: 0, premium: 0, paymentTerm: 0, extraPremium: 0, abuvTerm: '' });
+        if (window.MDP3) MDP3.reset();
     }
     runWorkflow();
 }
@@ -129,6 +127,7 @@ function updatePerson(personId, props) {
             if (strategy && !strategy.isEligible(person)) {
                 updateMainProduct({ key: '' });
             }
+            if (window.MDP3) MDP3.reset();
         }
     }
     runWorkflow();
@@ -139,12 +138,14 @@ function addSupplementaryPerson() {
     const personId = `supp-${Date.now()}`;
     appState.persons[personId] = { id: personId, isMain: false, name: '', dob: '', age: 0, daysFromBirth: 0, gender: 'Nam', riskGroup: 0, occupationName: '', supplements: {} };
     appState.supplementaryPersonIds.push(personId);
+    if (window.MDP3) MDP3.reset(); // BỔ SUNG LOGIC RESET
     runWorkflow();
 }
 
 function removeSupplementaryPerson(personId) {
     delete appState.persons[personId];
     appState.supplementaryPersonIds = appState.supplementaryPersonIds.filter(id => id !== personId);
+    if (window.MDP3) MDP3.reset(); // BỔ SUNG LOGIC RESET
     runWorkflow();
 }
 
@@ -322,8 +323,7 @@ function renderMainProductSection(state) {
     if (!strategy) { container.innerHTML = ''; $('#main-product-fee-display').innerHTML = ''; return; }
     
     let html = '';
-    // KHÔI PHỤC HƯỚNG DẪN & PLACEHOLDER
-    if (strategy.stbh) { // Trọn Tâm An
+    if (strategy.stbh) {
         html += `<div><label class="font-medium">STBH</label><input type="text" class="form-input bg-gray-100" value="${formatCurrency(strategy.stbh)}" disabled> <p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí và bảo vệ: 10 năm.</p></div>`;
     } else {
         html += `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input" value="${formatCurrency(mainProduct.stbh)}" placeholder="VD: 1.000.000.000"></div>`;
@@ -331,7 +331,7 @@ function renderMainProductSection(state) {
     if (!strategy.isRateBased) {
         html += `<div><label class="font-medium">Phí sản phẩm chính</label><input type="text" id="main-premium-input" class="form-input" value="${formatCurrency(mainProduct.premium)}" placeholder="Nhập phí"></div>`;
     }
-    if (strategy.getPaymentTermOptions) { // An Bình Ưu Việt
+    if (strategy.getPaymentTermOptions) {
         const optionsHtml = strategy.getPaymentTermOptions(mainPerson.age).map(opt => `<option value="${opt.value}" ${mainProduct.abuvTerm === opt.value ? 'selected' : ''}>${opt.text}</option>`).join('');
         html += `<div><label class="font-medium">Thời hạn đóng phí</label><select id="abuv-term" class="form-select"><option value="">-- Chọn --</option>${optionsHtml}</select><p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí bằng thời hạn hợp đồng.</p></div>`;
     }
@@ -352,22 +352,21 @@ function renderMainProductSection(state) {
         feeDisplay.textContent = '';
     }
 }
+
 function renderSupplementaryProductsForPerson(person, state) {
     const container = $(`#${person.id} .supplementary-products-container`);
     if (!container) return;
     if (!container.innerHTML) container.innerHTML = generateBaseSupplementaryHtml();
 
     const isTTA = state.mainProduct.key === 'TRON_TAM_AN';
-    const mainPremium = state.fees.baseMain; // Lấy phí SP chính đã tính
+    const mainPremium = state.fees.baseMain;
 
     CONFIG.supplementaryProducts.forEach(prod => {
         const section = container.querySelector(`.${prod.id}-section`);
         if (!section) return;
-
         const isEligible = person.daysFromBirth >= 30 && person.age <= prod.maxEntryAge &&
             (prod.id !== 'health_scl' || (person.riskGroup > 0 && person.riskGroup < 4)) &&
             (!isTTA || prod.id === 'health_scl');
-
         section.classList.toggle('hidden', !isEligible);
         
         const checkbox = section.querySelector(`.${prod.id}-checkbox`);
@@ -377,27 +376,29 @@ function renderSupplementaryProductsForPerson(person, state) {
         const optionsDiv = section.querySelector('.product-options');
         optionsDiv.classList.toggle('hidden', !checkbox.checked);
 
-        // ===== SỬA LỖI LOGIC PHỤ THUỘC TẠI ĐÂY =====
-        if (prod.id === 'health_scl' && isEligible) {
+        if (isEligible && prod.id === 'health_scl') {
             const programSelect = section.querySelector('.health-scl-program');
-            if (isTTA) {
-                // Với Trọn Tâm An, không giới hạn
-                programSelect.querySelectorAll('option').forEach(opt => opt.disabled = false);
-            } else {
-                // Với sản phẩm khác, giới hạn theo phí chính
-                programSelect.querySelectorAll('option').forEach(opt => {
-                    if (opt.value === '') return;
-                    if (mainPremium >= 15000000) opt.disabled = false;
-                    else if (mainPremium >= 10000000) opt.disabled = (opt.value === 'hoan_hao');
-                    else if (mainPremium >= 5000000) opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
-                    else opt.disabled = true;
-                });
+            programSelect.querySelectorAll('option').forEach(opt => {
+                if (opt.value === '') return;
+                if (isTTA || mainPremium >= 15000000) opt.disabled = false;
+                else if (mainPremium >= 10000000) opt.disabled = (opt.value === 'hoan_hao');
+                else if (mainPremium >= 5000000) opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
+                else opt.disabled = true;
+            });
+        }
+        
+        // BỔ SUNG LOGIC: Hiển thị cảnh báo cho Hỗ trợ nằm viện
+        if (isEligible && prod.id === 'hospital_support') {
+            const maxByAge = person.age < 18 ? prod.maxStbhByAge.under18 : prod.maxStbhByAge.from18;
+            const maxByPremium = Math.floor(mainPremium / 4000000) * 100000;
+            const hint = `Tối đa: ${formatCurrency(Math.min(maxByAge, maxByPremium))}đ/ngày. Là bội số của 100.000.`;
+            let hintEl = section.querySelector('.field-hint');
+            if (!hintEl) {
+                hintEl = document.createElement('p');
+                hintEl.className = 'field-hint text-sm text-gray-500 mt-1';
+                optionsDiv.appendChild(hintEl);
             }
-            // Nếu lựa chọn hiện tại bị disabled, reset nó
-            if (programSelect.options[programSelect.selectedIndex]?.disabled) {
-                // Dòng này sẽ tự động cập nhật state trong lần tương tác tiếp theo của người dùng
-                // Hoặc chúng ta có thể chủ động reset state ở đây nếu cần
-            }
+            hintEl.textContent = hint;
         }
 
         if (checkbox.checked) {
@@ -408,6 +409,7 @@ function renderSupplementaryProductsForPerson(person, state) {
         }
     });
 }
+
 
 function renderSummary(state) {
     const { fees, paymentFrequency } = state;
@@ -445,8 +447,6 @@ function updateSupplementaryAddButtonState(state) {
 }
 
 function generateBaseSupplementaryHtml() {
-    // This function creates the initial HTML for supplementary product sections.
-    // It's called once per person to populate their supplementary product container.
     return CONFIG.supplementaryProducts.map(prod => {
         let optionsHtml = '';
         if (prod.id === 'health_scl') {
@@ -478,12 +478,10 @@ function runWorkflow() {
 
 function attachGlobalListeners() {
     const body = document.body;
-
     body.addEventListener('change', e => {
         const target = e.target;
         const personContainer = target.closest('.person-container');
         const personId = personContainer?.id;
-
         if (target.id === 'main-product') updateMainProduct({ key: target.value });
         else if (target.id === 'payment-frequency') { appState.paymentFrequency = target.value; runWorkflow(); }
         else if (target.id === 'abuv-term') updateMainProduct({ abuvTerm: target.value });
@@ -534,7 +532,6 @@ function attachGlobalListeners() {
         const target = e.target;
         if (target.id === 'add-supp-insured-btn') addSupplementaryPerson();
         if (target.classList.contains('remove-supp-btn')) removeSupplementaryPerson(target.closest('.person-container').id);
-        
         if (target.dataset.action === 'select-occupation') {
             const personId = target.closest('.person-container').id;
             const occupationName = target.dataset.name;
@@ -562,3 +559,8 @@ document.addEventListener('DOMContentLoaded', () => {
     attachGlobalListeners();
     runWorkflow();
 });
+
+// Mock MDP3 object để tương thích
+window.MDP3 = {
+    reset: () => { console.log("MDP3 Reset"); }
+};
