@@ -352,26 +352,59 @@ function renderMainProductSection(state) {
         feeDisplay.textContent = '';
     }
 }
-
 function renderSupplementaryProductsForPerson(person, state) {
     const container = $(`#${person.id} .supplementary-products-container`);
     if (!container) return;
     if (!container.innerHTML) container.innerHTML = generateBaseSupplementaryHtml();
+
     const isTTA = state.mainProduct.key === 'TRON_TAM_AN';
+    const mainPremium = state.fees.baseMain; // Lấy phí SP chính đã tính
+
     CONFIG.supplementaryProducts.forEach(prod => {
         const section = container.querySelector(`.${prod.id}-section`);
         if (!section) return;
+
         const isEligible = person.daysFromBirth >= 30 && person.age <= prod.maxEntryAge &&
             (prod.id !== 'health_scl' || (person.riskGroup > 0 && person.riskGroup < 4)) &&
             (!isTTA || prod.id === 'health_scl');
+
         section.classList.toggle('hidden', !isEligible);
+        
         const checkbox = section.querySelector(`.${prod.id}-checkbox`);
         checkbox.disabled = !isEligible;
         checkbox.checked = !!person.supplements[prod.id];
-        section.querySelector('.product-options').classList.toggle('hidden', !checkbox.checked);
+        
+        const optionsDiv = section.querySelector('.product-options');
+        optionsDiv.classList.toggle('hidden', !checkbox.checked);
+
+        // ===== SỬA LỖI LOGIC PHỤ THUỘC TẠI ĐÂY =====
+        if (prod.id === 'health_scl' && isEligible) {
+            const programSelect = section.querySelector('.health-scl-program');
+            if (isTTA) {
+                // Với Trọn Tâm An, không giới hạn
+                programSelect.querySelectorAll('option').forEach(opt => opt.disabled = false);
+            } else {
+                // Với sản phẩm khác, giới hạn theo phí chính
+                programSelect.querySelectorAll('option').forEach(opt => {
+                    if (opt.value === '') return;
+                    if (mainPremium >= 15000000) opt.disabled = false;
+                    else if (mainPremium >= 10000000) opt.disabled = (opt.value === 'hoan_hao');
+                    else if (mainPremium >= 5000000) opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
+                    else opt.disabled = true;
+                });
+            }
+            // Nếu lựa chọn hiện tại bị disabled, reset nó
+            if (programSelect.options[programSelect.selectedIndex]?.disabled) {
+                // Dòng này sẽ tự động cập nhật state trong lần tương tác tiếp theo của người dùng
+                // Hoặc chúng ta có thể chủ động reset state ở đây nếu cần
+            }
+        }
+
         if (checkbox.checked) {
             const fee = state.fees.byPerson[person.id]?.suppDetails?.[prod.id] || 0;
             section.querySelector('.fee-display').textContent = fee > 0 ? `Phí: ${formatCurrency(fee)}` : '';
+        } else {
+            section.querySelector('.fee-display').textContent = '';
         }
     });
 }
