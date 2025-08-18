@@ -28,11 +28,7 @@ function initState() {
     appState = {
         mainProduct: { key: '', stbh: 0, premium: 0, paymentTerm: 0, extraPremium: 0, abuvTerm: '' },
         paymentFrequency: 'year',
-        mainPerson: {
-            id: 'main-person-container',
-            container: document.getElementById('main-person-container'),
-            isMain: true, name: '', dob: '', age: 0, daysFromBirth: 0, gender: 'Nam', riskGroup: 0, supplements: {}
-        },
+        mainPerson: { id: 'main-person-container', container: document.getElementById('main-person-container'), isMain: true, name: '', dob: '', age: 0, daysFromBirth: 0, gender: 'Nam', riskGroup: 0, supplements: {} },
         supplementaryPersons: [],
         fees: { baseMain: 0, extra: 0, totalMain: 0, totalSupp: 0, total: 0, byPerson: {} },
     };
@@ -50,6 +46,8 @@ function normalizeProductKey(key) {
     const map = { 'PUL_15_NAM': 'PUL_15NAM', 'PUL_5_NAM': 'PUL_5NAM' };
     return map[key] || key;
 }
+function sanitizeHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');}
+
 
 // ===================================================================================
 // ===== MODULE: DATA COLLECTION
@@ -63,9 +61,7 @@ function updateStateFromUI() {
     appState.mainProduct.abuvTerm = document.getElementById('abuv-term')?.value || '';
     appState.paymentFrequency = document.getElementById('payment-frequency')?.value || 'year';
     appState.mainPerson = collectPersonData(document.getElementById('main-person-container'), true);
-    appState.supplementaryPersons = Array.from(
-        document.querySelectorAll('#supplementary-insured-container .person-container')
-    ).map(container => collectPersonData(container, false));
+    appState.supplementaryPersons = Array.from(document.querySelectorAll('#supplementary-insured-container .person-container')).map(container => collectPersonData(container, false));
 }
 
 function collectPersonData(container, isMain) {
@@ -135,9 +131,19 @@ function performCalculations(state) {
         fees.byPerson[person.id].supp = personSuppFee;
         fees.totalSupp += personSuppFee;
     });
-    const totalMain = fees.baseMain + fees.extra;
-    const total = totalMain + fees.totalSupp;
-    return { ...fees, totalMain, total };
+    // Add MDP3 fee
+    if (window.MDP3 && MDP3.isEnabled()) {
+        const mdp3Fee = MDP3.getPremium();
+        fees.totalSupp += mdp3Fee;
+        const mdpTargetId = MDP3.getSelectedId();
+        if (mdpTargetId && fees.byPerson[mdpTargetId]) {
+            fees.byPerson[mdpTargetId].supp += mdp3Fee;
+            fees.byPerson[mdpTargetId].suppDetails.mdp3 = mdp3Fee;
+        }
+    }
+    fees.totalMain = fees.baseMain + fees.extra;
+    fees.total = fees.totalMain + fees.totalSupp;
+    return fees;
 }
 
 function calculateMainPremium(customer, productInfo) {
@@ -290,9 +296,11 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
     if (config.minStbh && stbh > 0 && stbh < config.minStbh) { setFieldError(input, `Tối thiểu ${formatCurrency(config.minStbh)}`); ok = false; }
     else if (config.maxStbh && stbh > config.maxStbh) { setFieldError(input, `Tối đa ${formatCurrency(config.maxStbh)}`); ok = false; }
     else if (prodId === 'hospital_support' && stbh > 0) {
+        const validationEl = section.querySelector('.hospital-support-validation');
         const maxSupportTotal = mainPremium > 0 ? Math.floor(mainPremium / 4000000) * 100000 : 0;
         const maxByAge = person.age >= 18 ? config.maxStbhByAge.from18 : config.maxStbhByAge.under18;
         const remaining = maxSupportTotal - totalHospitalSupportStbh;
+        if(validationEl) validationEl.textContent = `Tối đa: ${formatCurrency(Math.min(maxByAge, remaining), 'đ/ngày')}. Phải là bội số của 100.000.`;
         if (stbh % CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE !== 0) { setFieldError(input, `Là bội số của ${formatCurrency(CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE)}`); ok = false; }
         else if (stbh > maxByAge || stbh > remaining) { setFieldError(input, 'Vượt quá giới hạn cho phép'); ok = false; }
         else { clearFieldError(input); }
@@ -303,7 +311,7 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
 function validateDobField(input) {
     if (!input) return true;
     const v = (input.value || '').trim();
-    if (!v) { clearFieldError(input); return true; }
+    if (!v) { clearFieldError(input); return true; } // Allow empty field, but clear error
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(v)) { setFieldError(input, 'Nhập DD/MM/YYYY'); return false; }
     const [dd, mm, yyyy] = v.split('/').map(n => parseInt(n, 10));
     const d = new Date(yyyy, mm - 1, dd);
@@ -317,23 +325,23 @@ function setFieldError(input, message) {
     if (!input) return;
     const parent = input.parentElement;
     let err = parent.querySelector('.field-error');
-    if (!err) {
+    if (!err && message) {
         err = document.createElement('p');
         err.className = 'field-error text-sm text-red-600 mt-1';
         parent.appendChild(err);
     }
-    err.textContent = message || '';
+    if (err) err.textContent = message || '';
     input.classList.toggle('border-red-500', !!message);
+    if (!message && err) err.remove();
 }
 
 function clearFieldError(input) { if(input) setFieldError(input, ''); }
-function clearAllErrors() { document.querySelectorAll('.field-error').forEach(el => el.textContent = ''); document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500')); }
+function clearAllErrors() { document.querySelectorAll('.field-error').forEach(el => el.remove()); document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500')); }
 
 // ===================================================================================
-// ===== MODULE: UI (From original file)
+// ===== MODULE: UI
 // ===================================================================================
 function renderUI() {
-    // This is the main render function that updates the entire UI based on appState
     const allPersons = [appState.mainPerson, ...appState.supplementaryPersons].filter(p => p);
     allPersons.forEach(p => {
         if (p.container) {
@@ -341,25 +349,20 @@ function renderUI() {
             p.container.querySelector('.risk-group-span').textContent = p.riskGroup > 0 ? p.riskGroup : '...';
         }
     });
-    
     renderMainProductSection(appState.mainPerson, appState.mainProduct.key);
-    
     allPersons.forEach(p => {
         const suppContainer = p.isMain ? document.querySelector('#main-supp-container .supplementary-products-container') : p.container.querySelector('.supplementary-products-container');
         if (suppContainer) {
             renderSupplementaryProductsForPerson(p, appState.mainProduct.key, appState.fees.baseMain, suppContainer);
         }
     });
-
-    // Run validation AFTER rendering potential new fields
     const isValid = runAllValidations(appState);
-
     const { fees } = appState;
     const summaryTotalEl = document.getElementById('summary-total');
     const mainFeeEl = document.getElementById('main-insured-main-fee');
     const extraFeeEl = document.getElementById('main-insured-extra-fee');
     const suppFeeEl = document.getElementById('summary-supp-fee');
-    
+
     if (!isValid) {
         if (summaryTotalEl) summaryTotalEl.textContent = "0";
         if (mainFeeEl) mainFeeEl.textContent = "0";
@@ -368,12 +371,10 @@ function renderUI() {
         updateMainProductFeeDisplay(0, 0);
         return;
     }
-
     if (summaryTotalEl) summaryTotalEl.textContent = formatCurrency(fees.total);
     if (mainFeeEl) mainFeeEl.textContent = formatCurrency(fees.baseMain);
     if (extraFeeEl) extraFeeEl.textContent = formatCurrency(fees.extra);
     if (suppFeeEl) suppFeeEl.textContent = formatCurrency(fees.totalSupp);
-
     updateMainProductFeeDisplay(fees.baseMain, fees.extra);
     updatePaymentFrequencyOptions(fees.baseMain);
 }
@@ -404,19 +405,18 @@ function renderMainProductSection(customer, mainProductKey) {
     const container = document.getElementById('main-product-options');
     container.innerHTML = '';
     if (!mainProductKey) return;
+    const currentStbh = document.getElementById('main-stbh')?.value || '';
+    const currentPremium = document.getElementById('main-premium-input')?.value || '';
+    const currentPaymentTerm = document.getElementById('payment-term')?.value || '';
+    const currentExtra = document.getElementById('extra-premium-input')?.value || '';
     let optionsHtml = '';
-    // This part generates the dynamic options for the main product. It is extensive and kept from the original.
-    // ... (logic for generating optionsHtml based on mainProductKey)
-    const currentStbh = formatCurrency(appState.mainProduct.stbh) === '0' ? '' : formatCurrency(appState.mainProduct.stbh);
-    const currentPremium = formatCurrency(appState.mainProduct.premium) === '0' ? '' : formatCurrency(appState.mainProduct.premium);
-    const currentExtra = formatCurrency(appState.mainProduct.extraPremium) === '0' ? '' : formatCurrency(appState.mainProduct.extraPremium);
     if (mainProductKey === 'TRON_TAM_AN') {
-        optionsHtml = `<div><label class="font-medium">STBH</label><input type="text" class="form-input bg-gray-100" value="100.000.000" disabled></div><div><p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí: 10 năm. Thời gian bảo vệ: 10 năm.</p></div>`;
+        optionsHtml = `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input bg-gray-100" value="100.000.000" disabled></div><div><p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí: 10 năm. Thời gian bảo vệ: 10 năm.</p></div>`;
     } else if (mainProductKey === 'AN_BINH_UU_VIET') {
         let termOptions = '';
-        if (customer.age <= 55) termOptions += `<option value="15" ${appState.mainProduct.abuvTerm === '15' ? 'selected' : ''}>15 năm</option>`;
-        if (customer.age <= 60) termOptions += `<option value="10" ${appState.mainProduct.abuvTerm === '10' ? 'selected' : ''}>10 năm</option>`;
-        if (customer.age <= 65) termOptions += `<option value="5" ${appState.mainProduct.abuvTerm === '5' ? 'selected' : ''}>5 năm</option>`;
+        if (customer.age <= 55) termOptions += '<option value="15">15 năm</option>';
+        if (customer.age <= 60) termOptions += '<option value="10">10 năm</option>';
+        if (customer.age <= 65) termOptions += '<option value="5">5 năm</option>';
         optionsHtml = `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input" value="${currentStbh}" placeholder="VD: 1.000.000.000"></div><div><label class="font-medium">Thời hạn đóng phí</label><select id="abuv-term" class="form-select"><option value="">-- Chọn --</option>${termOptions}</select></div>`;
     } else if (['PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProductKey)) {
         optionsHtml = `<div><label class="font-medium">STBH</label><input type="text" id="main-stbh" class="form-input" value="${currentStbh}" placeholder="VD: 1.000.000.000"></div>`;
@@ -425,7 +425,7 @@ function renderMainProductSection(customer, mainProductKey) {
         }
         const bounds = getPaymentTermBounds(customer.age);
         const minTerm = mainProductKey === 'PUL_5_NAM' ? 5 : (mainProductKey === 'PUL_15_NAM' ? 15 : 4);
-        optionsHtml += `<div><label class="font-medium">Thời gian đóng phí (năm)</label><input type="number" id="payment-term" class="form-input" value="${appState.mainProduct.paymentTerm || ''}" placeholder="VD: 20" min="${minTerm}" max="${bounds.max}"><div id="payment-term-hint" class="text-sm text-gray-500 mt-1">Nhập từ ${minTerm} đến ${bounds.max} năm.</div></div>`;
+        optionsHtml += `<div><label class="font-medium">Thời gian đóng phí (năm)</label><input type="number" id="payment-term" class="form-input" value="${currentPaymentTerm}" placeholder="VD: 20" min="${minTerm}" max="${bounds.max}"><div id="payment-term-hint" class="text-sm text-gray-500 mt-1">Nhập từ ${minTerm} đến ${bounds.max} năm.</div></div>`;
         optionsHtml += `<div><label class="font-medium">Phí đóng thêm</label><input type="text" id="extra-premium-input" class="form-input" value="${currentExtra}" placeholder="VD: 10.000.000"><div class="text-sm text-gray-500 mt-1">Tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí chính.</div></div>`;
     }
     container.innerHTML = optionsHtml;
@@ -451,7 +451,7 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
-        if(programSelect) {
+        if (programSelect) {
             programSelect.querySelectorAll('option').forEach(opt => {
                 if (opt.value === '') return;
                 if (isTTA || mainPremium >= 15000000) opt.disabled = false;
@@ -468,11 +468,7 @@ function updateMainProductFeeDisplay(basePremium, extraPremium) {
     const el = document.getElementById('main-product-fee-display');
     if (!el) return;
     if (basePremium <= 0 && extraPremium <= 0) { el.textContent = ''; return; }
-    if (extraPremium > 0) {
-        el.textContent = `Phí SP chính: ${formatCurrency(basePremium)} | Phí đóng thêm: ${formatCurrency(extraPremium)}`;
-    } else {
-        el.textContent = `Phí SP chính: ${formatCurrency(basePremium)}`;
-    }
+    el.textContent = extraPremium > 0 ? `Phí SP chính: ${formatCurrency(basePremium)} | Phí đóng thêm: ${formatCurrency(extraPremium)}` : `Phí SP chính: ${formatCurrency(basePremium)}`;
 }
 
 function updatePaymentFrequencyOptions(baseMainAnnual) {
@@ -508,16 +504,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function attachGlobalListeners() {
-    document.body.addEventListener('change', () => runWorkflow());
-    document.body.addEventListener('input', (e) => {
-        // Real-time formatting on input is removed to improve user experience
-        // Auto-formatting now happens on 'focusout' (blur) event
-        if (e.target.classList.contains('occupation-input') || e.target.id === 'main-product') {
-            runWorkflow(); // Only run for autocomplete and product changes
+    document.body.addEventListener('change', runWorkflow);
+    document.body.addEventListener('input', e => {
+        if (e.target.matches('input[type="text"]') && !e.target.classList.contains('dob-input') && !e.target.classList.contains('name-input') && !e.target.classList.contains('occupation-input')) {
+            formatNumberInput(e.target);
         }
+        runWorkflow();
     });
-    document.body.addEventListener('focusout', (e) => {
-        if (e.target.matches('input[type="text"]') && !e.target.classList.contains('name-input')) {
+    document.body.addEventListener('focusout', e => {
+        if (e.target.matches('input[type="text"]')) {
             roundInputToThousand(e.target);
             runWorkflow();
         }
@@ -637,11 +632,26 @@ function roundInputToThousand(input) {
     if (!input || input.classList.contains('dob-input') || input.classList.contains('occupation-input') || input.classList.contains('name-input')) return;
     const raw = parseFormattedNumber(input.value || '');
     if (!raw) { input.value = ''; return; }
-    if (input.classList.contains('hospital_support-stbh')) {
+    if (input.classList.contains('hospital-support-stbh')) {
         const rounded = Math.round(raw / CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE) * CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE;
         input.value = formatCurrency(rounded);
     } else {
         const rounded = roundDownTo1000(raw);
         input.value = formatCurrency(rounded);
+    }
+}
+function formatNumberInput(input) {
+    if (!input || !input.value) return;
+    const value = input.value.replace(/[.,]/g, '');
+    if (!isNaN(value) && value.length > 0) {
+        // Giữ nguyên con trỏ chuột
+        const start = input.selectionStart;
+        const oldLength = input.value.length;
+        const formatted = parseInt(value, 10).toLocaleString('vi-VN');
+        input.value = formatted;
+        const newLength = formatted.length;
+        input.selectionStart = input.selectionEnd = start + (newLength - oldLength);
+    } else if (input.value !== '') {
+        input.value = '';
     }
 }
