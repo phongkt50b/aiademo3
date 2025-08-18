@@ -425,6 +425,7 @@ function runWorkflow() {
 function attachGlobalListeners() {
     const body = document.body;
 
+    // SỰ KIỆN KHI THAY ĐỔI LỰA CHỌN (VD: dropdown, checkbox)
     body.addEventListener('change', e => {
         const target = e.target;
         const personContainer = target.closest('.person-container');
@@ -444,29 +445,34 @@ function attachGlobalListeners() {
         }
     });
 
+    // SỰ KIỆN KHI NHẬP LIỆU (VD: gõ chữ, gõ số)
     body.addEventListener('input', e => {
         const target = e.target;
-        
-        // SỬA LỖI 1: Tự động định dạng ngày tháng
+
+        // ===== SỬA LỖI 1: TỰ ĐỘNG ĐỊNH DẠNG NGÀY THÁNG =====
         if (target.classList.contains('dob-input')) {
             let value = target.value.replace(/\D/g, '');
             if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
             if (value.length > 5) value = `${value.slice(0, 5)}/${value.slice(5, 9)}`;
             target.value = value.slice(0, 10);
-            return; // Dừng lại để không chạy debounce
+            return; // Dừng lại, không xử lý gì thêm cho ô ngày sinh
         }
-        
-        // SỬA LỖI 2: Hiển thị danh sách nghề nghiệp
+
+        // ===== SỬA LỖI 2: HIỂN THỊ DANH SÁCH GỢI Ý NGHỀ NGHIỆP =====
         if (target.classList.contains('occupation-input')) {
             const list = target.nextElementSibling;
             const value = target.value.toLowerCase();
-            if (value.length < 2) { list.classList.add('hidden'); return; }
+            if (value.length < 2) {
+                list.classList.add('hidden');
+                return;
+            }
             const filtered = product_data.occupations.filter(o => o.name.toLowerCase().includes(value));
             list.innerHTML = filtered.map(o => `<div class="p-2 hover:bg-gray-100 cursor-pointer" data-action="select-occupation" data-name="${o.name}" data-group="${o.group}">${o.name} (Nhóm ${o.group})</div>`).join('');
             list.classList.remove('hidden');
             return;
         }
 
+        // Xử lý debounce cho các ô nhập số tiền/thời hạn
         clearTimeout(target.debounce);
         target.debounce = setTimeout(() => {
             const value = target.type === 'number' ? parseInt(target.value, 10) || 0 : target.value;
@@ -481,41 +487,40 @@ function attachGlobalListeners() {
         }, 400);
     });
     
+    // SỰ KIỆN KHI BẤM CHUỘT
     body.addEventListener('click', e => {
         const target = e.target;
         if (target.id === 'add-supp-insured-btn') addSupplementaryPerson();
         if (target.classList.contains('remove-supp-btn')) removeSupplementaryPerson(target.closest('.person-container').id);
         
-        // SỬA LỖI 2: Xử lý chọn nghề nghiệp
+        // ===== SỬA LỖI 2: XỬ LÝ KHI CHỌN NGHỀ NGHIỆP TỪ DANH SÁCH =====
         if (target.dataset.action === 'select-occupation') {
             const personId = target.closest('.person-container').id;
             const occupationName = target.dataset.name;
             const riskGroup = parseInt(target.dataset.group, 10);
             
-            // Cập nhật state
+            // Cập nhật state (dữ liệu nền)
             updatePerson(personId, { occupationName, riskGroup });
 
-            // Cập nhật UI ngay lập tức để người dùng thấy
+            // Cập nhật giao diện ngay lập tức để người dùng thấy
             const input = target.closest('.relative').querySelector('.occupation-input');
-            input.value = occupationName;
-            target.parentElement.classList.add('hidden');
+            input.value = occupationName; // Hiển thị tên nghề nghiệp đã chọn
+            target.parentElement.classList.add('hidden'); // Ẩn danh sách gợi ý đi
         }
 
+        // Xử lý các nút bấm khác
         if (target.id === 'view-summary-btn') {
             const errorEl = $('#error-message');
             errorEl.textContent = ''; // Xóa lỗi cũ
             try {
-                // Tạm thời chưa có logic này, sẽ báo lỗi nếu cố chạy
-                // generateSummaryTableV2(); 
                 alert("Chức năng 'Xem Bảng Minh Họa Chi Tiết' đang được phát triển.");
             } catch (err) {
-                errorEl.textContent = `Lỗi khi tạo bảng minh họa: ${err.message}`;
+                errorEl.textContent = `Lỗi: ${err.message}`;
             }
         }
         if (target.id === 'close-summary-modal-btn') { $('#summary-modal').classList.add('hidden'); }
     });
 }
-
 document.addEventListener('DOMContentLoaded', () => {
     appState = createInitialState();
     attachGlobalListeners();
