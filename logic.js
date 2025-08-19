@@ -639,7 +639,7 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             Array.from(programSelect.options).forEach(opt => opt.disabled = false);
         } else {
             programSelect.querySelectorAll('option').forEach(opt => {
-                if (opt.value === '') return;
+                if (opt.value === 'nang_cao') return;
                 if (mainPremium >= 15000000) opt.disabled = false;
                 else if (mainPremium >= 10000000) opt.disabled = !['co_ban', 'nang_cao', 'toan_dien'].includes(opt.value);
                 else if (mainPremium >= 5000000) opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
