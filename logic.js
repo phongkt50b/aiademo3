@@ -557,7 +557,7 @@ function renderMainProductSection(customer, mainProductKey) {
           <select id="abuv-term" class="form-select"><option value="" selected>-- Chọn --</option>${termOptions}</select>
           <p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí bằng thời hạn hợp đồng.</p>
         </div>`;
-    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM'].includes(mainProductKey)) {
+    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProductKey)) {
       optionsHtml = `
         <div>
           <label for="main-stbh" class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH) <span class="text-red-600">*</span></label>
@@ -574,7 +574,7 @@ function renderMainProductSection(customer, mainProductKey) {
       optionsHtml += `
         <div>
           <label for="payment-term" class="font-medium text-gray-700 block mb-1">Thời gian đóng phí (năm) <span class="text-red-600">*</span></label>
-          <input type="number" id="payment-term" class="form-input" value="${currentPaymentTerm}" placeholder="VD: 20" min="${mainProductKey === 'PUL_5_NAM' ? 5 : mainProductKey === 'PUL_15_NAM' ? 15 : 4}" max="${100 - customer.age - 1}">
+          <input type="number" id="payment-term" class="form-input" value="${currentPaymentTerm}" placeholder="VD: 20" min="${mainProductKey === 'PUL_5NAM' ? 5 : mainProductKey === 'PUL_15NAM' ? 15 : 4}" max="${100 - customer.age - 1}">
           <div id="payment-term-hint" class="text-sm text-gray-500 mt-1"></div>
         </div>`;
       optionsHtml += `
@@ -587,7 +587,7 @@ function renderMainProductSection(customer, mainProductKey) {
     
     container.innerHTML = optionsHtml;
     
-    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM'].includes(mainProductKey)) {
+    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProductKey)) {
       setPaymentTermHint(mainProductKey, customer.age);
     }
     attachTermListenersForTargetAge();
@@ -597,7 +597,7 @@ function renderMainProductSection(customer, mainProductKey) {
 function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container) {
     const { age, riskGroup, daysFromBirth } = customer;
     
-    const isBaseProduct = ['PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'AN_BINH_UU_VIET', 'TRON_TAM_AN'].includes(mainProductKey);
+    const isBaseProduct = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'AN_BINH_UU_VIET', 'TRON_TAM_AN'].includes(mainProductKey);
     const isTTA = mainProductKey === 'TRON_TAM_AN';
 
     CONFIG.supplementaryProducts.forEach(prod => {
@@ -827,7 +827,7 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
         } else {
             clearFieldError(abuvTermEl);
         }
-    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM'].includes(mainProduct)) {
+    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProduct)) {
         const v = parseInt(termEl?.value || "0", 10);
         const maxTerm = bounds.max;
         if (!(v >= minTerm && v <= maxTerm)) {
@@ -1292,8 +1292,8 @@ function setPaymentTermHint(mainProduct, age) {
   if (!hintEl) return;
   const { max } = getPaymentTermBounds(age);
   let min = 4;
-  if (mainProduct === 'PUL_5_NAM') min = 5;
-  if (mainProduct === 'PUL_15_NAM') min = 15;
+  if (mainProduct === 'PUL_5NAM') min = 5;
+  if (mainProduct === 'PUL_15NAM') min = 15;
   hintEl.textContent = `Nhập từ ${min} đến ${max} năm`;
 }
 
@@ -1633,8 +1633,8 @@ function generateSummaryTable() {
     const minByKey = (k)=>{
       if (k === 'TRON_TAM_AN') return 10;
       if (k === 'AN_BINH_UU_VIET') return 5;
-      if (k === 'PUL_5_NAM') return 5;
-      if (k === 'PUL_15_NAM') return 15;
+      if (k === 'PUL_5NAM') return 5;
+      if (k === 'PUL_15NAM') return 15;
       return 4;
     };
     const minTerm = minByKey(productKey);
