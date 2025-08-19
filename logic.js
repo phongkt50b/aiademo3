@@ -1101,7 +1101,7 @@ function generateSupplementaryProductsHtml() {
                 <label class="font-medium text-gray-700 block mb-1">Quyền lợi chính</label>
                 <select class="form-select health-scl-program">
                   <option value="co_ban">Cơ bản</option>
-                  <option value="nang_cao">Nâng cao</option>
+                  <option value="nang_cao" selected>Nâng cao</option>
                   <option value="toan_dien">Toàn diện</option>
                   <option value="hoan_hao">Hoàn hảo</option>
                 </select>
