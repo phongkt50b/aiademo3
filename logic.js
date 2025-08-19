@@ -499,7 +499,7 @@ function renderMainProductSection(customer, mainProductKey) {
         if (!productKey) return;
         let isEligible = true;
         const { age, daysFromBirth, gender, riskGroup } = customer;
-        const PUL_MUL = ['PUL_TRON_DOI', 'PUL_15_NAM', 'PUL_5_NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'];
+        const PUL_MUL = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'];
         if (PUL_MUL.includes(productKey)) {
             isEligible = (daysFromBirth >= 30) && (age <= 70);
         } else if (productKey === 'TRON_TAM_AN') {
