@@ -1909,26 +1909,48 @@ function generateSummaryTable() {
     });
   
 }
-
-
-
-
-
-
 function renderSuppList(){
   const box = document.getElementById('supp-insured-summaries');
   if (!box) return;
+
+  // Thu thập lại người
   const persons = [];
   const main = collectPersonData(document.getElementById('main-person-container'), true);
   if (main) persons.push(main);
   document.querySelectorAll('#supplementary-insured-container .person-container').forEach(c=>{
-    const p = collectPersonData(c,false); if (p) persons.push(p);
+    const p = collectPersonData(c,false); 
+    if (p) persons.push(p);
   });
-  const feesMap = (window.personFees)||{};
-  box.innerHTML = persons.map(p=>{
-    const f = feesMap[p.id] || { total: 0 };
-    return `<div class="flex justify-between"><span>${sanitizeHtml(p.name||'Người')}</span><span>${formatDisplayCurrency(f.total||0)}</span></div>`;
-  }).join('');
+
+  const feesMap   = (window.personFees)||{};
+  const mdpEnabled = window.MDP3 && MDP3.isEnabled && MDP3.isEnabled();
+  const mdpTargetId = mdpEnabled ? (MDP3.getSelectedId && MDP3.getSelectedId()) : null;
+  const mdpFee = (mdpEnabled && window.MDP3 && MDP3.getPremium) ? MDP3.getPremium() : 0;
+
+  const rows = persons.map(p=>{
+    const f = feesMap[p.id] || { main:0, supp:0 };
+    const suppOnly = f.supp || 0;
+    return `<div class="flex justify-between">
+              <span>${sanitizeHtml(p.name || (p.isMain ? 'NĐBH chính':'Người'))}</span>
+              <span>${formatDisplayCurrency(suppOnly)}</span>
+            </div>`;
+  });
+
+  // Nếu MDP3 chọn "other" => thêm mục riêng
+  if (mdpEnabled && mdpTargetId === 'other' && mdpFee > 0) {
+    const form = document.getElementById('person-container-mdp3-other');
+    let nameOther = 'Người được miễn đóng phí';
+    if (form) {
+      const info = collectPersonData(form, false);
+      if (info && info.name) nameOther = info.name;
+    }
+    rows.push(`<div class="flex justify-between">
+        <span>${sanitizeHtml(nameOther)}</span>
+        <span>${formatDisplayCurrency(mdpFee)}</span>
+      </div>`);
+  }
+
+  box.innerHTML = rows.join('');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
