@@ -938,63 +938,6 @@ function validatePerson(person) {
 }
 
 // Override runAllValidations để validate all persons
-function runAllValidations(state) {
-    clearAllErrors();
-    let isValid = true;
-
-    // Validate main person
-    if (!validatePerson(state.mainPerson)) isValid = false;
-
-    // Validate supplementary
-    state.supplementaryPersons.forEach(p => {
-        if (!validatePerson(p)) isValid = false;
-    });
-
-    // Validate MDP3 other
-    if (state.mdp3.selectedId === 'other' && state.mdp3.otherPerson) {
-        if (!validatePerson(state.mdp3.otherPerson)) isValid = false;
-        if (state.mdp3.otherPerson.age < 18 || state.mdp3.otherPerson.age > 60) {
-            setError('mdp3-other-dob', 'Tuổi phải từ 18 đến 60');
-            isValid = false;
-        }
-    }
-
-    // Validate main product specifics (giữ nguyên từ trước)
-    const { key, stbh, premium, paymentTerm, abuvTerm } = state.mainProduct;
-    if (!key) {
-        setError('main-product', 'Chọn sản phẩm chính');
-        isValid = false;
-    }
-    if (['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'AN_BINH_UU_VIET'].includes(key) && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-        setError('main-stbh', `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH)}`);
-        isValid = false;
-    }
-    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(key) && premium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
-        setError('main-premium-input', `Phí tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM)}`);
-        isValid = false;
-    }
-    if (key === 'AN_BINH_UU_VIET' && !abuvTerm) {
-        setError('abuv-term', 'Chọn thời hạn');
-        isValid = false;
-    }
-    if (!['TRON_TAM_AN', 'AN_BINH_UU_VIET'].includes(key) && paymentTerm === 0) {
-        setError('payment-term', 'Nhập thời hạn đóng phí');
-        isValid = false;
-    }
-
-    // Validate extra premium
-    if (state.mainProduct.extraPremium > state.fees.baseMain * CONFIG.EXTRA_PREMIUM_MAX_FACTOR) {
-        setError('extra-premium-input', `Phí extra tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí cơ bản`);
-        isValid = false;
-    }
-
-    // Validate supplementary per product (ví dụ: STBH min/max)
-    CONFIG.supplementaryProducts.forEach(prod => {
-        // Logic validate STBH cho từng prod (giữ nguyên hoặc thêm)
-    });
-
-    return isValid;
-}
 
 // ===================================================================================
 // ===== END OF SCRIPT
