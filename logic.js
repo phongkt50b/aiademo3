@@ -273,11 +273,10 @@ function performCalculations(state) {
     allPersons.forEach(person => {
         let personSuppFee = 0;
         CONFIG.supplementaryProducts.forEach(prod => {
-             if (person.supplements[prod.id]) {
+            if (person.supplements[prod.id]) {
                 const fee = prod.calculationFunc(person, fees.baseMain, totalHospitalSupportStbh);
                 personSuppFee += fee;
                 fees.byPerson[person.id].suppDetails[prod.id] = fee;
-
                 if (prod.id === 'hospital_support') {
                     totalHospitalSupportStbh += person.supplements[prod.id].stbh;
                 }
@@ -287,6 +286,7 @@ function performCalculations(state) {
         fees.totalSupp += personSuppFee;
     });
 
+    // Tạo personFees (chưa có MDP3 ở thời điểm này)
     window.personFees = {};
     allPersons.forEach(p => {
         const totalMainForPerson = p.isMain ? (fees.baseMain + fees.extra) : 0;
@@ -298,29 +298,47 @@ function performCalculations(state) {
         };
     });
 
-    const mdp3Fee = window.MDP3 ? MDP3.getPremium() : 0;
-    fees.totalSupp += mdp3Fee;
-    // assign mdp3 fee to byPerson map (or synthetic 'mdp3_other')
+    // === MDP3 block (đặt SAU khi có window.personFees) ===
     try {
-      const mdpEnabled = !!(window.MDP3 && MDP3.isEnabled && MDP3.isEnabled());
-      const mdpTargetId = mdpEnabled ? (MDP3.getSelectedId && MDP3.getSelectedId()) : null;
-      if (mdpEnabled && mdp3Fee > 0) {
-        if (mdpTargetId && fees.byPerson[mdpTargetId]) {
-          fees.byPerson[mdpTargetId].supp = (fees.byPerson[mdpTargetId].supp||0) + mdp3Fee;
-          fees.byPerson[mdpTargetId].suppDetails = fees.byPerson[mdpTargetId].suppDetails || {};
-          fees.byPerson[mdpTargetId].suppDetails.mdp3 = mdp3Fee;
-        } else if (mdpTargetId === 'other') {
-          if (!fees.byPerson['mdp3_other']) fees.byPerson['mdp3_other'] = { main: 0, supp: 0, total: 0, suppDetails: {} };
-          fees.byPerson['mdp3_other'].supp += mdp3Fee;
-          fees.byPerson['mdp3_other'].suppDetails.mdp3 = mdp3Fee;
+        const mdpEnabled = !!(window.MDP3 && MDP3.isEnabled && MDP3.isEnabled());
+        const mdpTargetId = mdpEnabled ? (MDP3.getSelectedId && MDP3.getSelectedId()) : null;
+        const mdp3Fee = (mdpEnabled && window.MDP3 && MDP3.getPremium) ? MDP3.getPremium() : 0;
+
+        if (mdpEnabled && mdp3Fee > 0) {
+            fees.totalSupp += mdp3Fee;
+
+            if (mdpTargetId && mdpTargetId !== 'other' && fees.byPerson[mdpTargetId]) {
+                // Cập nhật model gốc
+                fees.byPerson[mdpTargetId].supp += mdp3Fee;
+                fees.byPerson[mdpTargetId].suppDetails.mdp3 = mdp3Fee;
+                // Đồng bộ sang window.personFees để UI đọc đúng
+                if (window.personFees[mdpTargetId]) {
+                    window.personFees[mdpTargetId].supp += mdp3Fee;
+                    window.personFees[mdpTargetId].total += mdp3Fee;
+                }
+            } else if (mdpTargetId === 'other') {
+                // Tạo node riêng
+                if (!fees.byPerson['mdp3_other']) {
+                    fees.byPerson['mdp3_other'] = { main: 0, supp: 0, total: 0, suppDetails: {} };
+                }
+                fees.byPerson['mdp3_other'].supp += mdp3Fee;
+                fees.byPerson['mdp3_other'].suppDetails.mdp3 = mdp3Fee;
+
+                window.personFees['mdp3_other'] = {
+                    main: 0,
+                    mainBase: 0,
+                    supp: fees.byPerson['mdp3_other'].supp,
+                    total: fees.byPerson['mdp3_other'].supp
+                };
+            }
         }
-      }
-    } catch(e) {}
-    
-    
+    } catch (e) {
+        console.warn('[MDP3] tính phí lỗi:', e);
+    }
+
     const totalMain = fees.baseMain + fees.extra;
     const total = totalMain + fees.totalSupp;
-    
+
     return { ...fees, totalMain, total };
 }
 
