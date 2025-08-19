@@ -635,7 +635,6 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             sclSection.querySelector('.product-options')?.classList.remove('hidden');
         }
         // Mặc định 'Nâng cao' nếu chưa chọn
-        if (programSelect && !programSelect.value) programSelect.value = 'nang_cao';
         if (isTTA) {
             Array.from(programSelect.options).forEach(opt => opt.disabled = false);
         } else {
