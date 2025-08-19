@@ -1261,7 +1261,7 @@ function updateTargetAge() {
         targetAgeInput.disabled = true;
     } else if (mainProduct === 'AN_BINH_UU_VIET') {
         const term = parseInt(document.getElementById('abuv-term')?.value || '15', 10);
-        targetAgeInput.value = mainPersonInfo.age + term;
+        targetAgeInput.value = mainPersonInfo.age + term - 1;
         targetAgeInput.disabled = true;
     } else {
         const paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
