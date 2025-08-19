@@ -811,8 +811,8 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     const age = customer?.age || 0;
     const bounds = getPaymentTermBounds(age);
     let minTerm = 4;
-    if (mainProduct === 'PUL_5_NAM') minTerm = 5;
-    if (mainProduct === 'PUL_15_NAM') minTerm = 15;
+    if (mainProduct === 'PUL_5NAM') minTerm = 5;
+    if (mainProduct === 'PUL_15NAM') minTerm = 15;
     if (mainProduct === 'TRON_TAM_AN') minTerm = 10; // cố định (auto), không có input
     if (mainProduct === 'AN_BINH_UU_VIET') {
         // ABƯV: bắt buộc chọn 5/10/15 theo tuổi
