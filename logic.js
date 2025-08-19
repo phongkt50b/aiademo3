@@ -652,13 +652,11 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     }
 }
-
-
-
 function updateSummaryUI(fees) {
   const f = fees || { baseMain:0, extra:0, totalSupp:0, total:0 };
   const fmt = (n)=> formatDisplayCurrency(Math.round((Number(n)||0)/1000)*1000);
-  // Primary figures
+
+  // Các phần chính
   const totalEl = document.getElementById('summary-total');
   const mainEl  = document.getElementById('main-insured-main-fee');
   const extraEl = document.getElementById('main-insured-extra-fee');
@@ -668,35 +666,39 @@ function updateSummaryUI(fees) {
   if (extraEl) extraEl.textContent = fmt(f.extra);
   if (suppEl)  suppEl.textContent  = fmt(f.totalSupp);
 
-  // Frequency breakdown
+  // Kỳ đóng phí
   const freqSel = document.getElementById('payment-frequency');
   const freqBox = document.getElementById('frequency-breakdown');
   const v = freqSel ? freqSel.value : 'year';
   const periods = v==='half' ? 2 : (v==='quarter' ? 4 : 1);
-  const factor  = periods===2 ? 1.02 : (periods===4 ? 1.04 : 1); // only riders
+  const factor  = periods===2 ? 1.02 : (periods===4 ? 1.04 : 1); // rider factor
 
   if (freqBox) freqBox.classList.toggle('hidden', periods===1);
 
-  // Main & extra are baseline — no factor
+  // Phí theo kỳ
   const perMain  = periods===1 ? 0 : Math.round((f.baseMain||0)/periods/1000)*1000;
   const perExtra = periods===1 ? 0 : Math.round((f.extra||0)/periods/1000)*1000;
-  // Riders factor
+  // Riders áp dụng factor
   const perSupp  = periods===1 ? 0 : Math.round(((f.totalSupp||0)*factor)/periods/1000)*1000;
 
   const perTotal = periods===1 ? 0 : (perMain + perExtra + perSupp);
-  const annualEq = periods===1 ? f.total : (perTotal * periods);
-  const diff     = annualEq - f.total;
+  const annualEquivalent = periods===1 ? f.total : (perTotal * periods);         // Tổng quy năm (đã nhân factor riders)
+  const annualOriginal   = f.total;                                              // Tổng năm gốc (chưa nhân factor rider theo kỳ)
+  const diff             = annualEquivalent - annualOriginal;                    // Chênh lệch
 
   const set = (id, val)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(val); };
   set('freq-main', perMain);
   set('freq-extra', perExtra);
   set('freq-supp-total', perSupp);
   set('freq-total-period', perTotal);
-  set('freq-total-year', f.total);
+  set('freq-total-year', annualOriginal);
   set('freq-diff', diff);
+  set('freq-total-year-equivalent', annualEquivalent); // DÒNG MỚI: Tổng quy năm
+
+  // Ẩn dòng nếu là năm (periods===1)
+  const annualEqEl = document.getElementById('freq-total-year-equivalent');
+  if (annualEqEl && periods===1) annualEqEl.textContent = ''; // hoặc giữ nguyên tùy ý
 }
-
-
 function updateMainProductFeeDisplay(basePremium, extraPremium) {
     const el = document.getElementById('main-product-fee-display');
     if (!el) return;
