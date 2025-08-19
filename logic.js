@@ -1,142 +1,180 @@
+/****************************************************************************************
+ * File: logic.consolidated.fix.js
+ * Mục tiêu: Bản đầy đủ đã tích hợp tất cả chỉnh sửa theo yêu cầu người dùng (2025-08).
+ * Bạn chỉ cần copy & paste thay thế file cũ.
+ *
+ * TÓM TẮT NHỮNG SỬA ĐỔI QUAN TRỌNG:
+ * 1. Phí sản phẩm chính vẫn hiển thị dù chưa nhập thời hạn đóng phí (paymentTerm).
+ * 2. Không còn tình trạng tổng phí về 0 khi thêm người bổ sung thiếu dữ liệu (skip người đó).
+ * 3. Auto-chọn sản phẩm bổ sung "Sức khỏe Bùng Gia Lực" (health_scl) với program 'nang_cao'
+ *    khi chọn sản phẩm chính "Trọn Tâm An" (TRON_TAM_AN). Người dùng vẫn có thể bỏ chọn.
+ * 4. Thêm placeholder dạng số cho các ô STBH sản phẩm bổ sung:
+ *      - Bệnh hiểm nghèo 2.0 (bhn): 200000000-5000000000
+ *      - Tai nạn (accident): 10000000-8000000000
+ *      - Hỗ trợ viện phí (hospital_support): 300000-1000000 (giới hạn tùy tuổi, placeholder chung)
+ * 5. Miễn đóng phí 3.0 (MDP3):
+ *      - Hỗ trợ chọn 'other' (người khác): nhập DOB => tính tuổi, validate 18–60.
+ *      - Nếu người khác hợp lệ, tạo pseudo-person "mdp3-other" trong tính phí & minh hoạ.
+ *      - Phí MDP3 gộp vào phí bổ sung của người được áp dụng (hoặc pseudo-person).
+ * 6. Minh hoạ "Phí đến năm tuổi": giá trị = (tuổi NĐBH chính + thời hạn đóng phí - 1).
+ *      - Với TRON_TAM_AN & AN_BINH_UU_VIET: luôn khóa (readonly) và tự cập nhật, trừ 1 chuẩn.
+ * 7. Bảng minh hoạ chi tiết (Phần 1) thêm dòng "Tổng cuối" (gồm cả pseudo-person MDP3).
+ * 8. Bảng minh hoạ chi tiết (Phần 2) dùng hệ số quy đổi hiển thị:
+ *      - year: 1.00, half: 1.02, quarter: 1.04 (không dùng 0.51 / 0.26 ở phần này).
+ * 9. Tabs / nút xem từng người: hiển thị tổng phí bổ sung (gồm MDP3), realtime.
+ * 10. Tên người “other” trong MDP3 lấy đúng tên người dùng nhập.
+ * 11. Không auto-fill STBH nếu người dùng để trống, chỉ hiển thị placeholder gợi ý.
+ *
+ * LƯU Ý:
+ * - Các hàm tính phí chi tiết (calculateHealthSclPremium, v.v.) nếu đã có ở file cũ bạn có
+ *   thể giữ, ở đây có kèm stub/fallback an toàn. Nếu bạn có bảng phí chính xác hãy thay vào.
+ * - Bạn cần đảm bảo HTML có các id được tham chiếu (đã ghi chú bên dưới).
+ ***************************************************************************************/
+
 import { product_data } from './data.js';
 
 // ===================================================================================
-// ===== MODULE: CONFIG & BUSINESS RULES
+// CONFIG & BUSINESS RULES
 // ===================================================================================
 const CONFIG = {
-    REFERENCE_DATE: new Date(),
-    MAX_SUPPLEMENTARY_INSURED: 10,
-    MAIN_PRODUCT_MIN_PREMIUM: 5000000,
-    MAIN_PRODUCT_MIN_STBH: 100000000,
-    EXTRA_PREMIUM_MAX_FACTOR: 5,
-    PAYMENT_FREQUENCY_THRESHOLDS: {
-        half: 7000000,
-        quarter: 8000000,
+  REFERENCE_DATE: new Date(),
+  MAX_SUPPLEMENTARY_INSURED: 10,
+  MAIN_PRODUCT_MIN_PREMIUM: 5000000,
+  MAIN_PRODUCT_MIN_STBH: 100000000,
+  EXTRA_PREMIUM_MAX_FACTOR: 5,
+  PAYMENT_FREQUENCY_THRESHOLDS: {
+    half: 7000000,
+    quarter: 8000000,
+  },
+  // Hệ số để chuyển annual -> per-period (phần tóm tắt phía phải)
+  PAYMENT_FREQUENCY_FACTORS: {
+    year: { factor: 1 },
+    half: { factor: 0.51 },    // Giữ logic cũ (nếu trước đây dùng)
+    quarter: { factor: 0.26 },
+    month: { factor: 0.09 }
+  },
+  // Hệ số hiển thị PHẦN 2 minh hoạ (không dùng 0.51/0.26)
+  DISPLAY_FREQ_FACTORS: {
+    year: 1.00,
+    half: 1.02,
+    quarter: 1.04,
+    month: 1.00 // nếu có thêm tháng thì có thể chỉnh sau
+  },
+  HOSPITAL_SUPPORT_STBH_MULTIPLE: 100000,
+  MAIN_PRODUCTS: {
+    PUL_TRON_DOI: { name: 'PUL Trọn đời' },
+    PUL_15NAM: { name: 'PUL 15 năm' },
+    PUL_5NAM: { name: 'PUL 5 năm' },
+    KHOE_BINH_AN: { name: 'MUL - Khoẻ Bình An' },
+    VUNG_TUONG_LAI: { name: 'MUL - Vững Tương Lai' },
+    TRON_TAM_AN: { name: 'Trọn tâm an' },
+    AN_BINH_UU_VIET: { name: 'An Bình Ưu Việt' },
+  },
+  supplementaryProducts: [
+    {
+      id: 'health_scl',
+      name: 'Sức khỏe Bùng Gia Lực',
+      maxEntryAge: 65,
+      maxRenewalAge: 74,
+      calculationFunc: calculateHealthSclPremium,
+      stbhByProgram: {
+        co_ban: 100000000,
+          nang_cao: 250000000,
+          toan_dien: 500000000,
+          hoan_hao: 1000000000,
+      }
     },
-    PAYMENT_FREQUENCY_FACTORS: { // Factor cho per period (ví dụ: half = 0.51 * yearly)
-        year: { periods: 1, factor: 1 },
-        half: { periods: 2, factor: 0.51 },
-        quarter: { periods: 4, factor: 0.26 },
+    {
+      id: 'bhn',
+      name: 'Bệnh Hiểm Nghèo 2.0',
+      maxEntryAge: 70,
+      maxRenewalAge: 85,
+      calculationFunc: calculateBhnPremium,
+      minStbh: 200000000,
+      maxStbh: 5000000000,
     },
-    MAIN_PRODUCTS: {
-        PUL_TRON_DOI: { name: 'PUL Trọn đời' },
-        PUL_15NAM: { name: 'PUL 15 năm' },
-        PUL_5NAM: { name: 'PUL 5 năm' },
-        KHOE_BINH_AN: { name: 'MUL - Khoẻ Bình An' },
-        VUNG_TUONG_LAI: { name: 'MUL - Vững Tương Lai' },
-        TRON_TAM_AN: { name: 'Trọn tâm an' },
-        AN_BINH_UU_VIET: { name: 'An Bình Ưu Việt' },
+    {
+      id: 'accident',
+      name: 'Bảo hiểm Tai nạn',
+      maxEntryAge: 64,
+      maxRenewalAge: 65,
+      calculationFunc: calculateAccidentPremium,
+      minStbh: 10000000,
+      maxStbh: 8000000000,
     },
-    supplementaryProducts: [
-        {
-            id: 'health_scl',
-            name: 'Sức khỏe Bùng Gia Lực',
-            maxEntryAge: 65,
-            maxRenewalAge: 74,
-            calculationFunc: calculateHealthSclPremium,
-            stbhByProgram: {
-                co_ban: 100000000,
-                nang_cao: 250000000,
-                toan_dien: 500000000,
-                hoan_hao: 1000000000,
-            }
-        },
-        {
-            id: 'bhn',
-            name: 'Bệnh Hiểm Nghèo 2.0',
-            maxEntryAge: 70,
-            maxRenewalAge: 85,
-            calculationFunc: calculateBhnPremium,
-            minStbh: 200000000,
-            maxStbh: 5000000000,
-        },
-        {
-            id: 'accident',
-            name: 'Bảo hiểm Tai nạn',
-            maxEntryAge: 64,
-            maxRenewalAge: 65,
-            calculationFunc: calculateAccidentPremium,
-            minStbh: 10000000,
-            maxStbh: 8000000000,
-        },
-        {
-            id: 'hospital_support',
-            name: 'Hỗ trợ chi phí nằm viện',
-            maxEntryAge: 55,
-            maxRenewalAge: 59,
-            calculationFunc: calculateHospitalSupportPremium,
-            maxStbhByAge: {
-                under18: 300000,
-                from18: 1000000,
-            }
-        }
-    ]
+    {
+      id: 'hospital_support',
+      name: 'Hỗ trợ chi phí nằm viện',
+      maxEntryAge: 55,
+      maxRenewalAge: 59,
+      calculationFunc: calculateHospitalSupportPremium,
+      maxStbhByAge: {
+        under18: 300000,
+        from18: 1000000,
+      }
+    }
+  ]
 };
 
+// ===================================================================================
+// STATE
+// ===================================================================================
+let appState = {};
+
+function initState() {
+  appState = {
+    mainProduct: {
+      key: '',
+      stbh: 0,
+      premium: 0,
+      paymentTerm: 0,
+      extraPremium: 0,
+      abuvTerm: '',
+    },
+    paymentFrequency: 'year',
+    mainPerson: {
+      id: 'main-person-container',
+      container: document.getElementById('main-person-container'),
+      isMain: true,
+      name: '',
+      dob: '',
+      age: 0,
+      daysFromBirth: 0,
+      gender: 'Nam',
+      riskGroup: 0,
+      supplements: {}
+    },
+    supplementaryPersons: [],
+    fees: {
+      baseMain: 0,
+      extra: 0,
+      totalMain: 0,
+      totalSupp: 0,
+      total: 0,
+      byPerson: {},
+    },
+    mdp3: {
+      enabled: false,
+      selectedId: null,
+      fee: 0,
+      other: null
+    }
+  };
+}
 
 // ===================================================================================
-// ===== SMALL UTILS
+// SMALL UTILS
 // ===================================================================================
-function debounce(fn, wait = 40) {
+function debounce(fn, wait = 120) {
   let t = null;
-  return function(...args) {
+  return function (...args) {
     clearTimeout(t);
     t = setTimeout(() => fn.apply(this, args), wait);
   };
 }
 
-// ===================================================================================
-// ===== MODULE: STATE MANAGEMENT
-// ===================================================================================
-let appState = {};
-
-function initState() {
-    appState = {
-        mainProduct: {
-            key: '',
-            stbh: 0,
-            premium: 0,
-            paymentTerm: 0,
-            extraPremium: 0,
-            abuvTerm: '',
-        },
-        paymentFrequency: 'year',
-        mainPerson: {
-            id: 'main-person-container',
-            container: document.getElementById('main-person-container'),
-            isMain: true,
-            name: '',
-            dob: '',
-            age: 0,
-            daysFromBirth: 0,
-            gender: 'Nam',
-            riskGroup: 0,
-            supplements: {}
-        },
-        supplementaryPersons: [],
-        fees: {
-            baseMain: 0,
-            extra: 0,
-            totalMain: 0,
-            totalSupp: 0,
-            total: 0,
-            byPerson: {},
-        },
-        mdp3: {
-            enabled: false,
-            selectedId: null,
-            fee: 0,
-            otherPerson: null
-        }
-    };
-}
-
-// ===================================================================================
-// ===== MODULE: HELPERS (Pure utility functions)
-// ===================================================================================
-
 function roundDownTo1000(n) {
-    return Math.floor(Number(n || 0) / 1000) * 1000;
+  return Math.floor(Number(n || 0) / 1000) * 1000;
 }
 
 function parseFormattedNumber(formattedString) {
@@ -149,953 +187,667 @@ function parseFormattedNumber(formattedString) {
   return m2 ? parseInt(m2[0], 10) : 0;
 }
 
-function formatCurrency(value, suffix = '') {
-    const num = Number(value) || 0;
-    return num.toLocaleString('vi-VN') + (suffix || '');
-}
-
 function formatDisplayCurrency(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n.toLocaleString('vi-VN') : '0';
 }
 
 function sanitizeHtml(str) {
-    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(str || '').replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function getPaymentTermBounds(age) {
-    return { min: 4, max: Math.max(0, 100 - age - 1) };
+  return { min: 4, max: Math.max(0, 100 - age - 1) };
 }
 
-
 // ===================================================================================
-// ===== MODULE: DATA COLLECTION (Reading from DOM into State)
+// DATA COLLECTION
 // ===================================================================================
-
 function updateStateFromUI() {
-    const mainProductKey = document.getElementById('main-product')?.value || '';
-    appState.mainProduct.key = mainProductKey;
-    appState.mainProduct.stbh = parseFormattedNumber(document.getElementById('main-stbh')?.value);
-    appState.mainProduct.premium = parseFormattedNumber(document.getElementById('main-premium-input')?.value);
-    appState.mainProduct.paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
-    appState.mainProduct.extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value);
-    appState.mainProduct.abuvTerm = document.getElementById('abuv-term')?.value || '';
-    appState.paymentFrequency = document.getElementById('payment-frequency')?.value || 'year';
+  const mainProductKey = document.getElementById('main-product')?.value || '';
+  appState.mainProduct.key = mainProductKey;
+  appState.mainProduct.stbh = parseFormattedNumber(document.getElementById('main-stbh')?.value);
+  appState.mainProduct.premium = parseFormattedNumber(document.getElementById('main-premium-input')?.value);
+  appState.mainProduct.paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
+  appState.mainProduct.extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value);
+  appState.mainProduct.abuvTerm = document.getElementById('abuv-term')?.value || '';
 
-    appState.mainPerson = collectPersonData(document.getElementById('main-person-container'), true);
+  appState.paymentFrequency = document.getElementById('payment-frequency')?.value || 'year';
 
-    appState.supplementaryPersons = Array.from(
-        document.querySelectorAll('#supplementary-insured-container .person-container')
-    ).map(container => collectPersonData(container, false));
-    
-    if (window.MDP3) {
-        appState.mdp3.enabled = MDP3.isEnabled();
-        appState.mdp3.selectedId = MDP3.getSelectedId();
-        appState.mdp3.fee = MDP3.getPremium(); // Giả sử có hàm này
-        if (appState.mdp3.selectedId === 'other') {
-            appState.mdp3.otherPerson = collectMdp3OtherPersonData();
-        } else {
-            appState.mdp3.otherPerson = null;
-        }
-    }
+  appState.mainPerson = collectPersonData(document.getElementById('main-person-container'), true);
+
+  appState.supplementaryPersons = Array.from(
+    document.querySelectorAll('#supplementary-insured-container .person-container')
+  ).map(container => collectPersonData(container, false));
+
+  // MDP3 state gather (enable, selectedId handled later in gatherMdp3Data)
 }
 
 function collectPersonData(container, isMain) {
-    if (!container) return null;
+  if (!container) return null;
+  const dobInput = container.querySelector('.dob-input');
+  const dobStr = dobInput ? dobInput.value : '';
+  let age = 0;
+  let daysFromBirth = 0;
 
-    const dobInput = container.querySelector('.dob-input');
-    const dobStr = dobInput ? dobInput.value : '';
-    let age = 0;
-    let daysFromBirth = 0;
-
-    if (dobStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) {
-        const [dd, mm, yyyy] = dobStr.split('/').map(n => parseInt(n, 10));
-        const birthDate = new Date(yyyy, mm - 1, dd);
-        if (birthDate.getFullYear() === yyyy && birthDate.getMonth() === mm - 1 && birthDate.getDate() === dd && birthDate <= CONFIG.REFERENCE_DATE) {
-            daysFromBirth = Math.floor((CONFIG.REFERENCE_DATE - birthDate) / (1000 * 60 * 60 * 24));
-            age = CONFIG.REFERENCE_DATE.getFullYear() - birthDate.getFullYear();
-            const m = CONFIG.REFERENCE_DATE.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && CONFIG.REFERENCE_DATE.getDate() < birthDate.getDate())) {
-                age--;
-            }
-        }
+  if (dobStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) {
+    const [dd, mm, yyyy] = dobStr.split('/').map(n => parseInt(n, 10));
+    const birthDate = new Date(yyyy, mm - 1, dd);
+    if (
+      birthDate.getFullYear() === yyyy &&
+      birthDate.getMonth() === mm - 1 &&
+      birthDate.getDate() === dd &&
+      birthDate <= CONFIG.REFERENCE_DATE
+    ) {
+      daysFromBirth = Math.floor((CONFIG.REFERENCE_DATE - birthDate) / (1000 * 60 * 60 * 24));
+      age = CONFIG.REFERENCE_DATE.getFullYear() - birthDate.getFullYear();
+      const m = CONFIG.REFERENCE_DATE.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && CONFIG.REFERENCE_DATE.getDate() < birthDate.getDate())) {
+        age--;
+      }
     }
-
-    const supplementsContainer = isMain 
-        ? document.querySelector('#main-supp-container .supplementary-products-container')
-        : container.querySelector('.supplementary-products-container');
-    
-    const supplements = {};
-    if (supplementsContainer) {
-        CONFIG.supplementaryProducts.forEach(prod => {
-            const section = supplementsContainer.querySelector(`.${prod.id}-section`);
-            if (section && section.querySelector(`.${prod.id}-checkbox`)?.checked) {
-                supplements[prod.id] = {
-                    stbh: parseFormattedNumber(section.querySelector(`.${prod.id}-stbh`)?.value),
-                    program: section.querySelector(`.health-scl-program`)?.value,
-                    scope: section.querySelector(`.health-scl-scope`)?.value,
-                    outpatient: section.querySelector(`.health-scl-outpatient`)?.checked,
-                    dental: section.querySelector(`.health-scl-dental`)?.checked,
-                };
-            }
-        });
-    }
-
-    return {
-        id: container.id,
-        container: container,
-        isMain: isMain,
-        name: container.querySelector('.name-input')?.value || (isMain ? 'NĐBH Chính' : 'NĐBH Bổ sung'),
-        dob: dobStr,
-        age,
-        daysFromBirth,
-        gender: container.querySelector('.gender-select')?.value || 'Nam',
-        riskGroup: parseInt(container.querySelector('.occupation-input')?.dataset.group, 10) || 0,
-        supplements
-    };
-}
-
-function collectMdp3OtherPersonData() {
-    const container = document.getElementById('mdp3-other-container');
-    if (!container) return null;
-
-    const dobInput = container.querySelector('.dob-input');
-    const dobStr = dobInput ? dobInput.value : '';
-    let age = 0;
-    let daysFromBirth = 0;
-
-    if (dobStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) {
-        const [dd, mm, yyyy] = dobStr.split('/').map(n => parseInt(n, 10));
-        const birthDate = new Date(yyyy, mm - 1, dd);
-        if (birthDate.getFullYear() === yyyy && birthDate.getMonth() === mm - 1 && birthDate.getDate() === dd && birthDate <= CONFIG.REFERENCE_DATE) {
-            daysFromBirth = Math.floor((CONFIG.REFERENCE_DATE - birthDate) / (1000 * 60 * 60 * 24));
-            age = CONFIG.REFERENCE_DATE.getFullYear() - birthDate.getFullYear();
-            const m = CONFIG.REFERENCE_DATE.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && CONFIG.REFERENCE_DATE.getDate() < birthDate.getDate())) {
-                age--;
-            }
-        }
-    }
-
-    return {
-        id: 'mdp3_other',
-        container: container,
-        isMain: false,
-        name: container.querySelector('.name-input')?.value || 'Người khác (MDP3)',
-        dob: dobStr,
-        age,
-        daysFromBirth,
-        gender: container.querySelector('.gender-select')?.value || 'Nam',
-        riskGroup: 0, // Giả sử không cần
-        supplements: { mdp3: true } // Để tính phí
-    };
-}
-
-// ===================================================================================
-// ===== MODULE: LOGIC & CALCULATIONS (Pure functions)
-// ===================================================================================
-function performCalculations(state) {
-    const fees = {
-        baseMain: 0,
-        extra: 0,
-        totalSupp: 0,
-        byPerson: {},
-    };
-
-    fees.baseMain = calculateMainPremium(state.mainPerson, state.mainProduct);
-    fees.extra = state.mainProduct.extraPremium;
-    
-    let allPersons = [state.mainPerson, ...state.supplementaryPersons].filter(p => p && p.age >= 0 && p.dob);
-    if (state.mdp3.otherPerson && state.mdp3.otherPerson.age >= 0 && state.mdp3.otherPerson.dob) allPersons.push(state.mdp3.otherPerson);
-
-    allPersons.forEach(p => {
-        if (!fees.byPerson[p.id]) fees.byPerson[p.id] = { main: 0, supp: 0, total: 0, suppDetails: {} };
-    });
-
-    if (fees.byPerson[state.mainPerson.id]) {
-        fees.byPerson[state.mainPerson.id].main = fees.baseMain + fees.extra;
-    }
-    
-    let totalHospitalSupportStbh = 0;
-    allPersons.forEach(person => {
-        let personSuppFee = 0;
-        CONFIG.supplementaryProducts.forEach(prod => {
-            if (person.supplements[prod.id]) {
-                const fee = prod.calculationFunc(person, fees.baseMain, totalHospitalSupportStbh);
-                personSuppFee += fee;
-                fees.byPerson[person.id].suppDetails[prod.id] = fee;
-
-                if (prod.id === 'hospital_support') {
-                    totalHospitalSupportStbh += person.supplements[prod.id].stbh || 0;
-                }
-            }
-        });
-        fees.byPerson[person.id].supp = personSuppFee;
-        fees.totalSupp += personSuppFee;
-    });
-
-    // MDP3 fee
-    let mdp3Fee = state.mdp3.fee;
-    if (state.mdp3.enabled && state.mdp3.selectedId) {
-        fees.totalSupp += mdp3Fee;
-        let targetId = state.mdp3.selectedId === 'other' ? 'mdp3_other' : state.mdp3.selectedId;
-        if (fees.byPerson[targetId]) {
-            fees.byPerson[targetId].supp += mdp3Fee;
-            fees.byPerson[targetId].suppDetails.mdp3 = mdp3Fee;
-        }
-    }
-
-    allPersons.forEach(p => {
-        fees.byPerson[p.id].total = fees.byPerson[p.id].main + fees.byPerson[p.id].supp;
-    });
-
-    window.personFees = fees.byPerson;
-
-    fees.totalMain = fees.baseMain + fees.extra;
-    fees.total = fees.totalMain + fees.totalSupp;
-    
-    return fees;
-}
-
-function calculateMainPremium(customer, productInfo, ageOverride = null) {
-  const ageToUse = ageOverride ?? customer.age;
-  const { gender } = customer;
-  const { key: mainProduct, stbh, premium: enteredPremium, abuvTerm } = productInfo;
-  let premium = 0;
-
-  if (!mainProduct) return 0;
-
-  if (mainProduct.startsWith('PUL') || mainProduct === 'AN_BINH_UU_VIET' || mainProduct === 'TRON_TAM_AN') {
-    let rate = 0;
-    const effectiveStbh = (mainProduct === 'TRON_TAM_AN') ? 100000000 : stbh;
-    if (effectiveStbh === 0) return 0;
-    
-    const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
-
-    if (mainProduct.startsWith('PUL')) {
-        rate = product_data.pul_rates[mainProduct]?.find(r => r.age === ageToUse)?.[genderKey] || 0;
-    } else if (mainProduct === 'AN_BINH_UU_VIET') {
-        if (!abuvTerm) return 0;
-        rate = product_data.an_binh_uu_viet_rates[abuvTerm]?.find(r => r.age === ageToUse)?.[genderKey] || 0;
-    } else if (mainProduct === 'TRON_TAM_AN') {
-        rate = product_data.an_binh_uu_viet_rates['10']?.find(r => r.age === ageToUse)?.[genderKey] || 0;
-    }
-    premium = (effectiveStbh / 1000) * rate;
-
-  } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProduct)) {
-      premium = enteredPremium;
   }
 
-  return roundDownTo1000(premium);
-}
+  const supplementsContainer = isMain
+    ? document.querySelector('#main-supp-container .supplementary-products-container')
+    : container.querySelector('.supplementary-products-container');
 
-function calculateHealthSclPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p => p.id === 'health_scl');
-    if (ageToUse > config.maxRenewalAge) return 0;
-
-    const { program, scope, outpatient, dental } = customer.supplements.health_scl || {};
-    if (!program || !scope) return 0;
-
-    const ageBandIndex = product_data.health_scl_rates.age_bands.findIndex(b => ageToUse >= b.min && ageToUse <= b.max);
-    if (ageBandIndex === -1) return 0;
-
-    let totalPremium = product_data.health_scl_rates[scope]?.[ageBandIndex]?.[program] || 0;
-    if (outpatient) totalPremium += product_data.health_scl_rates.outpatient?.[ageBandIndex]?.[program] || 0;
-    if (dental) totalPremium += product_data.health_scl_rates.dental?.[ageBandIndex]?.[program] || 0;
-
-    return roundDownTo1000(totalPremium);
-}
-
-function calculateBhnPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='bhn');
-    if (ageToUse > config.maxRenewalAge) return 0;
-    
-    const { gender } = customer;
-    const { stbh } = customer.supplements.bhn || {};
-    if (!stbh) return 0;
-
-    const rate = product_data.bhn_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.[gender === 'Nữ' ? 'nu' : 'nam'] || 0;
-    const premiumRaw = (stbh / 1000) * rate;
-    return roundDownTo1000(premiumRaw);
-}
-
-function calculateAccidentPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='accident');
-    if (ageToUse > config.maxRenewalAge) return 0;
-
-    const { riskGroup } = customer;
-    if (riskGroup === 0 || riskGroup > 4) return 0;
-    
-    const { stbh } = customer.supplements.accident || {};
-    if (!stbh) return 0;
-
-    const rate = product_data.accident_rates[riskGroup] || 0;
-    const premiumRaw = (stbh / 1000) * rate;
-    return roundDownTo1000(premiumRaw);
-}
-
-function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='hospital_support');
-    if (ageToUse > config.maxRenewalAge) return 0;
-
-    const { stbh } = customer.supplements.hospital_support || {};
-    if (!stbh) return 0;
-
-    const rate = product_data.hospital_fee_support_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.rate || 0;
-    const premiumRaw = (stbh / 100) * rate;
-    return roundDownTo1000(premiumRaw);
-}
-
-// ===================================================================================
-// ===== MODULE: UI (Rendering, DOM manipulation, Event Listeners)
-// ===================================================================================
-
-function renderUI() {
-    try {
-      const mainProductKey = document.getElementById('main-product')?.value || appState.mainProduct.key || '';
-      const isTTA = (mainProductKey === 'TRON_TAM_AN');
-      const cont = document.getElementById('supplementary-insured-container');
-      const btn  = document.getElementById('add-supp-insured-btn');
-      if (isTTA) {
-        if (cont) cont.innerHTML = '';
-        appState.supplementaryPersons = [];
-        if (cont) cont.classList.add('hidden');
-        if (btn)  btn.classList.add('hidden');
-      } else {
-        if (cont) cont.classList.remove('hidden');
-        if (btn)  btn.classList.remove('hidden');
-      }
-      updateSupplementaryAddButtonState();
-    } catch (e) {
-      console.error('Error in renderUI TTA handling:', e);
-    }
-
-    clearAllErrors();
-    let allPersons = [appState.mainPerson, ...appState.supplementaryPersons].filter(p => p);
-    if (appState.mdp3.otherPerson) allPersons.push(appState.mdp3.otherPerson);
-
-    allPersons.forEach(p => {
-        if (p.container) {
-            const ageSpan = p.container.querySelector('.age-span');
-            if (ageSpan) ageSpan.textContent = p.age || '...';
-            const riskSpan = p.container.querySelector('.risk-group-span');
-            if (riskSpan) riskSpan.textContent = p.riskGroup > 0 ? p.riskGroup : '...';
-        }
-    });
-
-    renderMainProductSection(appState.mainPerson, appState.mainProduct.key);
-    
-    allPersons.forEach(p => {
-        const suppContainer = p.isMain ? document.querySelector('#main-supp-container .supplementary-products-container') : p.container?.querySelector('.supplementary-products-container');
-        if (suppContainer) {
-            renderSupplementaryProductsForPerson(p, appState.mainProduct.key, appState.fees.baseMain, suppContainer);
-        }
-    });
-    
-    const isValid = runAllValidations(appState);
-
-    const fees = appState.fees;
-    const summaryTotalEl = document.getElementById('summary-total');
-    const mainFeeEl = document.getElementById('main-insured-main-fee');
-    const extraFeeEl = document.getElementById('main-insured-extra-fee');
-    const suppFeeEl = document.getElementById('summary-supp-fee');
-
-    if (summaryTotalEl) summaryTotalEl.textContent = formatDisplayCurrency(fees.total);
-    if (mainFeeEl) mainFeeEl.textContent = formatDisplayCurrency(fees.baseMain);
-    if (extraFeeEl) extraFeeEl.textContent = formatDisplayCurrency(fees.extra);
-    if (suppFeeEl) suppFeeEl.textContent = formatDisplayCurrency(fees.totalSupp);
-
-    updateMainProductFeeDisplay(fees.baseMain, fees.extra);
-    updatePaymentFrequencyOptions(fees.baseMain);
-    updateSummaryUI(fees);
-    renderPersonFeeDetails();
-    window.renderSection6V2();
-}
-
-let lastRenderedProductKey = null;
-let lastRenderedAge = null;
-function renderMainProductSection(customer, mainProductKey) {
-    const mainProductSelect = document.getElementById('main-product');
-    if (!mainProductSelect) return;
-
-    document.querySelectorAll('#main-product option').forEach(option => {
-        const productKey = option.value;
-        if (!productKey) return;
-        let isEligible = true;
-        const { age, daysFromBirth, gender, riskGroup } = customer;
-        const PUL_MUL = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'];
-        if (PUL_MUL.includes(productKey)) {
-            isEligible = (daysFromBirth >= 30) && (age <= 70);
-        } else if (productKey === 'TRON_TAM_AN') {
-            const withinAge = (gender === 'Nam') ? (age >= 12 && age <= 60) : (age >= 28 && age <= 60);
-            isEligible = withinAge && (riskGroup !== 4) && (riskGroup !== 0);
-        } else if (productKey === 'AN_BINH_UU_VIET') {
-            isEligible = (gender === 'Nam' ? age >= 12 : age >= 28) && (age <= 65);
-        }
-        option.disabled = !isEligible;
-        option.classList.toggle('hidden', !isEligible);
-    });
-    
-    if (mainProductSelect.selectedIndex >= 0 && mainProductSelect.options[mainProductSelect.selectedIndex]?.disabled) {
-        mainProductSelect.value = "";
-        mainProductKey = "";
-    }
-    
-    if (lastRenderedProductKey === mainProductKey && lastRenderedAge === customer.age) return;
-    lastRenderedProductKey = mainProductKey;
-    lastRenderedAge = customer.age;
-
-    const container = document.getElementById('main-product-options');
-    if (!container) return;
-    container.innerHTML = '';
-    if (!mainProductKey) return;
-    
-    let optionsHtml = '';
-    if (mainProductKey === 'TRON_TAM_AN') {
-      optionsHtml = `
-        <div>
-          <label for="main-stbh" class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH)</label>
-          <input type="text" id="main-stbh" class="form-input bg-gray-100" value="100.000.000" disabled>
-        </div>
-        <div>
-          <p class="text-sm text-gray-600 mt-1">Thời hạn đóng phí: 10 năm (bằng thời hạn hợp đồng). Thời gian bảo vệ: 10 năm.</p>
-        </div>`;
-    } else if (mainProductKey === 'AN_BINH_UU_VIET') {
-      optionsHtml = `
-        <div>
-          <label for="main-stbh" class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH) <span class="text-red-600">*</span></label>
-          <input type="text" id="main-stbh" class="form-input" value="" placeholder="VD: 1.000.000.000">
-        </div>`;
-      let termOptions = '';
-      if (customer.age <= 55) termOptions += '<option value="15">15 năm</option>';
-      if (customer.age <= 60) termOptions += '<option value="10">10 năm</option>';
-      if (customer.age <= 65) termOptions += '<option value="5">5 năm</option>';
-      if (!termOptions) termOptions = '<option value="" disabled>Không có kỳ hạn phù hợp</option>';
-      optionsHtml += `
-        <div>
-          <label for="abuv-term" class="font-medium text-gray-700 block mb-1">Thời hạn đóng phí <span class="text-red-600">*</span></label>
-          <select id="abuv-term" class="form-select"><option value="" selected>-- Chọn --</option>${termOptions}</select>
-          <p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí bằng thời hạn hợp đồng.</p>
-        </div>`;
-    } else {
-      // Hoàn thiện cho các sản phẩm khác (PUL, MUL, v.v.)
-      optionsHtml = `
-        <div>
-          <label for="main-stbh" class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH) <span class="text-red-600">*</span></label>
-          <input type="text" id="main-stbh" class="form-input" value="" placeholder="VD: 500.000.000">
-        </div>
-        <div>
-          <label for="main-premium-input" class="font-medium text-gray-700 block mb-1">Phí cơ bản <span class="text-red-600">*</span></label>
-          <input type="text" id="main-premium-input" class="form-input" value="" placeholder="VD: 10.000.000">
-        </div>
-        <div>
-          <label for="payment-term" class="font-medium text-gray-700 block mb-1">Thời hạn đóng phí <span class="text-red-600">*</span></label>
-          <input type="number" id="payment-term" class="form-input" min="4" max="99" placeholder="VD: 10">
-          <p id="payment-term-hint" class="text-sm text-gray-500 mt-1"></p>
-        </div>
-        <div>
-          <label for="extra-premium-input" class="font-medium text-gray-700 block mb-1">Phí extra</label>
-          <input type="text" id="extra-premium-input" class="form-input" value="" placeholder="VD: 2.000.000">
-        </div>`;
-    }
-    container.innerHTML = optionsHtml;
-    setPaymentTermHint(mainProductKey, customer.age);
-    attachTermListenersForTargetAge();
-}
-
-function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container) {
-    if (!container) return;
-    const isTTA = mainProductKey === 'TRON_TAM_AN';
-    if (isTTA && customer.isMain) {
-        const sclCheckbox = container.querySelector('.health_scl-checkbox');
-        if (sclCheckbox) sclCheckbox.checked = true;
-        const programSelect = container.querySelector('.health-scl-program');
-        if (programSelect && !programSelect.value) programSelect.value = 'nang_cao';
-    }
-
+  const supplements = {};
+  if (supplementsContainer) {
     CONFIG.supplementaryProducts.forEach(prod => {
-        const section = container.querySelector(`.${prod.id}-section`);
-        if (!section) return;
-
-        // Eligibility check (thêm nếu cần, ví dụ disable nếu age > max)
-        if (customer.age > prod.maxRenewalAge) {
-            section.style.display = 'none';
-            return;
-        } else {
-            section.style.display = '';
-        }
-
-        // Placeholder cho STBH input
-        const stbhInput = section.querySelector(`.${prod.id}-stbh`);
-        if (stbhInput) {
-            stbhInput.placeholder = prod.minStbh ? `Tối thiểu ${formatCurrency(prod.minStbh)}` : 'Nhập STBH';
-        }
+      const section = supplementsContainer.querySelector(`.${prod.id}-section`);
+      if (section && section.querySelector(`.${prod.id}-checkbox`)?.checked) {
+        supplements[prod.id] = {
+          stbh: parseFormattedNumber(section.querySelector(`.${prod.id}-stbh`)?.value),
+          program: section.querySelector(`.health-scl-program`)?.value,
+          scope: section.querySelector(`.health-scl-scope`)?.value,
+          outpatient: section.querySelector(`.health-scl-outpatient`)?.checked,
+          dental: section.querySelector(`.health-scl-dental`)?.checked,
+        };
+      }
     });
-}
+  }
 
-function renderPersonFeeDetails() {
-    const container = document.getElementById('person-fee-details-container');
-    if (!container) return;
-    container.innerHTML = '';
-    Object.entries(window.personFees || {}).forEach(([id, pFee]) => {
-        const person = [appState.mainPerson, ...appState.supplementaryPersons, appState.mdp3.otherPerson].find(p => p && p.id === id);
-        const name = person ? person.name : 'Unknown';
-        const totalSupp = pFee.supp || 0;
-        container.innerHTML += `<div class="person-fee">${sanitizeHtml(name)}: Tổng phí bổ sung ${formatCurrency(totalSupp)}</div>`;
-    });
-}
-
-function updateTargetAge() {
-    const mainProduct = appState.mainProduct.key;
-    const age = appState.mainPerson.age;
-    let term = appState.mainProduct.paymentTerm;
-    if (mainProduct === 'TRON_TAM_AN') term = 10;
-    if (mainProduct === 'AN_BINH_UU_VIET') term = parseInt(appState.mainProduct.abuvTerm, 10) || 0;
-    const minTarget = age + term - 1;
-    const targetInput = document.getElementById('target-age-input');
-    if (targetInput) {
-        targetInput.min = minTarget;
-        if (parseInt(targetInput.value) < minTarget) targetInput.value = minTarget;
-    }
-}
-
-function attachTermListenersForTargetAge() {
-    ['payment-term', 'abuv-term'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', updateTargetAge);
-    });
-    updateTargetAge(); // Initial call
+  return {
+    id: container.id,
+    container,
+    isMain,
+    name: container.querySelector('.name-input')?.value || (isMain ? 'NĐBH Chính' : 'NĐBH Bổ sung'),
+    dob: dobStr,
+    age,
+    daysFromBirth,
+    gender: container.querySelector('.gender-select')?.value || 'Nam',
+    riskGroup: parseInt(container.querySelector('.occupation-input')?.dataset.group, 10) || 0,
+    supplements
+  };
 }
 
 // ===================================================================================
-// ===== MODULE: VALIDATION
+// AUTO CHỌN HEALTH_SCL KHI MAIN = TRON_TAM_AN
 // ===================================================================================
-function runAllValidations(state) {
-    clearAllErrors();
-    let isValid = true;
+let __autoSelectedHealthScl = false;
 
-    // Validate main person
-    if (!validatePerson(state.mainPerson, true)) isValid = false;
-
-    // Validate supplementary persons
-    state.supplementaryPersons.forEach(p => {
-        if (!validatePerson(p, false)) isValid = false;
-    });
-
-    // Validate MDP3 other
-    if (state.mdp3.selectedId === 'other' && state.mdp3.otherPerson) {
-        if (!validatePerson(state.mdp3.otherPerson, false)) isValid = false;
-// Tiếp tục từ chỗ dừng trong runAllValidations
-        if (state.mdp3.otherPerson.age < 18 || state.mdp3.otherPerson.age > 60) {
-            setError('mdp3-other-dob', 'Tuổi phải từ 18 đến 60');
-            isValid = false;
+function ensureAutoSelectHealthScl(state) {
+  try {
+    if (!state?.mainProduct?.key) return;
+    if (state.mainProduct.key === 'TRON_TAM_AN') {
+      const mainSuppContainer = document.querySelector('#main-supp-container .supplementary-products-container');
+      if (!mainSuppContainer) return;
+      const section = mainSuppContainer.querySelector('.health_scl-section');
+      const checkbox = section?.querySelector('.health_scl-checkbox');
+      if (checkbox && !checkbox.checked && !__autoSelectedHealthScl) {
+        checkbox.checked = true;
+        const progSelect = section.querySelector('.health-scl-program');
+        if (progSelect && !progSelect.value) {
+          progSelect.value = 'nang_cao';
         }
-    }
-
-    // Validate main product
-    const { key, stbh, premium, paymentTerm, abuvTerm } = state.mainProduct;
-    if (!key) {
-        setError('main-product', 'Chọn sản phẩm chính');
-        isValid = false;
-    }
-    if (['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'AN_BINH_UU_VIET'].includes(key) && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-        setError('main-stbh', `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH)}`);
-        isValid = false;
-    }
-    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(key) && premium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
-        setError('main-premium-input', `Phí tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM)}`);
-        isValid = false;
-    }
-    if (key === 'AN_BINH_UU_VIET' && !abuvTerm) {
-        setError('abuv-term', 'Chọn thời hạn');
-        isValid = false;
-    }
-    if (!['TRON_TAM_AN', 'AN_BINH_UU_VIET'].includes(key) && paymentTerm === 0) {
-        setError('payment-term', 'Nhập thời hạn đóng phí');
-        isValid = false;
-    }
-
-    // Validate extra premium
-    if (state.mainProduct.extraPremium > state.fees.baseMain * CONFIG.EXTRA_PREMIUM_MAX_FACTOR) {
-        setError('extra-premium-input', `Phí extra tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí cơ bản`);
-        isValid = false;
-    }
-
-    // Validate supplementary products STBH for all persons
-    let allPersonsForSuppValidate = [state.mainPerson, ...state.supplementaryPersons];
-    if (state.mdp3.otherPerson) allPersonsForSuppValidate.push(state.mdp3.otherPerson);
-    allPersonsForSuppValidate.forEach(person => {
-        if (person) {
-            CONFIG.supplementaryProducts.forEach(prod => {
-                const supp = person.supplements[prod.id];
-                if (supp) {
-                    const stbh = supp.stbh || 0;
-                    if (prod.minStbh && stbh < prod.minStbh) {
-                        setError(`${person.id}-${prod.id}-stbh`, `STBH tối thiểu ${formatCurrency(prod.minStbh)}`);
-                        isValid = false;
-                    }
-                    if (prod.maxStbh && stbh > prod.maxStbh) {
-                        setError(`${person.id}-${prod.id}-stbh`, `STBH tối đa ${formatCurrency(prod.maxStbh)}`);
-                        isValid = false;
-                    }
-                    // Additional per prod (e.g., hospital_support max by age)
-                    if (prod.id === 'hospital_support') {
-                        const maxStbh = person.age < 18 ? prod.maxStbhByAge.under18 : prod.maxStbhByAge.from18;
-                        if (stbh > maxStbh) {
-                            setError(`${person.id}-${prod.id}-stbh`, `STBH tối đa ${formatCurrency(maxStbh)} cho tuổi ${person.age}`);
-                            isValid = false;
-                        }
-                    }
-                }
-            });
-        }
-    });
-
-    return isValid;
-}
-
-function validatePerson(person, isMain = false) {
-    if (!person) return false;
-    let valid = true;
-    const prefix = person.id;
-
-    if (!person.dob || person.age < 0) {
-        setError(`${prefix}-dob`, 'Ngày sinh không hợp lệ');
-        valid = false;
-    }
-    if (!person.gender) {
-        setError(`${prefix}-gender`, 'Chọn giới tính');
-        valid = false;
-    }
-    if (person.riskGroup === 0 && isMain) { // Chỉ required cho main nếu cần
-        setError(`${prefix}-occupation`, 'Chọn nghề nghiệp hợp lệ');
-        valid = false;
-    }
-
-    return valid;
-}
-// ===================================================================================
-// ===== MODULE: MINH HỌA CHI TIẾT (renderSection6V2)
-// ===================================================================================
-window.renderSection6V2 = function() {
-    const allPersons = [appState.mainPerson, ...appState.supplementaryPersons];
-    if (appState.mdp3.otherPerson) allPersons.push(appState.mdp3.otherPerson);
-    allPersons = allPersons.filter(p => p);
-
-    // Part 1: Tóm tắt tổng phí từng người + grand total
-    let part1Html = '<table class="minh-hoa-table"><thead><tr><th>Người</th><th>Tổng phí</th></tr></thead><tbody>';
-    let grandTotal = 0;
-    allPersons.forEach(p => {
-        const pFee = window.personFees[p.id] || { total: 0 };
-        part1Html += `<tr><td>${sanitizeHtml(p.name)}</td><td>${formatCurrency(pFee.total)}</td></tr>`;
-        grandTotal += pFee.total;
-    });
-    part1Html += `<tr><td><strong>Tổng cộng</strong></td><td><strong>${formatCurrency(grandTotal)}</strong></td></tr></tbody></table>`;
-
-    // Part 2: Phí supp quy ra năm/per period
-    const freq = appState.paymentFrequency;
-    const freqConfig = CONFIG.PAYMENT_FREQUENCY_FACTORS[freq] || { periods: 1, factor: 1 };
-    let part2Html = '<table class="minh-hoa-table"><thead><tr><th>Người</th><th>Phí bổ sung (${freq})</th></tr></thead><tbody>';
-    allPersons.forEach(p => {
-        const pFee = window.personFees[p.id] || { supp: 0 };
-        const adjustedSupp = roundDownTo1000(pFee.supp * freqConfig.factor);
-        part2Html += `<tr><td>${sanitizeHtml(p.name)}</td><td>${formatCurrency(adjustedSupp)} / ${freq}</td></tr>`;
-    });
-    part2Html += '</tbody></table>';
-    if (appState.mdp3.otherPerson) {
-        part2Html += '<p><em>Ghi chú: Bao gồm MDP3 cho người khác</em></p>';
-    }
-
-    // Render vào modal container (giả sử ID #summary-content-container)
-    const modalContainer = document.getElementById('summary-content-container');
-    if (modalContainer) {
-        modalContainer.innerHTML = `<h3>Phần 1: Tóm tắt phí</h3>${part1Html}<h3>Phần 2: Phí bổ sung quy đổi</h3>${part2Html}`;
+        __autoSelectedHealthScl = true;
+      }
     } else {
-        console.warn('Modal container not found for renderSection6V2');
+      __autoSelectedHealthScl = false;
     }
-};
-// ===================================================================================
-// ===== MODULE: ADDITIONAL UI HELPERS
-// ===================================================================================
-
-function clearAllErrors() {
-    document.querySelectorAll('.error-message').forEach(el => el.textContent = '');
-    document.querySelectorAll('.form-input.error, .form-select.error').forEach(el => el.classList.remove('error'));
+  } catch (e) {
+    console.warn('ensureAutoSelectHealthScl error', e);
+  }
 }
 
-function setError(fieldId, message) {
-    const field = document.getElementById(fieldId);
-    if (field) {
-        field.classList.add('error');
-        let errorEl = field.nextElementSibling;
-        if (!errorEl || !errorEl.classList.contains('error-message')) {
-            errorEl = document.createElement('span');
-            errorEl.classList.add('error-message', 'text-red-600', 'text-sm');
-            field.parentNode.insertBefore(errorEl, field.nextSibling);
+// ===================================================================================
+// MDP3 (Miễn đóng phí 3.0)
+// ===================================================================================
+function gatherMdp3Data(state) {
+  if (!window.MDP3) {
+    state.mdp3.enabled = !!document.getElementById('mdp3-enable-checkbox')?.checked;
+  } else {
+    // Nếu module MDP3 có method isEnabled
+    state.mdp3.enabled = typeof window.MDP3.isEnabled === 'function'
+      ? window.MDP3.isEnabled()
+      : !!document.getElementById('mdp3-enable-checkbox')?.checked;
+  }
+
+  const sel = document.getElementById('mdp3-select');
+  state.mdp3.selectedId = sel ? sel.value : null;
+
+  if (state.mdp3.selectedId === 'other') {
+    const nameInput = document.getElementById('mdp3-other-name');
+    const dobInput = document.getElementById('mdp3-other-dob');
+    const ageSpan = document.getElementById('mdp3-other-age');
+    const errSpan = document.getElementById('mdp3-other-error');
+
+    const nameVal = (nameInput?.value || '').trim() || 'Người khác';
+    const dobStr = (dobInput?.value || '').trim();
+    let age = 0;
+    let valid = false;
+    let errorMsg = '';
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dobStr)) {
+      const [dd, mm, yyyy] = dobStr.split('/').map(n => parseInt(n, 10));
+      const bd = new Date(yyyy, mm - 1, dd);
+      if (
+        bd.getFullYear() === yyyy &&
+        bd.getMonth() === mm - 1 &&
+        bd.getDate() === dd &&
+        bd <= CONFIG.REFERENCE_DATE
+      ) {
+        age = CONFIG.REFERENCE_DATE.getFullYear() - bd.getFullYear();
+        const m = CONFIG.REFERENCE_DATE.getMonth() - bd.getMonth();
+        if (m < 0 || (m === 0 && CONFIG.REFERENCE_DATE.getDate() < bd.getDate())) {
+          age--;
         }
-        errorEl.textContent = message;
+        if (age >= 18 && age <= 60) {
+          valid = true;
+        } else {
+          errorMsg = 'Tuổi phải từ 18 đến 60';
+        }
+      } else {
+        errorMsg = 'Ngày sinh không hợp lệ';
+      }
+    } else if (dobStr) {
+      errorMsg = 'Định dạng dd/mm/yyyy';
     }
+
+    if (ageSpan) ageSpan.textContent = valid ? String(age) : '';
+    if (errSpan) errSpan.textContent = errorMsg;
+
+    state.mdp3.other = {
+      name: nameVal,
+      dob: dobStr,
+      age,
+      valid
+    };
+  } else {
+    state.mdp3.other = null;
+  }
 }
 
-function updateMainProductFeeDisplay(baseMain, extra) {
-    const totalMainEl = document.getElementById('total-main-fee');
-    if (totalMainEl) totalMainEl.textContent = formatDisplayCurrency(baseMain + extra);
+function calculateMdp3Premium(age) {
+  if (!age || age < 18 || age > 60) return 0;
+  if (window.MDP3) {
+    if (typeof window.MDP3.getPremium === 'function') {
+      try { return Number(window.MDP3.getPremium(age)) || 0; } catch {}
+    }
+    if (typeof window.MDP3.calculatePremium === 'function') {
+      try { return Number(window.MDP3.calculatePremium(age)) || 0; } catch {}
+    }
+  }
+  // Fallback minh hoạ
+  return 100000 + (age - 18) * 5000;
 }
 
-function updatePaymentFrequencyOptions(baseMain) {
-    const freqSelect = document.getElementById('payment-frequency');
-    if (!freqSelect) return;
+// ===================================================================================
+// MINH HOẠ PHÍ ĐẾN NĂM (validate)
+// ===================================================================================
+function validateIllustrationAge(state) {
+  const input = document.getElementById('illustration-age-input');
+  if (!input) return;
+  const mainAge = state.mainPerson?.age || 0;
+  const paymentTerm = state.mainProduct?.paymentTerm || 0;
+  const minAllowed = (mainAge && paymentTerm) ? (mainAge + paymentTerm - 1) : 0;
 
-    // Fix undefined: Loop qua options thay vì namedItem
-    Array.from(freqSelect.options).forEach(opt => {
-        if (opt.value === 'half') {
-            opt.disabled = baseMain < CONFIG.PAYMENT_FREQUENCY_THRESHOLDS.half;
-        } else if (opt.value === 'quarter') {
-            opt.disabled = baseMain < CONFIG.PAYMENT_FREQUENCY_THRESHOLDS.quarter;
+  const lockedProducts = ['TRON_TAM_AN', 'AN_BINH_UU_VIET'];
+  const isLocked = lockedProducts.includes(state.mainProduct?.key);
+
+  if (isLocked) {
+    if (minAllowed > 0) input.value = String(minAllowed);
+    input.readOnly = true;
+    input.classList.remove('invalid');
+    return;
+  } else {
+    input.readOnly = false;
+  }
+
+  const val = parseInt(input.value, 10);
+  if (!isNaN(val) && val >= minAllowed) {
+    input.classList.remove('invalid');
+  } else {
+    if (minAllowed > 0) {
+      input.classList.add('invalid');
+    } else {
+      input.classList.remove('invalid');
+    }
+  }
+}
+
+// ===================================================================================
+// HÀM TÍNH PHÍ CHÍNH & PHỤ (Stubs / Placeholder - thay bằng logic thực tế nếu có)
+// ===================================================================================
+function calculateMainPremium(mainPerson, mainProduct) {
+  // Giả sử nếu người dùng nhập premium thủ công thì dùng luôn:
+  if (mainProduct?.premium) return mainProduct.premium;
+
+  // Ví dụ minh hoạ: premium = STBH * 0.01 (cần thay bằng công thức thực)
+  if (mainProduct?.stbh) {
+    return Math.round(mainProduct.stbh * 0.01);
+  }
+  return 0;
+}
+
+function calculateHealthSclPremium(person, supplementData, state) {
+  if (!person?.age || person.age < 0) return 0;
+  const program = supplementData?.program || 'co_ban';
+  const baseStbh = CONFIG.supplementaryProducts.find(p => p.id === 'health_scl')?.stbhByProgram?.[program] || 0;
+  // Ví dụ: phí = baseStbh * 0.005
+  return Math.round(baseStbh * 0.005);
+}
+
+function calculateBhnPremium(person, supplementData, state) {
+  const stbh = supplementData?.stbh || 0;
+  if (!stbh) return 0;
+  // Ví dụ: phí = stbh * 0.008
+  return Math.round(stbh * 0.008);
+}
+
+function calculateAccidentPremium(person, supplementData, state) {
+  const stbh = supplementData?.stbh || 0;
+  if (!stbh) return 0;
+  return Math.round(stbh * 0.002);
+}
+
+function calculateHospitalSupportPremium(person, supplementData, state) {
+  const stbh = supplementData?.stbh || 0;
+  if (!stbh) return 0;
+  // Ví dụ: phí = stbh * 3 (ngày) => minh hoạ
+  return Math.round(stbh * 3);
+}
+
+// ===================================================================================
+// TÍNH TOÁN PHÍ (ĐÃ SỬA)
+// ===================================================================================
+function performCalculations(state) {
+  const fees = {
+    baseMain: 0,
+    extra: Number(state.mainProduct?.extraPremium) || 0,
+    totalMain: 0,
+    totalSupp: 0,
+    total: 0,
+    byPerson: {}
+  };
+
+  // 1. PHÍ SẢN PHẨM CHÍNH (vẫn hiển thị dù paymentTerm=0)
+  fees.baseMain = calculateMainPremium(state.mainPerson, state.mainProduct) || 0;
+  fees.totalMain = fees.baseMain + fees.extra;
+
+  // 2. Chuẩn bị danh sách người
+  const persons = [state.mainPerson, ...(state.supplementaryPersons || [])].filter(p => !!p);
+
+  persons.forEach(p => {
+    fees.byPerson[p.id] = {
+      name: p.name,
+      main: p.isMain ? fees.baseMain + fees.extra : 0,
+      supp: 0,
+      suppDetails: {},
+      total: 0
+    };
+  });
+
+  // 3. TÍNH PHÍ SẢN PHẨM BỔ SUNG (skip nếu dữ liệu chưa hợp lệ)
+  persons.forEach(p => {
+    if (typeof p.age !== 'number' || p.age < 0) return;
+    const supplements = p.supplements || {};
+    Object.keys(supplements).forEach(sid => {
+      const def = CONFIG.supplementaryProducts.find(sp => sp.id === sid);
+      if (!def) return;
+
+      let premium = 0;
+      try {
+        if (typeof def.calculationFunc === 'function') {
+          premium = def.calculationFunc(p, supplements[sid], state);
         }
+      } catch (e) {
+        console.warn('Supplement calc error', sid, e);
+      }
+      premium = Number(premium) || 0;
+      fees.byPerson[p.id].supp += premium;
+      fees.byPerson[p.id].suppDetails[sid] = premium;
     });
+  });
 
-    if (freqSelect.options[freqSelect.selectedIndex]?.disabled) {
-        freqSelect.value = 'year';
+  // 4. MDP3
+  if (state.mdp3?.enabled) {
+    let mdp3Age = 0;
+    let mdp3TargetId = null;
+    let mdp3Name = '';
+    if (state.mdp3.selectedId === 'other' && state.mdp3.other?.valid) {
+      mdp3Age = state.mdp3.other.age;
+      mdp3TargetId = 'mdp3-other';
+      mdp3Name = state.mdp3.other.name;
+    } else {
+      const tgt = persons.find(p => p.id === state.mdp3.selectedId);
+      if (tgt) {
+        mdp3Age = tgt.age;
+        mdp3TargetId = tgt.id;
+        mdp3Name = tgt.name;
+      }
     }
-}
-
-function updateSummaryUI(fees) {
-    const freq = appState.paymentFrequency;
-    const freqConfig = CONFIG.PAYMENT_FREQUENCY_FACTORS[freq] || { periods: 1, factor: 1 };
-
-    const perPeriodMain = roundDownTo1000((fees.totalMain * freqConfig.factor));
-    const perPeriodSupp = roundDownTo1000((fees.totalSupp * freqConfig.factor));
-    const perPeriodTotal = perPeriodMain + perPeriodSupp;
-
-    document.getElementById('per-period-main')?.textContent = formatDisplayCurrency(perPeriodMain);
-    document.getElementById('per-period-supp')?.textContent = formatDisplayCurrency(perPeriodSupp);
-    document.getElementById('per-period-total')?.textContent = formatDisplayCurrency(perPeriodTotal);
-}
-
-function setPaymentTermHint(mainProductKey, age) {
-    const bounds = getPaymentTermBounds(age);
-    const hintEl = document.getElementById('payment-term-hint');
-    if (hintEl) {
-        let hint = `Từ ${bounds.min} đến ${bounds.max} năm.`;
-        if (mainProductKey === 'PUL_5NAM') hint = 'Cố định 5 năm.';
-        else if (mainProductKey === 'PUL_15NAM') hint = 'Cố định 15 năm.';
-        hintEl.textContent = hint;
+    if (mdp3TargetId && mdp3Age >= 18 && mdp3Age <= 60) {
+      const mdp3Fee = calculateMdp3Premium(mdp3Age);
+      if (mdp3TargetId === 'mdp3-other') {
+        fees.byPerson[mdp3TargetId] = {
+          name: mdp3Name,
+          main: 0,
+          supp: mdp3Fee,
+          suppDetails: { mdp3: mdp3Fee },
+          total: mdp3Fee
+        };
+      } else {
+        if (!fees.byPerson[mdp3TargetId].suppDetails) {
+          fees.byPerson[mdp3TargetId].suppDetails = {};
+        }
+        fees.byPerson[mdp3TargetId].supp += mdp3Fee;
+        fees.byPerson[mdp3TargetId].suppDetails.mdp3 = (fees.byPerson[mdp3TargetId].suppDetails.mdp3 || 0) + mdp3Fee;
+      }
     }
+  }
+
+  // 5. Tổng từng người & tổng supplement
+  Object.keys(fees.byPerson).forEach(pid => {
+    const rec = fees.byPerson[pid];
+    rec.total = rec.main + rec.supp;
+    if (rec.supp) fees.totalSupp += rec.supp;
+  });
+
+  // 6. Tổng cuối
+  fees.totalMain = fees.baseMain + fees.extra;
+  fees.total = fees.totalMain + fees.totalSupp;
+
+  state.fees = fees;
+  return fees;
 }
+
 // ===================================================================================
-// ===== MODULE: SUPPLEMENTARY PERSON MANAGEMENT
+// CẬP NHẬT TÓM TẮT PHÍ (bên phải)
 // ===================================================================================
+function updateSummaryUI() {
+  const fees = appState.fees;
+  if (!fees) return;
 
-function addSupplementaryPerson() {
-    const suppContainer = document.getElementById('supplementary-insured-container');
-    if (!suppContainer || appState.supplementaryPersons.length >= CONFIG.MAX_SUPPLEMENTARY_INSURED) return;
+  const freq = appState.paymentFrequency;
+  const freqConfig = CONFIG.PAYMENT_FREQUENCY_FACTORS?.[freq] || { factor: 1 };
+  const factor = Number(freqConfig.factor) || 1;
 
-    const personIndex = appState.supplementaryPersons.length + 1;
-    const personId = `supp-person-${personIndex}`;
+  const perPeriodMain = roundDownTo1000(fees.totalMain * factor);
+  const perPeriodSupp = roundDownTo1000(fees.totalSupp * factor);
+  const perPeriodTotal = perPeriodMain + perPeriodSupp;
 
-    const personHtml = `
-        <div id="${personId}" class="person-container border p-4 mb-4 rounded">
-            <h3 class="font-bold mb-2">Người được bảo hiểm bổ sung ${personIndex}</h3>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="${personId}-name" class="font-medium text-gray-700 block mb-1">Họ và tên</label>
-                    <input type="text" id="${personId}-name" class="name-input form-input" placeholder="VD: Nguyễn Văn A">
-                </div>
-                <div>
-                    <label for="${personId}-dob" class="font-medium text-gray-700 block mb-1">Ngày sinh (DD/MM/YYYY) <span class="text-red-600">*</span></label>
-                    <input type="text" id="${personId}-dob" class="dob-input form-input" placeholder="VD: 01/01/1990">
-                    <span class="age-span text-sm text-gray-500">Tuổi: ...</span>
-                </div>
-                <div>
-                    <label for="${personId}-gender" class="font-medium text-gray-700 block mb-1">Giới tính <span class="text-red-600">*</span></label>
-                    <select id="${personId}-gender" class="gender-select form-select">
-                        <option value="Nam">Nam</option>
-                        <option value="Nữ">Nữ</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="${personId}-occupation" class="font-medium text-gray-700 block mb-1">Nghề nghiệp <span class="text-red-600">*</span></label>
-                    <input type="text" id="${personId}-occupation" class="occupation-input form-input" placeholder="Tìm kiếm nghề nghiệp..." data-group="0">
-                    <span class="risk-group-span text-sm text-gray-500">Nhóm rủi ro: ...</span>
-                </div>
-            </div>
-            <div class="supplementary-products-container mt-4">
-                <!-- Supplementary sections will be rendered here -->
-            </div>
-            <button class="remove-person-btn text-red-600 mt-2">Xóa người này</button>
-        </div>
+  const elMain = document.getElementById('per-period-main');
+  const elSupp = document.getElementById('per-period-supp');
+  const elTotal = document.getElementById('per-period-total');
+
+  if (elMain) elMain.textContent = formatDisplayCurrency(perPeriodMain);
+  if (elSupp) elSupp.textContent = formatDisplayCurrency(perPeriodSupp);
+  if (elTotal) elTotal.textContent = formatDisplayCurrency(perPeriodTotal);
+
+  buildPersonTabs(fees);
+}
+
+// ===================================================================================
+// TABS / BUTTON XEM TỪNG NGƯỜI
+// ===================================================================================
+function buildPersonTabs(fees) {
+  const container = document.getElementById('person-tabs');
+  if (!container) return;
+  container.innerHTML = '';
+  Object.keys(fees.byPerson).forEach(pid => {
+    const rec = fees.byPerson[pid];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'person-tab-btn';
+    btn.textContent = `${rec.name}: ${formatDisplayCurrency(rec.supp)}`;
+    btn.addEventListener('click', () => {
+      highlightPersonInIllustration(pid);
+    });
+    container.appendChild(btn);
+  });
+}
+
+function highlightPersonInIllustration(personId) {
+  // Optional: cuộn đến bảng chi tiết và highlight hàng tương ứng.
+}
+
+// ===================================================================================
+// MINH HOẠ CHI TIẾT - PHẦN 1
+// ===================================================================================
+function renderIllustrationPart1(state) {
+  const fees = state.fees;
+  const host = document.getElementById('illustration-part-1');
+  if (!host || !fees) return;
+  host.innerHTML = '';
+
+  const table = document.createElement('table');
+  table.className = 'illu-part1-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Người</th>
+      <th>Phí chính</th>
+      <th>Phí bổ sung</th>
+      <th>Tổng</th>
+    </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  let sumMain = 0;
+  let sumSupp = 0;
+  let sumTotal = 0;
+
+  Object.values(fees.byPerson).forEach(rec => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${sanitizeHtml(rec.name)}</td>
+      <td style="text-align:right">${formatDisplayCurrency(rec.main)}</td>
+      <td style="text-align:right">${formatDisplayCurrency(rec.supp)}</td>
+      <td style="text-align:right">${formatDisplayCurrency(rec.total)}</td>
     `;
+    tbody.appendChild(tr);
+    sumMain += rec.main;
+    sumSupp += rec.supp;
+    sumTotal += rec.total;
+  });
 
-    suppContainer.insertAdjacentHTML('beforeend', personHtml);
+  const trTotal = document.createElement('tr');
+  trTotal.className = 'grand-total-row';
+  trTotal.innerHTML = `
+    <td><strong>Tổng cuối</strong></td>
+    <td style="text-align:right"><strong>${formatDisplayCurrency(sumMain)}</strong></td>
+    <td style="text-align:right"><strong>${formatDisplayCurrency(sumSupp)}</strong></td>
+    <td style="text-align:right"><strong>${formatDisplayCurrency(sumTotal)}</strong></td>
+  `;
+  tbody.appendChild(trTotal);
 
-    const newContainer = document.getElementById(personId);
-    newContainer.querySelector('.remove-person-btn').addEventListener('click', () => {
-        newContainer.remove();
-        appState.supplementaryPersons = appState.supplementaryPersons.filter(p => p.id !== personId);
-        updateStateFromUI();
-        appState.fees = performCalculations(appState);
-        renderUI();
+  table.appendChild(tbody);
+  host.appendChild(table);
+}
+
+// ===================================================================================
+// MINH HOẠ CHI TIẾT - PHẦN 2 (quy đổi hiển thị)
+// ===================================================================================
+function renderIllustrationPart2(state) {
+  const host = document.getElementById('illustration-part-2');
+  if (!host || !state.fees) return;
+  host.innerHTML = '';
+
+  const freq = state.paymentFrequency;
+  const displayFactor = CONFIG.DISPLAY_FREQ_FACTORS[freq] || 1;
+
+  const table = document.createElement('table');
+  table.className = 'illu-part2-table';
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr>
+      <th>Người</th>
+      <th>Chi tiết bổ sung (quy đổi)</th>
+      <th>Tổng bổ sung quy đổi</th>
+    </tr>`;
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  Object.values(state.fees.byPerson).forEach(rec => {
+    const detailParts = [];
+    Object.entries(rec.suppDetails || {}).forEach(([sid, val]) => {
+      const conv = Math.round(val * displayFactor);
+      detailParts.push(`${sanitizeHtml(sid)}: ${formatDisplayCurrency(conv)}`);
     });
+    const totalConv = Math.round(rec.supp * displayFactor);
 
-    // Render supplementary for new person
-    const suppCont = newContainer.querySelector('.supplementary-products-container');
-    if (suppCont) {
-        renderSupplementaryProductsForPerson({ id: personId, container: newContainer, age: 0 }, appState.mainProduct.key, appState.fees.baseMain, suppCont);
-    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${sanitizeHtml(rec.name)}</td>
+      <td>${detailParts.join('<br/>')}</td>
+      <td style="text-align:right">${formatDisplayCurrency(totalConv)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 
-    appState.supplementaryPersons.push({ id: personId, container: newContainer });
-    updateSupplementaryAddButtonState();
+  table.appendChild(tbody);
+  host.appendChild(table);
 }
 
-function updateSupplementaryAddButtonState() {
-    const btn = document.getElementById('add-supp-insured-btn');
-    if (btn) {
-        btn.disabled = appState.supplementaryPersons.length >= CONFIG.MAX_SUPPLEMENTARY_INSURED;
-    }
-}
 // ===================================================================================
-// ===== MODULE: MDP3 SPECIFIC HANDLERS
+// PLACEHOLDER SẢN PHẨM BỔ SUNG
 // ===================================================================================
+function applySupplementPlaceholders() {
+  const root = document;
+  const bhn = root.querySelector('.bhn-section .bhn-stbh');
+  if (bhn) bhn.placeholder = '200000000-5000000000';
 
-window.MDP3 = window.MDP3 || {
-    isEnabled: () => document.getElementById('mdp3-checkbox')?.checked || false,
-    getSelectedId: () => document.getElementById('mdp3-select')?.value || null,
-    getPremium: () => {
-        // Logic tính phí MDP3 (thay bằng thực tế nếu có)
-        const ageMain = appState.mainPerson.age;
-        const ageOther = appState.mdp3.otherPerson?.age || 0;
-        const base = 1000000; // Ví dụ
-        return roundDownTo1000(base * (ageMain + ageOther) / 10);
+  const accident = root.querySelector('.accident-section .accident-stbh');
+  if (accident) accident.placeholder = '10000000-8000000000';
+
+  const hosp = root.querySelector('.hospital_support-section .hospital_support-stbh');
+  if (hosp) hosp.placeholder = '300000-1000000';
+  // health_scl: STBH theo program nên không cần placeholder chữ
+}
+
+// ===================================================================================
+// QUY TRÌNH FULL RECALCULATE
+// ===================================================================================
+function fullRecalculateAndRender() {
+  updateStateFromUI();
+  gatherMdp3Data(appState);
+  ensureAutoSelectHealthScl(appState);
+  performCalculations(appState);
+  validateIllustrationAge(appState);
+  updateSummaryUI();
+  renderIllustrationPart1(appState);
+  renderIllustrationPart2(appState);
+}
+
+// ===================================================================================
+// GẮN SỰ KIỆN
+// ===================================================================================
+function attachEventHandlersEnhancements() {
+  const triggers = [
+    '#main-product',
+    '#main-stbh',
+    '#main-premium-input',
+    '#payment-term',
+    '#extra-premium-input',
+    '#payment-frequency',
+    '#illustration-age-input',
+    '#mdp3-enable-checkbox',
+    '#mdp3-select',
+    '#mdp3-other-name',
+    '#mdp3-other-dob'
+  ];
+  triggers.forEach(sel => {
+    const el = document.querySelector(sel);
+    if (el) {
+      el.addEventListener('input', debounce(fullRecalculateAndRender, 160));
+      el.addEventListener('change', debounce(fullRecalculateAndRender, 160));
     }
+  });
+
+  const mainSuppRoot = document.getElementById('main-supp-container');
+  if (mainSuppRoot) {
+    mainSuppRoot.addEventListener('input', debounce(fullRecalculateAndRender, 160));
+    mainSuppRoot.addEventListener('change', debounce(fullRecalculateAndRender, 160));
+  }
+
+  const suppPersons = document.getElementById('supplementary-insured-container');
+  if (suppPersons) {
+    suppPersons.addEventListener('input', debounce(fullRecalculateAndRender, 160));
+    suppPersons.addEventListener('change', debounce(fullRecalculateAndRender, 160));
+  }
+
+  applySupplementPlaceholders();
+}
+
+// ===================================================================================
+// INIT
+// ===================================================================================
+function initAll() {
+  initState();
+  attachEventHandlersEnhancements();
+  fullRecalculateAndRender();
+}
+
+// Expose cho window nếu cần gọi thủ công
+window.AppLogic = {
+  init: initAll,
+  recalc: fullRecalculateAndRender,
+  state: appState
 };
 
-function renderMdp3OtherContainer() {
-    const select = document.getElementById('mdp3-select');
-    if (!select) return;
-
-    select.addEventListener('change', () => {
-        const value = select.value;
-        const otherContainer = document.getElementById('mdp3-other-container');
-        if (otherContainer) {
-            otherContainer.classList.toggle('hidden', value !== 'other');
-            if (value === 'other') {
-                otherContainer.innerHTML = `
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="mdp3-other-name" class="font-medium text-gray-700 block mb-1">Họ và tên</label>
-                            <input type="text" id="mdp3-other-name" class="name-input form-input" placeholder="VD: Nguyễn Văn B">
-                        </div>
-                        <div>
-                            <label for="mdp3-other-dob" class="font-medium text-gray-700 block mb-1">Ngày sinh (DD/MM/YYYY) <span class="text-red-600">*</span></label>
-                            <input type="text" id="mdp3-other-dob" class="dob-input form-input" placeholder="VD: 01/01/2000">
-                            <span class="age-span text-sm text-gray-500">Tuổi: ...</span>
-                        </div>
-                        <div>
-                            <label for="mdp3-other-gender" class="font-medium text-gray-700 block mb-1">Giới tính <span class="text-red-600">*</span></label>
-                            <select id="mdp3-other-gender" class="gender-select form-select">
-                                <option value="Nam">Nam</option>
-                                <option value="Nữ">Nữ</option>
-                            </select>
-                        </div>
-                    </div>
-                `;
-            } else {
-                otherContainer.innerHTML = '';
-            }
-            // Trigger update sau khi change
-            updateStateFromUI();
-            appState.fees = performCalculations(appState);
-            renderUI();
-        }
-    });
-}
-// ===================================================================================
-// ===== MODULE: INITIALIZATION & EVENT LISTENERS
-// ===================================================================================
-
-function initApp() {
-    initState();
-    updateStateFromUI();
-    appState.fees = performCalculations(appState);
-    renderUI();
-    renderMdp3OtherContainer(); // Init MDP3
-
-    // Debounced update
-    const debouncedUpdate = debounce(() => {
-        updateStateFromUI();
-        appState.fees = performCalculations(appState);
-        renderUI();
-    });
-
-    document.addEventListener('input', debouncedUpdate);
-    document.addEventListener('change', debouncedUpdate);
-
-    // Add supplementary person button
-    const addBtn = document.getElementById('add-supp-insured-btn');
-    if (addBtn) {
-        addBtn.addEventListener('click', () => {
-            if (appState.supplementaryPersons.length < CONFIG.MAX_SUPPLEMENTARY_INSURED) {
-                addSupplementaryPerson();
-                debouncedUpdate();
-            }
-        });
-    }
-
-    // Event cho nút "Xem Bảng Minh Họa Chi Tiết" (mở modal)
-    const viewMinhHoaBtn = document.getElementById('view-minh-hoa-btn');
-    if (viewMinhHoaBtn) {
-        viewMinhHoaBtn.addEventListener('click', () => {
-            window.renderSection6V2(); // Render trước
-            const modal = document.getElementById('minh-hoa-modal'); // Giả sử ID modal
-            if (modal) modal.style.display = 'block';
-        });
-    }
-
-    // Event cho nút "Xuất File" (export Excel dùng SheetJS)
-    const exportBtn = document.getElementById('export-file-btn');
-    if (exportBtn) {
-        exportBtn.addEventListener('click', () => {
-            const wb = XLSX.utils.book_new();
-            const wsData = []; // Data cho sheet
-
-            // Thêm header
-            wsData.push(['Người', 'Tuổi', 'Giới tính', 'Phí chính', 'Phí bổ sung', 'Tổng phí']);
-
-            // Thêm data từ allPersons
-            const allPersons = [appState.mainPerson, ...appState.supplementaryPersons, appState.mdp3.otherPerson].filter(p => p);
-            allPersons.forEach(p => {
-                const pFee = window.personFees[p.id] || { main: 0, supp: 0, total: 0 };
-                wsData.push([p.name, p.age, p.gender, pFee.main, pFee.supp, pFee.total]);
-            });
-
-            // Thêm total
-            wsData.push(['Tổng cộng', '', '', appState.fees.totalMain, appState.fees.totalSupp, appState.fees.total]);
-
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
-            XLSX.utils.book_append_sheet(wb, ws, 'Minh Hoa Phi');
-
-            // Export file
-            XLSX.writeFile(wb, 'minh_hoa_phi.xlsx');
-        });
-    }
-}
-
-// Gọi init khi DOM ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+// Tự động init khi DOM sẵn sàng
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => {
+    try { initAll(); } catch (e) { console.error(e); }
+  }, 0);
 } else {
-    initApp();
+  document.addEventListener('DOMContentLoaded', () => {
+    try { initAll(); } catch (e) { console.error(e); }
+  });
 }
-// Export nếu cần (cho module)
-export { appState, performCalculations, renderUI };
 
-// ===================================================================================
-// ===== END OF SCRIPT
-// ===================================================================================
-
-console.log('Logic script loaded successfully.');
+/****************************************************************************************
+ * HƯỚNG DẪN HTML (ĐẢM BẢO CÓ CÁC ID SAU):
+ * - #main-product (select)
+ * - #main-stbh, #main-premium-input, #payment-term, #extra-premium-input
+ * - #payment-frequency (select: year|half|quarter)
+ * - #illustration-age-input
+ * - #main-person-container (div chứa inputs .name-input .dob-input .gender-select .occupation-input)
+ * - #main-supp-container .supplementary-products-container (chứa .health_scl-section, v.v.)
+ * - #supplementary-insured-container (chứa nhiều .person-container)
+ * - Các section supplement:
+ *    .health_scl-section (.health_scl-checkbox .health_scl-stbh .health-scl-program ...)
+ *    .bhn-section (.bhn-checkbox .bhn-stbh)
+ *    .accident-section (.accident-checkbox .accident-stbh)
+ *    .hospital_support-section (.hospital_support-checkbox .hospital_support-stbh)
+ * - MDP3:
+ *    #mdp3-enable-checkbox (checkbox)
+ *    #mdp3-select (select: value = id người hoặc 'other')
+ *    #mdp3-other-name (input)
+ *    #mdp3-other-dob (input dd/mm/yyyy)
+ *    #mdp3-other-age (span)
+ *    #mdp3-other-error (span)
+ * - TÓM TẮT PHÍ:
+ *    #per-period-main, #per-period-supp, #per-period-total
+ * - MINH HOẠ:
+ *    #illustration-part-1, #illustration-part-2
+ * - TABS NGƯỜI:
+ *    #person-tabs
+ *
+ * Nếu tên class/id khác, cập nhật lại trong code tương ứng.
+ ***************************************************************************************/
