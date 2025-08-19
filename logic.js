@@ -957,13 +957,15 @@ document.addEventListener('DOMContentLoaded', () => {
     runWorkflow();
     if (window.MDP3) MDP3.init();
 });
-
 function runWorkflow() {
-    updateStateFromUI();
-    const calculatedFees = performCalculations(appState);
-    appState.fees = calculatedFees;
-    renderUI();
+  updateStateFromUI();
+  const calculatedFees = performCalculations(appState);
+  appState.fees = calculatedFees;
+  renderUI();
+  // Cập nhật danh sách "Xem từng người" realtime
+  try { renderSuppList(); } catch(e) { /* an toàn, tránh gãy luồng */ }
 }
+
 const runWorkflowDebounced = debounce(runWorkflow, 40);
 
 
