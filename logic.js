@@ -15,9 +15,9 @@ const CONFIG = {
     },
     HOSPITAL_SUPPORT_STBH_MULTIPLE: 100000,
     MAIN_PRODUCTS: {
-        PUL_TRON_DOI: { name: 'PUL Trọn đời' },
-        PUL_15NAM: { name: 'PUL 15 năm' },
-        PUL_5NAM: { name: 'PUL 5 năm' },
+        PUL_TRON_DOI: { name: 'Khoẻ trọn vẹn-Trọn đời' },
+        PUL_15NAM: { name: 'Khoẻ trọn vẹn-15 năm' },
+        PUL_5NAM: { name: 'Khoẻ trọn vẹn-5 năm' },
         KHOE_BINH_AN: { name: 'MUL - Khoẻ Bình An' },
         VUNG_TUONG_LAI: { name: 'MUL - Vững Tương Lai' },
         TRON_TAM_AN: { name: 'Trọn tâm an' },
