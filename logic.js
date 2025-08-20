@@ -1883,6 +1883,14 @@ function showGlobalErrors(errors) {
     </div>
   `;
 }
+function hideGlobalErrors() {
+  const box = document.getElementById('global-error-box');
+  if (!box) return;
+  if (!box.classList.contains('hidden')) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+  }
+}
 
 function generateSummaryTable() {
     // Gate validate sớm
