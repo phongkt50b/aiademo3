@@ -947,7 +947,7 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
             const minFee = stbh / factorRow.maxFactor;
             const maxFee = stbh / factorRow.minFactor;
             if(rangeEl) rangeEl.textContent = `Phí hợp lệ từ ${formatCurrency(minFee, '')} đến ${formatCurrency(maxFee, '')}.`;
-            if (premium > 0 && (premium < minFee || premium > maxFee)) {
+            if (premium >= 0 && (premium < minFee || premium > maxFee)) {
                 setFieldError(feeInput, 'Phí không hợp lệ');
                 ok = false;
             } else { clearFieldError(feeInput);}
