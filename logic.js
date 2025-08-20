@@ -898,26 +898,49 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
     const suppContainer = person.isMain ? document.getElementById('main-supp-container') : person.container;
     const section = suppContainer.querySelector(`.${prodId}-section`);
     const input = section.querySelector(`.${prodId}-stbh`);
-    if(!input) return true;
-    
+    if (!input) return true;
+
     let ok = true;
-    if (config.minStbh && stbh > 0 && stbh < config.minStbh) {
-        setFieldError(input, `Tối thiểu ${formatCurrency(config.minStbh, '')}`); ok = false;
-    } else if (config.maxStbh && stbh > config.maxStbh) {
-        setFieldError(input, `Tối đa ${formatCurrency(config.maxStbh, '')}`); ok = false;
-    } else if (prodId === 'hospital_support' && stbh > 0) {
+
+    // Hospital support: giữ logic đặc thù
+    if (prodId === 'hospital_support' && stbh > 0) {
         const validationEl = section.querySelector('.hospital-support-validation');
         const maxSupportTotal = Math.floor(mainPremium / 4000000) * 100000;
         const maxByAge = person.age >= 18 ? config.maxStbhByAge.from18 : config.maxStbhByAge.under18;
         const remaining = maxSupportTotal - totalHospitalSupportStbh;
-        if(validationEl) validationEl.textContent = `Tối đa: ${formatCurrency(Math.min(maxByAge, remaining), 'đ/ngày')}. Phải là bội số của 100.000.`;
+        if (validationEl) {
+            validationEl.textContent = `Tối đa: ${formatCurrency(Math.min(maxByAge, remaining), 'đ/ngày')}. Phải là bội số của 100.000.`;
+        }
 
         if (stbh % CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE !== 0) {
-             setFieldError(input, `Là bội số của ${formatCurrency(CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE, '')}`); ok = false;
+            setFieldError(input, `Là bội số của ${formatCurrency(CONFIG.HOSPITAL_SUPPORT_STBH_MULTIPLE, '')}`);
+            ok = false;
         } else if (stbh > maxByAge || stbh > remaining) {
-             setFieldError(input, 'Vượt quá giới hạn cho phép'); ok = false;
-        } else { clearFieldError(input); }
+            setFieldError(input, 'Vượt quá giới hạn cho phép');
+            ok = false;
+        } else {
+            clearFieldError(input);
+        }
+    } else if (stbh > 0) {
+        // Gom min / max cho các sản phẩm thường
+        const violateMin = config.minStbh && stbh < config.minStbh;
+        const violateMax = config.maxStbh && stbh > config.maxStbh;
+        if (violateMin || violateMax) {
+            let msg;
+            if (config.minStbh && config.maxStbh) {
+                msg = `Tối thiểu ${formatCurrency(config.minStbh, '')}, tối đa ${formatCurrency(config.maxStbh, '')}`;
+            } else if (config.minStbh) {
+                msg = `Tối thiểu ${formatCurrency(config.minStbh, '')}`;
+            } else {
+                msg = `Tối đa ${formatCurrency(config.maxStbh, '')}`;
+            }
+            setFieldError(input, msg);
+            ok = false;
+        } else {
+            clearFieldError(input);
+        }
     } else {
+        // stbh = 0 hoặc chưa nhập: không báo lỗi
         clearFieldError(input);
     }
 
