@@ -1438,7 +1438,7 @@ function updateTargetAge() {
 
     // Chỉ hiển thị hint cho nhóm PUL/MUL
     if (isPulMul) {
-        if (labelEl) labelEl.textContent = 'Minh họa phí đến tuổi (PUL/MUL)';
+        if (labelEl) labelEl.textContent = 'Minh họa phí đến năm (tuổi NĐBH chính)';
         if (hintEl) {
             hintEl.innerHTML = `Khoảng hợp lệ: <strong>${minAge}</strong> – <strong>${maxAge}</strong>.`;
         }
