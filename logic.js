@@ -1028,6 +1028,47 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
 
     return ok;
 }
+function validateTargetAge(mainPerson, mainProductInfo) {
+  const input = document.getElementById('target-age-input');
+  if (!input) return true;
+
+  // Nếu bị disable (TTA hoặc ABƯV), coi như hợp lệ
+  if (input.disabled) {
+    clearFieldError(input);
+    return true;
+  }
+
+  const val = parseInt((input.value || '').trim(), 10);
+  const age = mainPerson?.age || 0;
+
+  // Xác định paymentTerm thực tế
+  let term = mainProductInfo?.paymentTerm || 0;
+  const key = mainProductInfo?.key || '';
+
+  if (key === 'TRON_TAM_AN') {
+    term = 10;
+  } else if (key === 'AN_BINH_UU_VIET') {
+    term = parseInt(document.getElementById('abuv-term')?.value || '0', 10) || 0;
+  }
+
+  // Nếu chưa có tuổi hoặc chưa có term hợp lệ thì chưa báo lỗi (đợi người dùng nhập xong)
+  if (!age || !term) {
+    clearFieldError(input);
+    return true;
+  }
+
+  const minAllowed = age + term - 1;
+  const maxAllowed = 100;
+
+  let ok = true;
+  if (!val || val < minAllowed || val > maxAllowed) {
+    setFieldError(input, `Tuổi minh họa phải từ ${minAllowed} đến ${maxAllowed}`);
+    ok = false;
+  } else {
+    clearFieldError(input);
+  }
+  return ok;
+}
 
 function validateDobField(input) {
     if (!input) return false;
