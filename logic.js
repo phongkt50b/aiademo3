@@ -1093,6 +1093,7 @@ const runWorkflowDebounced = debounce(runWorkflow, 40);
 
 function attachGlobalListeners() {
     document.body.addEventListener('change', (e) => {
+        hideGlobalErrors(); // NEW
         if (e.target.id === 'main-product') {
             lastRenderedProductKey = null; // Force re-render of options
             if (window.MDP3) MDP3.reset();
@@ -1105,6 +1106,7 @@ function attachGlobalListeners() {
     });
 
     document.body.addEventListener('input', (e) => {
+        hideGlobalErrors(); // NEW
         if (e.target.matches('input[type="text"]') && !e.target.classList.contains('dob-input') && !e.target.classList.contains('name-input') && !e.target.classList.contains('occupation-input')) {
             formatNumberInput(e.target);
         }
@@ -1112,6 +1114,7 @@ function attachGlobalListeners() {
     });
 
     document.body.addEventListener('focusout', (e) => {
+        hideGlobalErrors(); // NEW
         if (e.target.matches('input[type="text"]')) {
             roundInputToThousand(e.target);
             if (e.target.classList.contains('dob-input')) validateDobField(e.target);
