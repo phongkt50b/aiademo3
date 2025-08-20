@@ -1373,29 +1373,78 @@ function initSummaryModal() {
     mainDobInput.addEventListener('input', updateTargetAge);
   }
 }
-
 function updateTargetAge() {
     const mainPersonInfo = collectPersonData(document.getElementById('main-person-container'), true);
-    const mainProduct = document.getElementById('main-product').value;
+    const mainProduct = document.getElementById('main-product')?.value;
     const targetAgeInput = document.getElementById('target-age-input');
 
-    if (!targetAgeInput || !mainPersonInfo || !mainPersonInfo.age) return;
+    if (!targetAgeInput || !mainPersonInfo || typeof mainPersonInfo.age !== 'number' || mainPersonInfo.age <= 0) return;
 
+    const labelEl = document.querySelector('label[for="target-age-input"]');
+    const hintEl  = document.getElementById('target-age-hint'); // giả sử có, nếu không có cũng không sao
+    const isPulMul = ['PUL_TRON_DOI','PUL_15NAM','PUL_5NAM','KHOE_BINH_AN','VUNG_TUONG_LAI'].includes(mainProduct);
+
+    // Reset hint trước
+    if (hintEl) hintEl.textContent = '';
+    // Nếu không phải nhóm PUL/MUL thì trả label về mặc định (nếu từng đổi)
+    if (labelEl && !isPulMul) {
+        labelEl.textContent = 'Minh họa phí đến năm (tuổi NĐBH chính)';
+    }
+
+    // Trọn Tâm An: cố định 10 năm, không hiển thị hint
     if (mainProduct === 'TRON_TAM_AN') {
+        targetAgeInput.disabled = true;
         targetAgeInput.value = mainPersonInfo.age + 10 - 1;
-        targetAgeInput.disabled = true;
-    } else if (mainProduct === 'AN_BINH_UU_VIET') {
+        if (hintEl) hintEl.textContent = ''; // đảm bảo trống
+        return;
+    }
+
+    // An Bình Ưu Việt: cố định theo kỳ hạn chọn, không hiển thị hint
+    if (mainProduct === 'AN_BINH_UU_VIET') {
         const term = parseInt(document.getElementById('abuv-term')?.value || '15', 10);
-        targetAgeInput.value = mainPersonInfo.age + term - 1;
         targetAgeInput.disabled = true;
-    } else {
-        const paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
-        targetAgeInput.disabled = false;
-        const minAge = mainPersonInfo.age + paymentTerm - 1;
-        targetAgeInput.min = minAge;
-        if (!targetAgeInput.value || parseInt(targetAgeInput.value, 10) < minAge) {
-            targetAgeInput.value = minAge;
+        targetAgeInput.value = mainPersonInfo.age + term - 1;
+        if (hintEl) hintEl.textContent = '';
+        return;
+    }
+
+    // Các sản phẩm còn lại (có thể sửa) — bao gồm PUL/MUL
+    targetAgeInput.disabled = false;
+
+    const paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
+
+    if (!paymentTerm || paymentTerm <= 0) {
+        // Chưa nhập thời gian đóng phí
+        targetAgeInput.removeAttribute('min');
+        targetAgeInput.removeAttribute('max');
+        if (isPulMul && hintEl) {
+            hintEl.textContent = 'Nhập thời gian đóng phí để xác định tuổi minh họa.';
         }
+        return;
+    }
+
+    const minAge = mainPersonInfo.age + paymentTerm - 1;
+    const maxAge = 100; // Nếu có rule riêng từng sản phẩm, có thể thay bằng mapping.
+
+    targetAgeInput.min = String(minAge);
+    targetAgeInput.max = String(maxAge);
+
+    const curVal = parseInt(targetAgeInput.value || '0', 10);
+    if (!curVal || curVal < minAge) {
+        targetAgeInput.value = minAge;
+    } else if (curVal > maxAge) {
+        targetAgeInput.value = maxAge;
+    }
+
+    // Chỉ hiển thị hint cho nhóm PUL/MUL
+    if (isPulMul) {
+        if (labelEl) labelEl.textContent = 'Minh họa phí đến tuổi (PUL/MUL)';
+        if (hintEl) {
+            hintEl.innerHTML = `Khoảng hợp lệ: <strong>${minAge}</strong> – <strong>${maxAge}</strong>.`;
+        }
+    } else {
+        // Sản phẩm khác: không hiển thị gì thêm
+        if (hintEl) hintEl.textContent = '';
     }
 }
 
