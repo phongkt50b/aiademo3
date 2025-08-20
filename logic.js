@@ -666,6 +666,21 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             if (programSelect.options[programSelect.selectedIndex]?.disabled) {
                 programSelect.value = '';
             }
+            // HIỂN THỊ STBH THEO OPTION (KHÔNG DÙNG HÀM RIÊNG)
+            const stbhHintEl = sclSection.querySelector('.health-scl-stbh-hint');
+            if (stbhHintEl && programSelect) {
+                const setHint = () => {
+                    const opt = programSelect.selectedOptions[0];
+                    stbhHintEl.textContent = opt && opt.dataset.stbh
+                        ? `STBH: ${formatCurrency(Number(opt.dataset.stbh))}`
+                        : '';
+                };
+                setHint();
+                if (!programSelect.dataset._bindStbh) {
+                    programSelect.addEventListener('change', setHint);
+                    programSelect.dataset._bindStbh = '1';
+                }
+            }
         }
     }
 }
