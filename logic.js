@@ -846,7 +846,7 @@ function runAllValidations(state) {
     if (!validateMainPersonInputs(state.mainPerson)) isValid = false;
     if (!validateMainProductInputs(state.mainPerson, state.mainProduct, state.fees.baseMain)) isValid = false;
     if (!validateExtraPremium(state.fees.baseMain, state.mainProduct.extraPremium)) isValid = false;
-    
+    if (!validateTargetAge(state.mainPerson, state.mainProduct)) isValid = false; // NEW
     const allPersons = [state.mainPerson, ...state.supplementaryPersons].filter(p=>p);
     let totalHospitalSupportStbh = 0;
     
