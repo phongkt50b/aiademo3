@@ -611,12 +611,23 @@ function renderMainProductSection(customer, mainProductKey) {
     attachTermListenersForTargetAge();
 }
 
-
 function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container) {
     const { age, riskGroup, daysFromBirth } = customer;
     
-    const isBaseProduct = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'AN_BINH_UU_VIET', 'TRON_TAM_AN'].includes(mainProductKey);
+    const isBaseProduct = [
+        'PUL_TRON_DOI',
+        'PUL_15NAM',
+        'PUL_5NAM',
+        'KHOE_BINH_AN',
+        'VUNG_TUONG_LAI',
+        'AN_BINH_UU_VIET',
+        'TRON_TAM_AN'
+    ].includes(mainProductKey);
     const isTTA = mainProductKey === 'TRON_TAM_AN';
+
+    // Dưới ngưỡng: khóa riders. (Nếu muốn chỉ khóa khi >0 mà vẫn < ngưỡng, đổi dòng dưới thành: const belowMin = mainPremium > 0 && mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM;)
+    const belowMin = mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM;
+    let anyUncheckedByThreshold = false;
 
     CONFIG.supplementaryProducts.forEach(prod => {
         const section = container.querySelector(`.${prod.id}-section`);
@@ -629,44 +640,93 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             && (!isTTA || prod.id === 'health_scl');
 
         section.classList.toggle('hidden', !isEligible);
+
         const checkbox = section.querySelector(`.${prod.id}-checkbox`);
-        
-        if (!isEligible) checkbox.checked = false;
-        
-        checkbox.disabled = !isEligible;
-        
+        if (!checkbox) return;
+
+        if (!isEligible) {
+            if (checkbox.checked) checkbox.checked = false;
+        }
+
+        if (isEligible && belowMin) {
+            // Khóa do chưa đạt ngưỡng phí chính
+            if (checkbox.checked) {
+                checkbox.checked = false;
+                anyUncheckedByThreshold = true;
+            }
+            checkbox.disabled = true;
+            section.classList.add('opacity-50');
+            const msgEl = section.querySelector('.main-premium-threshold-msg');
+            if (msgEl) {
+                msgEl.textContent = `Cần phí sản phẩm chính ≥ ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+                msgEl.classList.remove('hidden');
+            }
+        } else {
+            // Trạng thái bình thường
+            checkbox.disabled = !isEligible;
+            section.classList.toggle('opacity-50', !isEligible);
+            const msgEl = section.querySelector('.main-premium-threshold-msg');
+            if (msgEl) {
+                msgEl.textContent = '';
+                msgEl.classList.add('hidden');
+            }
+        }
+
+        // Hiển thị / ẩn block options
         const options = section.querySelector('.product-options');
-        options.classList.toggle('hidden', !checkbox.checked);
-        
+        if (options) {
+            options.classList.toggle('hidden', !checkbox.checked);
+        }
+
+        // Cập nhật hiển thị phí
         const fee = appState.fees.byPerson[customer.id]?.suppDetails?.[prod.id] || 0;
         const feeDisplay = section.querySelector('.fee-display');
-        if(feeDisplay) feeDisplay.textContent = fee > 0 ? `Phí: ${formatCurrency(fee)}` : '';
+        if (feeDisplay) {
+            feeDisplay.textContent = fee > 0 ? `Phí: ${formatCurrency(fee)}` : '';
+        }
     });
+
+    // Nếu có rider bị bỏ chọn do bị khóa bởi ngưỡng → tính lại (debounce để tránh vòng lặp)
+    if (anyUncheckedByThreshold && typeof runWorkflowDebounced === 'function') {
+        runWorkflowDebounced();
+    }
     
+    // Xử lý riêng Sức khỏe Bùng Gia Lực (chương trình) sau khi đã khóa nếu belowMin
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
         const checkbox = sclSection.querySelector('.health_scl-checkbox');
-        // Nếu là TTA thì auto bật Sức khoẻ Bùng Gia Lực
-        if (isTTA && checkbox && !checkbox.checked) {
+        if (checkbox && isTTA && !checkbox.checked && !belowMin) {
+            // Với Trọn Tâm An tự bật nếu không bị khóa bởi belowMin
             checkbox.checked = true;
             sclSection.querySelector('.product-options')?.classList.remove('hidden');
         }
-        // Mặc định 'Nâng cao' nếu chưa chọn
-        if (isTTA) {
+
+        if (belowMin) {
+            // Đang bị khóa toàn cục: không cần xử lý logic lựa chọn chương trình
+            return;
+        } else if (isTTA) {
+            // TTA: mở toàn bộ option
             Array.from(programSelect.options).forEach(opt => opt.disabled = false);
         } else {
+            // Logic giới hạn chương trình theo premium
             programSelect.querySelectorAll('option').forEach(opt => {
-                if (opt.value === 'nang_cao') return;
-                if (mainPremium >= 15000000) opt.disabled = false;
-                else if (mainPremium >= 10000000) opt.disabled = !['co_ban', 'nang_cao', 'toan_dien'].includes(opt.value);
-                else if (mainPremium >= 5000000) opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
-                else opt.disabled = true;
+                if (opt.value === 'nang_cao') return; // luôn giữ nâng_cao không disable
+                if (mainPremium >= 15000000) {
+                    opt.disabled = false;
+                } else if (mainPremium >= 10000000) {
+                    opt.disabled = !['co_ban', 'nang_cao', 'toan_dien'].includes(opt.value);
+                } else if (mainPremium >= 5000000) {
+                    opt.disabled = !['co_ban', 'nang_cao'].includes(opt.value);
+                } else {
+                    opt.disabled = true;
+                }
             });
             if (programSelect.options[programSelect.selectedIndex]?.disabled) {
                 programSelect.value = '';
             }
-            // HIỂN THỊ STBH THEO OPTION (KHÔNG DÙNG HÀM RIÊNG)
+
+            // Hint STBH theo option
             const stbhHintEl = sclSection.querySelector('.health-scl-stbh-hint');
             if (stbhHintEl && programSelect) {
                 const setHint = () => {
@@ -684,6 +744,7 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     }
 }
+
 function updateSummaryUI(fees) {
   const f = fees || { baseMain:0, extra:0, totalSupp:0, total:0 };
   const fmt = (n)=> formatDisplayCurrency(Math.round((Number(n)||0)/1000)*1000);
