@@ -1770,11 +1770,87 @@ window.MDP3 = (function () {
     if (el.textContent !== target) el.textContent = target;
   };
 })();
+// === LITE MIN: Gom lỗi chỉ bổ sung những nhóm CHƯA có inline ===
+function collectSimpleErrors() {
+  const rawErrors = [];
 
+  // 1. Gom toàn bộ inline hiện có
+  document.querySelectorAll('.field-error').forEach(el => {
+    const t = (el.textContent || '').trim();
+    if (t) rawErrors.push(t);
+  });
 
+  // Helper: kiểm tra đã có lỗi chứa 1 trong các từ khóa
+  const hasError = (...keys) => rawErrors.some(e => {
+    const low = e.toLowerCase();
+    return keys.some(k => low.includes(k.toLowerCase()));
+  });
 
+  const mainProduct = document.getElementById('main-product')?.value || '';
 
+  // 2. Chưa chọn sản phẩm chính
+  if (!mainProduct && !hasError('sản phẩm chính')) {
+    rawErrors.push('Chưa chọn sản phẩm chính.');
+  }
 
+  // 3. STBH sản phẩm chính (chỉ check thiếu & dưới min cơ bản)
+  if (mainProduct && mainProduct !== 'TRON_TAM_AN' && !hasError('stbh sản phẩm chính')) {
+    const stbhVal = parseFormattedNumber(document.getElementById('main-stbh')?.value);
+    if (!stbhVal) {
+      rawErrors.push('Chưa nhập STBH sản phẩm chính.');
+    } else if (stbhVal < CONFIG.MAIN_PRODUCT_MIN_STBH) {
+      rawErrors.push(`STBH sản phẩm chính tối thiểu ${CONFIG.MAIN_PRODUCT_MIN_STBH.toLocaleString('vi-VN')} đ.`);
+    }
+  }
+
+  // 4. DOB tối giản (chỉ check trống) nếu chưa có inline về ngày sinh
+  const dobInput = document.querySelector('#main-person-container .dob-input');
+  if (dobInput && !hasError('ngày sinh')) {
+    if (!(dobInput.value || '').trim()) {
+      rawErrors.push('Chưa nhập ngày sinh NĐBH chính.');
+    }
+  }
+
+  // 5. Nghề nghiệp (chỉ check chưa chọn) nếu chưa có inline
+  const occInput = document.querySelector('#main-person-container .occupation-input');
+  if (occInput && !hasError('nghề')) {
+    if (!occInput.dataset.group) {
+      rawErrors.push('Chưa chọn nghề nghiệp.');
+    }
+  }
+
+  // 6. Phí sản phẩm chính tối thiểu (dựa appState) nếu chưa có inline tương tự
+  const baseMain = (typeof appState !== 'undefined' && appState?.fees?.baseMain) ? appState.fees.baseMain : 0;
+  if (mainProduct && baseMain > 0 && baseMain < CONFIG.MAIN_PRODUCT_MIN_PREMIUM && !hasError('phí sản phẩm chính', 'phí chính tối thiểu')) {
+    rawErrors.push(`Phí sản phẩm chính tối thiểu ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ.`);
+  }
+
+  // 7. Extra premium > factor nếu chưa có inline
+  const extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value);
+  if (extraPremium > 0 && baseMain > 0 &&
+      extraPremium > CONFIG.EXTRA_PREMIUM_MAX_FACTOR * baseMain &&
+      !hasError('lần phí chính', 'phí đóng thêm')) {
+    rawErrors.push(`Phí đóng thêm tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí chính.`);
+  }
+
+  // 8. Rider STBH parse = 0 (nhập ký tự), chỉ nếu chưa có lỗi rider tương tự
+  if (!hasError('sản phẩm bổ sung', 'rider')) {
+    let needAddRiderInvalid = false;
+    document.querySelectorAll('.product-section:not(.hidden) input[type="text"]').forEach(inp => {
+      if (/\bstbh\b/.test(inp.className)) {
+        const raw = (inp.value || '').trim();
+        if (raw !== '') {
+          const val = parseFormattedNumber(raw);
+            if (val === 0) needAddRiderInvalid = true;
+        }
+      }
+    });
+    if (needAddRiderInvalid) rawErrors.push('STBH sản phẩm bổ sung không hợp lệ.');
+  }
+
+  // 9. Khử trùng lặp nhanh
+  return [...new Set(rawErrors)];
+}
 
 function generateSummaryTable() {
 
