@@ -1137,15 +1137,16 @@ function generateSupplementaryProductsHtml() {
         let optionsHtml = '';
         if (prod.id === 'health_scl') {
             optionsHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+             <div>
                 <label class="font-medium text-gray-700 block mb-1">Quyền lợi chính</label>
                 <select class="form-select health-scl-program">
-                  <option value="co_ban">Cơ bản</option>
-                  <option value="nang_cao" selected>Nâng cao</option>
-                  <option value="toan_dien">Toàn diện</option>
-                  <option value="hoan_hao">Hoàn hảo</option>
+                  <option value="co_ban"    data-stbh="100000000">Cơ bản</option>
+                  <option value="nang_cao"  data-stbh="250000000" selected>Nâng cao</option>
+                  <option value="toan_dien" data-stbh="500000000">Toàn diện</option>
+                  <option value="hoan_hao"  data-stbh="1000000000">Hoàn hảo</option>
                 </select>
-              </div>
+                <p class="text-sm text-gray-500 mt-1 health-scl-stbh-hint"></p>
+              </div>    
               <div>
                 <label class="font-medium text-gray-700 block mb-1">Phạm vi địa lý</label>
                 <select class="form-select health-scl-scope"><option value="main_vn">Việt Nam</option><option value="main_global">Nước ngoài</option></select>
