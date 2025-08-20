@@ -1869,7 +1869,22 @@ function showGlobalErrors(errors) {
 }
 
 function generateSummaryTable() {
-
+    // Gate validate sớm
+  try { if (typeof runWorkflow === 'function') runWorkflow(); } catch(e){}
+  const simpleErrors = collectSimpleErrors();
+  if (simpleErrors.length) {
+    showGlobalErrors(simpleErrors);
+    const box = document.getElementById('global-error-box');
+    if (box) {
+      const y = box.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y < 0 ? 0 : y, behavior: 'smooth' });
+      box.setAttribute('tabindex','-1');
+      box.focus({ preventScroll: true });
+    }
+    return false; // Dừng hẳn
+  } else {
+    showGlobalErrors([]); // Clear lỗi cũ nếu trước đó có
+  }
     const modal = document.getElementById('summary-modal');
     const container = document.getElementById('summary-content-container');
     if (!container) return;
