@@ -487,11 +487,17 @@ function renderUI() {
     const suppFeeEl = document.getElementById('summary-supp-fee');
 
     if (!isValid) {
+        // Vẫn hiển thị phí chính & phí đóng thêm
+        if (mainFeeEl)  mainFeeEl.textContent  = formatDisplayCurrency(fees.baseMain);
+        if (extraFeeEl) extraFeeEl.textContent = formatDisplayCurrency(fees.extra);
+        // Tổng & phí bổ sung để 0 vì chưa đủ điều kiện hợp lệ
         if (summaryTotalEl) summaryTotalEl.textContent = "0";
-        if (mainFeeEl) mainFeeEl.textContent = "0";
-        if (extraFeeEl) extraFeeEl.textContent = "0";
-        if (suppFeeEl) suppFeeEl.textContent = "0";
-        updateMainProductFeeDisplay(0, 0);
+        if (suppFeeEl)      suppFeeEl.textContent      = "0";
+        // Khối hiển thị dưới form sản phẩm chính
+        updateMainProductFeeDisplay(fees.baseMain, fees.extra);
+        // Tùy chọn: vẫn cập nhật khả dụng kỳ đóng phí
+        updatePaymentFrequencyOptions(fees.baseMain);
+        updateSummaryUI(fees); // Nếu không muốn hiển thị breakdown khi invalid, có thể bỏ hàng này
         if (window.renderSection6V2) window.renderSection6V2();
         return;
     }
