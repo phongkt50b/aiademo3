@@ -1819,16 +1819,32 @@ function collectSimpleErrors() {
     }
   }
 
-  // 6. Phí sản phẩm chính tối thiểu (dựa appState) nếu chưa có inline tương tự
-  const baseMain = (typeof appState !== 'undefined' && appState?.fees?.baseMain) ? appState.fees.baseMain : 0;
-  if (mainProduct && baseMain > 0 && baseMain < CONFIG.MAIN_PRODUCT_MIN_PREMIUM && !hasError('phí sản phẩm chính', 'phí chính tối thiểu')) {
-    rawErrors.push(`Phí sản phẩm chính tối thiểu ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ.`);
+  // 6. Phí sản phẩm chính
+  // (Giữ cách lấy cũ để tối thiểu chỉnh sửa)
+  const baseMainRaw = (typeof appState !== 'undefined' && appState?.fees?.baseMain) ? appState.fees.baseMain : '';
+  const baseMainNum = Number(String(baseMainRaw).replace(/[\s,._]/g, '')) || 0; // đơn giản: strip vài ký tự thường gặp
+  const minPremium = CONFIG.MAIN_PRODUCT_MIN_PREMIUM;
+
+  if (!hasError('phí sản phẩm chính')) {
+    if (mainProduct === 'MUL') {
+      if (!baseMainNum) {
+        rawErrors.push('Chưa nhập phí sản phẩm chính (MUL).');
+      } else if (baseMainNum < minPremium) {
+        rawErrors.push(`Phí sản phẩm chính (MUL) tối thiểu ${minPremium.toLocaleString('vi-VN')} đ.`);
+      }
+    } else if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
+      // Sản phẩm khác: chỉ check nếu đã nhập (>0) nhưng < min
+      if (baseMainNum > 0 && baseMainNum < minPremium) {
+        rawErrors.push(`Phí sản phẩm chính tối thiểu ${minPremium.toLocaleString('vi-VN')} đ.`);
+      }
+    }
+    // TRON_TAM_AN: bỏ qua
   }
 
-  // 7. Extra premium > factor nếu chưa có inline
+  // 7. Extra premium > factor nếu chưa có inline tương tự
   const extraPremium = parseFormattedNumber(document.getElementById('extra-premium-input')?.value);
-  if (extraPremium > 0 && baseMain > 0 &&
-      extraPremium > CONFIG.EXTRA_PREMIUM_MAX_FACTOR * baseMain &&
+  if (extraPremium > 0 && baseMainNum > 0 &&
+      extraPremium > CONFIG.EXTRA_PREMIUM_MAX_FACTOR * baseMainNum &&
       !hasError('lần phí chính', 'phí đóng thêm')) {
     rawErrors.push(`Phí đóng thêm tối đa ${CONFIG.EXTRA_PREMIUM_MAX_FACTOR} lần phí chính.`);
   }
@@ -1841,7 +1857,7 @@ function collectSimpleErrors() {
         const raw = (inp.value || '').trim();
         if (raw !== '') {
           const val = parseFormattedNumber(raw);
-            if (val === 0) needAddRiderInvalid = true;
+          if (val === 0) needAddRiderInvalid = true;
         }
       }
     });
