@@ -1851,6 +1851,22 @@ function collectSimpleErrors() {
   // 9. Khử trùng lặp nhanh
   return [...new Set(rawErrors)];
 }
+function showGlobalErrors(errors) {
+  const box = document.getElementById('global-error-box');
+  if (!box) return;
+  if (!errors.length) {
+    box.classList.add('hidden');
+    box.innerHTML = '';
+    return;
+  }
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="border border-red-300 bg-red-50 text-red-700 rounded p-3 text-sm">
+      <div class="font-medium mb-1">Vui lòng sửa trước khi tạo bảng minh họa:</div>
+      ${errors.map(e => `<div class="flex gap-1"><span>•</span><span>${e}</span></div>`).join('')}
+    </div>
+  `;
+}
 
 function generateSummaryTable() {
 
