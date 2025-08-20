@@ -1245,6 +1245,7 @@ function generateSupplementaryProductsHtml() {
           </label>
           <div class="product-options hidden mt-3 pl-8 space-y-3 border-l-2 border-gray-200">
             ${optionsHtml}
+            <p class="text-xs text-red-600 main-premium-threshold-msg hidden"></p>
             <div class="text-right font-semibold text-aia-red fee-display min-h-[1.5rem]"></div>
           </div>
         </div>`;
