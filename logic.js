@@ -2241,6 +2241,7 @@ function buildPart1RowsData(ctx) {
 /********************************************************************
  * PART 2 (SCHEDULE) DATA BUILDER
  ********************************************************************/
+// PATCH #5: Part 2 schedule đồng nhất rider factoring
 function buildPart2ScheduleRows(ctx){
   const {
     persons, mainInfo, paymentTerm, targetAge,
@@ -2258,80 +2259,64 @@ function buildPart2ScheduleRows(ctx){
     const currentAge = mainInfo.age + year -1;
     const inTerm = year <= paymentTerm;
 
-    const mainYear = inTerm ? baseMainAnnual : 0;
-    const extraYear = inTerm ? extraAnnual : 0;
+    const mainYearBase = inTerm ? baseMainAnnual : 0;
+    const extraYearBase = inTerm ? extraAnnual : 0;
 
-    const perPersonSuppYear = [];
-    const perPersonSuppPeriod = [];
+    const perPersonSuppBase = [];
+    const perPersonSuppPerPeriod = [];
+    const perPersonSuppAnnualEq = [];
 
     persons.forEach(p => {
-      let sumYear = 0;
-      let sumPeriod = 0;
-      const ageAtThisYear = p.age + (year - 1);
+      let sumBase = 0;
+      let sumPer = 0;
+
+      const attained = p.age + year - 1;
 
       const addRider = (key, baseFee) => {
         if (!baseFee) return;
-        // tuổi còn trong giới hạn?
-          if (ageAtThisYear > riderMaxAge(key)) return;
-        sumYear += baseFee;
+        if (attained > riderMaxAge(key)) return;
+        sumBase += baseFee;
         if (!isAnnual) {
-          const factored = roundTo1000((baseFee * riderFactor)/periods);
-          sumPeriod += factored;
+          sumPer += riderPerPeriod(baseFee, periods, riderFactor);
         }
       };
 
-      if (p.supplements?.health_scl) {
-        const fee = calculateHealthSclPremium(p, baseMainAnnual, 0, ageAtThisYear);
-        addRider('health_scl', fee);
-      }
-      if (p.supplements?.bhn) {
-        const fee = calculateBhnPremium(p, baseMainAnnual, 0, ageAtThisYear);
-        addRider('bhn', fee);
-      }
-      if (p.supplements?.accident) {
-        const fee = calculateAccidentPremium(p, baseMainAnnual, 0, ageAtThisYear);
-        addRider('accident', fee);
-      }
-      if (p.supplements?.hospital_support) {
-        const fee = calculateHospitalSupportPremium(p, baseMainAnnual, 0, ageAtThisYear);
-        addRider('hospital_support', fee);
-      }
-      if (mdpEnabled && mdpFeeYear>0 && (mdpTargetId === p.id || (mdpTargetId==='other' && p.id==='mdp3_other'))){
-        const fee = (ageAtThisYear <= riderMaxAge('mdp3')) ? mdpFeeYear : 0;
-        addRider('mdp3', fee);
+      if (p.supplements?.health_scl) addRider('health_scl', calculateHealthSclPremium(p, baseMainAnnual, 0, attained));
+      if (p.supplements?.bhn)        addRider('bhn',        calculateBhnPremium(p, baseMainAnnual, 0, attained));
+      if (p.supplements?.accident)   addRider('accident',   calculateAccidentPremium(p, baseMainAnnual, 0, attained));
+      if (p.supplements?.hospital_support) addRider('hospital_support', calculateHospitalSupportPremium(p, baseMainAnnual, 0, attained));
+
+      if (mdpEnabled && mdpFeeYear>0 && (mdpTargetId === p.id || (mdpTargetId==='other' && p.id==='mdp3_other'))) {
+        if (attained <= riderMaxAge('mdp3')) addRider('mdp3', mdpFeeYear);
       }
 
-      perPersonSuppYear.push(sumYear);
-      perPersonSuppPeriod.push(sumPeriod);
+      perPersonSuppBase.push(sumBase);
+      perPersonSuppPerPeriod.push(sumPer);
+      perPersonSuppAnnualEq.push(isAnnual ? sumBase : sumPer * periods);
     });
 
-    const totalSuppYear = perPersonSuppYear.reduce((a,b)=>a+b,0);
-    const totalSuppPeriod = perPersonSuppPeriod.reduce((a,b)=>a+b,0);
+    const suppBaseTotal = perPersonSuppBase.reduce((a,b)=>a+b,0);
+    const suppAnnualEqTotal = perPersonSuppAnnualEq.reduce((a,b)=>a+b,0);
 
-    let totalPeriod = 0;
-    let diff = 0;
-    const totalYear = mainYear + extraYear + totalSuppYear;
-    if (!isAnnual) {
-      const mainPer = roundTo1000(mainYear/periods);
-      const extraPer = roundTo1000(extraYear/periods);
-      totalPeriod = mainPer + extraPer + totalSuppPeriod;
-      diff = totalPeriod*periods - totalYear;
-    }
+    const totalYearBase = mainYearBase + extraYearBase + suppBaseTotal;
+    const totalAnnualEq = isAnnual ? totalYearBase : (mainYearBase + extraYearBase + suppAnnualEqTotal);
+    const diff = totalAnnualEq - totalYearBase;
 
     rows.push({
       year,
       age: currentAge,
-      mainYear,
-      extraYear,
-      perPersonSuppYear,
-      perPersonSuppPeriod,
-      totalYear,
-      totalPeriod,
+      mainYearBase,
+      extraYearBase,
+      perPersonSuppBase,
+      perPersonSuppPerPeriod,
+      perPersonSuppAnnualEq,
+      totalYearBase,
+      totalAnnualEq,
       diff
     });
   }
 
-  const extraAllZero = rows.every(r => r.extraYear === 0);
+  const extraAllZero = rows.every(r => r.extraYearBase === 0);
 
   return { rows, extraAllZero };
 }
@@ -2353,44 +2338,24 @@ function buildIntroSection(data) {
   `;
 }
 /******************** HELPER: TÍNH LIFETIME CHO PHẦN 1 ********************/
+// PATCH #3: Lifetime riders per-year factoring + MDP3 STBH + average
 function computePart1LifetimeData(summaryData) {
   const {
-    persons, productKey, paymentTerm, targetAge,
+    persons, paymentTerm, targetAge,
     periods, isAnnual, riderFactor,
     mdpEnabled, mdpTargetId
   } = summaryData;
 
   const mainPerson = summaryData.mainInfo;
-  const globalTimelineYears = targetAge - mainPerson.age + 1; // inclusive
+  const globalTimelineYears = targetAge - mainPerson.age + 1;
   const r1000 = (n) => Math.round((n||0)/1000)*1000;
 
-  // Phí năm đầu SP chính & extra
   const baseMainAnnualFirst = calculateMainPremium(mainPerson, appState.mainProduct);
   const extraAnnualFirst = appState.mainProduct.extraPremium || 0;
   const stbhMain = (appState.mainProduct.key === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0);
-
   const payYearsMain = Math.max(0, Math.min(paymentTerm, globalTimelineYears));
 
-  const riderCfgMap = {
-    health_scl: { maxRenewalAge: 74, label: (person) => {
-      const s = person.supplements.health_scl;
-      const programMap = {co_ban:'Cơ bản', nang_cao:'Nâng cao', toan_dien:'Toàn diện', hoan_hao:'Hoàn hảo'};
-      const programName = programMap[s.program] || '';
-      const scopeStr = (s.scope==='main_global'?'Nước ngoài':'Việt Nam')
-        + (s.outpatient?', Ngoại trú':'')
-        + (s.dental?', Nha khoa':'');
-      return `Sức khoẻ Bùng Gia Lực – ${programName} (${scopeStr})`;
-    }, stbh: (person) => {
-      const s = person.supplements.health_scl;
-      return formatDisplayCurrency(getHealthSclStbhByProgram(s.program));
-    }},
-    bhn: { maxRenewalAge: 85, label: ()=> 'Bệnh Hiểm Nghèo 2.0', stbh: (p)=>formatDisplayCurrency(p.supplements.bhn.stbh || 0) },
-    accident: { maxRenewalAge: 64, label: ()=> 'Bảo hiểm Tai nạn', stbh: (p)=>formatDisplayCurrency(p.supplements.accident.stbh || 0) },
-    hospital_support: { maxRenewalAge: 64, label: ()=> 'Hỗ trợ chi phí nằm viện', stbh: (p)=>formatDisplayCurrency(p.supplements.hospital_support.stbh || 0) },
-    mdp3: { maxRenewalAge: 64, label: ()=> 'Miễn đóng phí 3.0', stbh: ()=> '—' }
-  };
-
-  // Chuẩn bị stbhBase cho MDP3 giống logic getPremium
+  // Chuẩn bị STBH base cho MDP3
   let mdp3StbhBase = 0;
   if (mdpEnabled) {
     try {
@@ -2402,7 +2367,7 @@ function computePart1LifetimeData(summaryData) {
       }
     } catch(e){}
   }
-  function calcMdp3PremiumAtAge(age, gender) {
+  function calcMdp3PremiumIssue(age, gender) { // chỉ dùng tuổi phát hành
     if (!mdpEnabled || !mdp3StbhBase) return 0;
     const row = product_data.mdp3_rates.find(r => age >= r.ageMin && age <= r.ageMax);
     if (!row) return 0;
@@ -2410,18 +2375,36 @@ function computePart1LifetimeData(summaryData) {
     return roundDownTo1000((mdp3StbhBase/1000)*rate);
   }
 
+  const riderCfgMap = {
+    health_scl: { maxRenewalAge: 74, label: (person) => {
+      const s = person.supplements.health_scl;
+      const programMap = {co_ban:'Cơ bản', nang_cao:'Nâng cao', toan_dien:'Toàn diện', hoan_hao:'Hoàn hảo'};
+      const programName = programMap[s.program] || '';
+      const scopeStr = (s.scope==='main_global'?'Nước ngoài':'Việt Nam')
+        + (s.outpatient?', Ngoại trú':'')
+        + (s.dental?', Nha khoa':'');
+      return `Sức khoẻ Bùng Gia Lực – ${programName} (${scopeStr})`;
+    }, stbh: (p) => formatDisplayCurrency(getHealthSclStbhByProgram(p.supplements.health_scl.program)) },
+    bhn: { maxRenewalAge: 85, label: ()=> 'Bệnh Hiểm Nghèo 2.0', stbh: (p)=> formatDisplayCurrency(p.supplements.bhn.stbh || 0) },
+    accident: { maxRenewalAge: 64, label: ()=> 'Bảo hiểm Tai nạn', stbh: (p)=> formatDisplayCurrency(p.supplements.accident.stbh || 0) },
+    hospital_support: { maxRenewalAge: 64, label: ()=> 'Hỗ trợ chi phí nằm viện', stbh: (p)=> formatDisplayCurrency(p.supplements.hospital_support.stbh || 0) },
+    mdp3: { maxRenewalAge: 64, label: ()=> 'Miễn đóng phí 3.0', stbh: ()=> formatDisplayCurrency(mdp3StbhBase) }
+  };
+
   const rows = [];
   const perPersonAgg = {};
   function ensureAgg(person) {
     if (!perPersonAgg[person.id]) {
       perPersonAgg[person.id] = {
+        id: person.id,
         name: person.name,
         perPeriodSum: 0,
         annualEqSum: 0,
         diffSum: 0,
         firstYearAnnualSum: 0,
         annualBaseSum: 0,
-        lifetimeSum: 0
+        lifetimeSum: 0,
+        maxYears: 0
       };
     }
     return perPersonAgg[person.id];
@@ -2429,21 +2412,28 @@ function computePart1LifetimeData(summaryData) {
 
   function pushRow(person, productLabel, stbhDisplay, payYears, firstAnnualBase, isRider, lifetimeSum) {
     if (payYears <= 0 || firstAnnualBase <= 0 || lifetimeSum <= 0) return;
-        // PATCH: lifetime của rider phải tính theo số tiền thực trả (có factor khi không đóng năm)
-    if (!isAnnual && isRider) {
-      lifetimeSum = r1000(lifetimeSum * riderFactor);
-    }
+
+    // perPeriod / annualEq / diff chỉ cho năm đầu
     let perPeriod = 0, annualEq = 0, diff = 0;
-    // Phí năm đầu (firstAnnualBase) khác “Phí theo năm” (annualBase) chỉ khi có kỳ đóng?? -> “Phí theo năm” là annualBase = firstAnnualBase
     const annualBase = firstAnnualBase;
-    const firstYearEquivalent = isRider && !isAnnual ? r1000(firstAnnualBase * riderFactor) : firstAnnualBase;
+    let firstYearEquivalent = firstAnnualBase;
 
     if (!isAnnual) {
-      perPeriod = r1000(firstYearEquivalent / periods);
-      annualEq = perPeriod * periods;
-      diff = annualEq - annualBase;
+      if (isRider) {
+        // năm đầu rider
+        perPeriod = riderPerPeriod(firstAnnualBase, periods, riderFactor);
+        annualEq = perPeriod * periods;
+        diff = annualEq - annualBase;
+        firstYearEquivalent = annualEq;
+      } else {
+        perPeriod = roundDownTo1000(firstAnnualBase / periods);
+        annualEq = perPeriod * periods;
+        diff = annualEq - annualBase;
+        firstYearEquivalent = annualEq;
+      }
     }
-    const avg = lifetimeSum > 0 && payYears > 0 ? r1000(lifetimeSum / payYears) : 0;
+
+    const avg = payYears > 0 ? r1000(lifetimeSum / payYears) : 0;
 
     rows.push({
       personId: person.id,
@@ -2452,8 +2442,8 @@ function computePart1LifetimeData(summaryData) {
       stbhDisplay,
       payYears,
       perPeriod,
-      firstYearAnnual: (isAnnual ? firstAnnualBase : annualEq), // “Phí năm đầu”
-      annualBase,                       // “Phí theo năm” (năm đầu)
+      firstYearAnnual: (isAnnual ? firstAnnualBase : firstYearEquivalent),
+      annualBase,
       annualEq,
       diff,
       lifetimeSum,
@@ -2465,91 +2455,94 @@ function computePart1LifetimeData(summaryData) {
     agg.perPeriodSum += perPeriod;
     agg.annualEqSum += annualEq;
     agg.diffSum += diff;
-    agg.firstYearAnnualSum += (isAnnual ? firstAnnualBase : annualEq);
+    agg.firstYearAnnualSum += (isAnnual ? firstAnnualBase : firstYearEquivalent);
     agg.annualBaseSum += annualBase;
     agg.lifetimeSum += lifetimeSum;
+    agg.maxYears = Math.max(agg.maxYears, payYears);
   }
 
   persons.forEach(person => {
-    // Sản phẩm chính + đóng thêm (level, phí không tăng theo tuổi)
-    if (person.isMain && appState.mainProduct.key) {
-      if (payYearsMain > 0 && baseMainAnnualFirst > 0) {
-        const lifetimeMain = baseMainAnnualFirst * payYearsMain;
-        pushRow(person, 'Sản phẩm chính', formatDisplayCurrency(stbhMain),
-          payYearsMain, baseMainAnnualFirst, false, lifetimeMain);
-      }
-      if (extraAnnualFirst > 0 && payYearsMain > 0) {
-        const lifetimeExtra = extraAnnualFirst * payYearsMain;
-        pushRow(person, 'Phí đóng thêm', '—',
-          payYearsMain, extraAnnualFirst, false, lifetimeExtra);
-      }
+
+    // Sản phẩm chính
+    if (person.isMain && appState.mainProduct.key && payYearsMain > 0 && baseMainAnnualFirst > 0) {
+      const lifetimeMain = baseMainAnnualFirst * payYearsMain;
+      pushRow(person, getProductLabel(appState.mainProduct.key), formatDisplayCurrency(stbhMain),
+        payYearsMain, baseMainAnnualFirst, false, lifetimeMain);
     }
 
-    // Riders
+    // Đóng thêm
+    if (person.isMain && extraAnnualFirst > 0 && payYearsMain > 0) {
+      const lifetimeExtra = extraAnnualFirst * payYearsMain;
+      pushRow(person, 'Phí đóng thêm', '—', payYearsMain, extraAnnualFirst, false, lifetimeExtra);
+    }
+
+    // Riders biến phí theo tuổi
     if (person.supplements) {
       Object.keys(person.supplements).forEach(rid => {
-        if (!riderCfgMap[rid]) return;
         const cfg = riderCfgMap[rid];
+        if (!cfg) return;
         const issueAge = person.age;
         const maxAge = cfg.maxRenewalAge;
         const payYears = Math.max(0, Math.min(targetAge, maxAge) - issueAge + 1);
         if (payYears <= 0) return;
 
-        let lifetime = 0;
         let firstAnnualBase = 0;
-        for (let y=1; y<=payYears; y++) {
-          const attainedAge = issueAge + (y - 1);
-          let pY = 0;
-          if (rid === 'health_scl') {
-            pY = calculateHealthSclPremium(person, appState.fees.baseMain, 0, attainedAge);
-          } else if (rid === 'bhn') {
-            pY = calculateBhnPremium(person, appState.fees.baseMain, 0, attainedAge);
-          } else if (rid === 'accident') {
-            pY = calculateAccidentPremium(person, appState.fees.baseMain, 0, attainedAge);
-          } else if (rid === 'hospital_support') {
-            pY = calculateHospitalSupportPremium(person, appState.fees.baseMain, 0, attainedAge);
-          }
-          if (y===1) firstAnnualBase = pY;
-          lifetime += pY;
-        }
-        if (firstAnnualBase <= 0 || lifetime <= 0) return;
+        let lifetimeAnnualEq = 0; // tổng annualEquivalent (factored) nếu có kỳ đóng
+        let lifetimeBase = 0;     // tổng base (tham khảo)
 
-        pushRow(
-          person,
-          cfg.label(person),
-          cfg.stbh(person),
-          payYears,
-          firstAnnualBase,
-          true,
-          lifetime
-        );
+        for (let y=1; y<=payYears; y++) {
+          const attainedAge = issueAge + y - 1;
+            let baseYear = 0;
+            if (rid === 'health_scl') baseYear = calculateHealthSclPremium(person, appState.fees.baseMain, 0, attainedAge);
+            else if (rid === 'bhn') baseYear = calculateBhnPremium(person, appState.fees.baseMain, 0, attainedAge);
+            else if (rid === 'accident') baseYear = calculateAccidentPremium(person, appState.fees.baseMain, 0, attainedAge);
+            else if (rid === 'hospital_support') baseYear = calculateHospitalSupportPremium(person, appState.fees.baseMain, 0, attainedAge);
+
+          if (y === 1) firstAnnualBase = baseYear;
+          lifetimeBase += baseYear;
+          if (isAnnual) {
+            lifetimeAnnualEq += baseYear;
+          } else {
+            const per = riderPerPeriod(baseYear, periods, riderFactor);
+            lifetimeAnnualEq += per * periods;
+          }
+        }
+
+        if (firstAnnualBase > 0 && lifetimeAnnualEq > 0) {
+          pushRow(person, cfg.label(person), cfg.stbh(person), payYears, firstAnnualBase, true,
+            isAnnual ? lifetimeBase : lifetimeAnnualEq);
+        }
       });
     }
 
-    // MDP3
+    // MDP3 (phí level theo tuổi phát hành)
     if (mdpEnabled && (mdpTargetId === person.id || (mdpTargetId === 'other' && person.id === 'mdp3_other'))) {
       const cfg = riderCfgMap.mdp3;
       const issueAge = person.age;
-      const payYears = Math.max(0, Math.min(targetAge, cfg.maxRenewalAge) - issueAge + 1);
-      if (payYears > 0) {
-        let lifetime = 0;
-        let firstAnnualBase = 0;
-        for (let y=1; y<=payYears; y++) {
-          const attainedAge = issueAge + (y - 1);
-          const pY = calcMdp3PremiumAtAge(attainedAge, person.gender);
-            if (y===1) firstAnnualBase = pY;
-          lifetime += pY;
-        }
-        if (firstAnnualBase > 0 && lifetime > 0) {
-          pushRow(person, cfg.label(), cfg.stbh(), payYears, firstAnnualBase, true, lifetime);
+      if (issueAge < 18 || issueAge > 60) {
+        // tuổi không hợp lệ -> bỏ
+      } else {
+        const payYears = Math.max(0, Math.min(targetAge, cfg.maxRenewalAge) - issueAge + 1);
+        const firstAnnualBase = calcMdp3PremiumIssue(issueAge, person.gender); // level
+        if (payYears > 0 && firstAnnualBase > 0) {
+          let lifetimeSum = 0;
+          if (isAnnual) {
+            lifetimeSum = firstAnnualBase * payYears;
+          } else {
+            // mỗi năm annualEq = riderAnnualEquivalent(firstAnnualBase)
+            const annualEqYear = riderAnnualEquivalent(firstAnnualBase, periods, riderFactor);
+            lifetimeSum = annualEqYear * payYears;
+          }
+          pushRow(person, cfg.label(), cfg.stbh(), payYears, firstAnnualBase, true, lifetimeSum);
         }
       }
     }
   });
 
-  // Gom theo thứ tự persons
+  // Tính tổng
   const orderedPersonIds = persons.map(p=>p.id);
-  let grand = { per:0, eq:0, diff:0, firstYearAnnual:0, annualBase:0, lifetime:0 };
+  let grand = { per:0, eq:0, diff:0, firstYearAnnual:0, annualBase:0, lifetime:0, maxYears:0 };
+
   orderedPersonIds.forEach(pid => {
     const a = perPersonAgg[pid];
     if (!a) return;
@@ -2559,7 +2552,14 @@ function computePart1LifetimeData(summaryData) {
     grand.firstYearAnnual += a.firstYearAnnualSum;
     grand.annualBase += a.annualBaseSum;
     grand.lifetime += a.lifetimeSum;
+    grand.maxYears = Math.max(grand.maxYears, a.maxYears);
   });
+
+  // Tính average cho mỗi người & grand
+  Object.values(perPersonAgg).forEach(a => {
+    a.avg = (a.maxYears > 0) ? r1000(a.lifetimeSum / a.maxYears) : 0;
+  });
+  grand.avg = (grand.maxYears > 0) ? r1000(grand.lifetime / grand.maxYears) : 0;
 
   return {
     rows,
@@ -2572,6 +2572,7 @@ function computePart1LifetimeData(summaryData) {
 }
 
 /******************** RENDER PHẦN 1 (MỚI) ********************/
+// PATCH #4: Ẩn tên chi tiết, thêm average
 function buildPart1Section(summaryData) {
   const lifetimeData = computePart1LifetimeData(summaryData);
   const {
@@ -2583,69 +2584,66 @@ function buildPart1Section(summaryData) {
     periods
   } = lifetimeData;
 
-  const r1000 = (n)=> Math.round((n||0)/1000)*1000;
-  function formatDiffCell(n){
-    if (!n) return '0';
-    return `<span class="text-red-600 font-bold">${formatDisplayCurrency(r1000(n))}</span>`;
-  }
+  const r1000 = n => Math.round((n||0)/1000)*1000;
+  const formatDiffCell = n => !n ? '0' : `<span class="text-red-600 font-bold">${formatDisplayCurrency(r1000(n))}</span>`;
 
-  // Header
   const headerHtml = isAnnual
-    ? `
-      <tr>
-        <th class="p-2 border">Tên NĐBH</th>
-        <th class="p-2 border">Sản phẩm</th>
-        <th class="p-2 border">STBH</th>
-        <th class="p-2 border">Số năm đóng phí</th>
-        <th class="p-2 border">Phí theo năm</th>
-        <th class="p-2 border">Tổng cộng phải đóng</th>
-        <th class="p-2 border">Trung bình/năm</th>
-      </tr>`
-    : `
-      <tr>
-        <th class="p-2 border">Tên NĐBH</th>
-        <th class="p-2 border">Sản phẩm</th>
-        <th class="p-2 border">STBH</th>
-        <th class="p-2 border">Số năm đóng phí</th>
-        <th class="p-2 border">Phí (${periods===2?'nửa năm':'theo quý'})</th>
-        <th class="p-2 border">Phí năm đầu</th>
-        <th class="p-2 border">Phí theo năm</th>
-        <th class="p-2 border">Chênh lệch</th>
-        <th class="p-2 border">Tổng cộng phải đóng</th>
-        <th class="p-2 border">Trung bình/năm</th>
-      </tr>`;
+    ? `<tr>
+         <th class="p-2 border">Tên NĐBH</th>
+         <th class="p-2 border">Sản phẩm</th>
+         <th class="p-2 border">STBH</th>
+         <th class="p-2 border">Số năm đóng phí</th>
+         <th class="p-2 border">Phí theo năm</th>
+         <th class="p-2 border">Tổng cộng phải đóng</th>
+         <th class="p-2 border">Trung bình/năm</th>
+       </tr>`
+    : `<tr>
+         <th class="p-2 border">Tên NĐBH</th>
+         <th class="p-2 border">Sản phẩm</th>
+         <th class="p-2 border">STBH</th>
+         <th class="p-2 border">Số năm đóng phí</th>
+         <th class="p-2 border">Phí (${periods===2?'nửa năm':'theo quý'})</th>
+         <th class="p-2 border">Phí năm đầu</th>
+         <th class="p-2 border">Phí theo năm</th>
+         <th class="p-2 border">Chênh lệch</th>
+         <th class="p-2 border">Tổng cộng phải đóng</th>
+         <th class="p-2 border">Trung bình/năm</th>
+       </tr>`;
 
-  // Grouped body
-  const bodyParts = [];
+  const body = [];
 
   orderedPersonIds.forEach(pid => {
     const agg = perPersonAgg[pid];
     if (!agg) return;
-    // Dòng tổng theo người
-    bodyParts.push(`
+    // Tổng theo người
+    body.push(isAnnual ? `
       <tr class="bg-gray-50 font-bold">
         <td class="p-2 border">${sanitizeHtml(agg.name)}</td>
         <td class="p-2 border">Tổng theo người</td>
-        <td class="p-2 border text-right"></td>
-        <td class="p-2 border text-center"></td>
-        ${isAnnual ? `
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
-          <td class="p-2 border text-right"></td>
-        ` : `
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.perPeriodSum))}</td>
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.firstYearAnnualSum))}</td>
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
-          <td class="p-2 border text-right">${formatDiffCell(agg.diffSum)}</td>
-          <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
-          <td class="p-2 border text-right"></td>
-        `}
+        <td class="p-2 border text-right">—</td>
+        <td class="p-2 border text-center">—</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.avg||0))}</td>
+      </tr>
+    ` : `
+      <tr class="bg-gray-50 font-bold">
+        <td class="p-2 border">${sanitizeHtml(agg.name)}</td>
+        <td class="p-2 border">Tổng theo người</td>
+        <td class="p-2 border text-right">—</td>
+        <td class="p-2 border text-center">—</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.perPeriodSum))}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.firstYearAnnualSum))}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
+        <td class="p-2 border text-right">${formatDiffCell(agg.diffSum)}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.avg||0))}</td>
       </tr>
     `);
 
-    // Dòng chi tiết
-    rows.filter(r=>r.personId===pid).forEach(r => {
-      bodyParts.push(isAnnual ? `
+    // Chi tiết
+    rows.filter(r => r.personId === pid).forEach(r => {
+      body.push(isAnnual ? `
         <tr>
           <td class="p-2 border"></td>
           <td class="p-2 border">${sanitizeHtml(r.productLabel)}</td>
@@ -2653,32 +2651,32 @@ function buildPart1Section(summaryData) {
           <td class="p-2 border text-center">${r.payYears}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r.annualBase)}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r.lifetimeSum)}</td>
-          <td class="p-2 border text-right">${r.average ? formatDisplayCurrency(r.average) : '0'}</td>
+          <td class="p-2 border text-right">${formatDisplayCurrency(r.average||0)}</td>
         </tr>
       ` : `
         <tr>
-          <td class="p-2 border">${sanitizeHtml(r.personName)}</td>
+          <td class="p-2 border"></td>
           <td class="p-2 border">${sanitizeHtml(r.productLabel)}</td>
           <td class="p-2 border text-right">${r.stbhDisplay}</td>
           <td class="p-2 border text-center">${r.payYears}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r.perPeriod)}</td>
-          <td class="p-2 border text-right">${formatDisplayCurrency(r.firstYearAnnual)}</td>
+            <td class="p-2 border text-right">${formatDisplayCurrency(r.firstYearAnnual)}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r.annualBase)}</td>
           <td class="p-2 border text-right">${r.diff ? formatDiffCell(r.diff) : '0'}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r.lifetimeSum)}</td>
-          <td class="p-2 border text-right">${r.average ? formatDisplayCurrency(r.average) : '0'}</td>
+          <td class="p-2 border text-right">${formatDisplayCurrency(r.average||0)}</td>
         </tr>
       `);
     });
   });
 
-  // Dòng tổng tất cả
-  bodyParts.push(isAnnual ? `
+  // Tổng tất cả
+  body.push(isAnnual ? `
     <tr class="bg-gray-100 font-bold">
       <td class="p-2 border" colspan="4">Tổng tất cả</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.annualBase))}</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.lifetime))}</td>
-      <td class="p-2 border text-right"></td>
+      <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.avg||0))}</td>
     </tr>
   ` : `
     <tr class="bg-gray-100 font-bold">
@@ -2688,7 +2686,7 @@ function buildPart1Section(summaryData) {
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.annualBase))}</td>
       <td class="p-2 border text-right">${formatDiffCell(grand.diff)}</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.lifetime))}</td>
-      <td class="p-2 border text-right"></td>
+      <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.avg||0))}</td>
     </tr>
   `);
 
@@ -2697,7 +2695,7 @@ function buildPart1Section(summaryData) {
     <div class="overflow-x-auto">
       <table class="w-full border-collapse text-sm">
         <thead>${headerHtml}</thead>
-        <tbody>${bodyParts.join('')}</tbody>
+        <tbody>${body.join('')}</tbody>
       </table>
     </div>
   `;
@@ -2706,92 +2704,95 @@ function buildPart1Section(summaryData) {
 /********************************************************************
  * RENDER: PART 2 (Bảng phí từng năm)
  ********************************************************************/
+// PATCH #6: Render Part 2 mới (Tổng quy năm / Tổng năm gốc / ẩn cột rider trống)
 function buildPart2Section(data) {
   const { schedule, isAnnual, periods, persons } = data;
   const rows = schedule.rows;
   if (!rows.length) {
     return `
       <h3 class="text-lg font-bold mt-6 mb-2">Phần 2 · Bảng phí</h3>
-      <div class="p-3 border border-dashed rounded text-gray-500 text-sm">
-        Không có dữ liệu.
-      </div>
+      <div class="p-3 border border-dashed rounded text-gray-500 text-sm">Không có dữ liệu.</div>
     `;
   }
 
-  const extraAllZero = schedule.extraAllZero;
-  const headerCols = [];
-  headerCols.push(`<th class="p-2 border">Năm HĐ</th>`);
-  headerCols.push(`<th class="p-2 border">Tuổi NĐBH chính</th>`);
-  headerCols.push(`<th class="p-2 border">Phí chính</th>`);
-  if (!extraAllZero) headerCols.push(`<th class="p-2 border">Phí đóng thêm</th>`);
-  persons.forEach(p => {
-    headerCols.push(`<th class="p-2 border">Phí bổ sung (${sanitizeHtml(p.name)})</th>`);
+  // Xác định index người có rider (>=1 năm >0)
+  const activePersonIdx = persons
+    .map((p,i)=> rows.some(r => (r.perPersonSuppAnnualEq[i]||0) > 0) ? i : -1)
+    .filter(i => i !== -1);
+
+  const header = [];
+  header.push('<th class="p-2 border">Năm HĐ</th>');
+  header.push('<th class="p-2 border">Tuổi NĐBH chính</th>');
+  header.push('<th class="p-2 border">Phí chính (gốc)</th>');
+  if (rows.some(r => r.extraYearBase > 0)) {
+    header.push('<th class="p-2 border">Phí đóng thêm (gốc)</th>');
+  }
+  activePersonIdx.forEach(i => {
+    header.push(`<th class="p-2 border">Phí bổ sung (${sanitizeHtml(persons[i].name)})</th>`);
   });
-  if (!isAnnual) headerCols.push(`<th class="p-2 border">Tổng (${periods === 2 ? 'nửa năm' : 'theo quý'})</th>`);
-  headerCols.push(`<th class="p-2 border">${isAnnual?'Tổng (năm)':'Nếu đóng theo năm'}</th>`);
-  if (!isAnnual) headerCols.push(`<th class="p-2 border">Chênh lệch</th>`);
+  header.push('<th class="p-2 border">Tổng quy năm</th>');
+  header.push('<th class="p-2 border">Tổng năm gốc</th>');
+  if (!isAnnual) header.push('<th class="p-2 border">Chênh lệch</th>');
 
-  let sumMain = 0, sumExtra = 0;
-  const sumSuppYear = new Array(persons.length).fill(0);
-  const sumSuppPeriod = new Array(persons.length).fill(0); // <-- THÊM DÒNG NÀY
-  let sumTotalPeriod = 0, sumTotalYear = 0, sumDiff=0;
+  let sumMainBase=0, sumExtraBase=0, sumSuppAnnualEq=[], sumSuppBase=[], sumAnnualEq=0, sumBase=0, sumDiff=0;
+  activePersonIdx.forEach(()=> {
+    sumSuppAnnualEq.push(0);
+    sumSuppBase.push(0);
+  });
 
-  const bodyRows = rows.map(r => {
-    sumMain += r.mainYear;
-    sumExtra += r.extraYear;
-    r.perPersonSuppYear.forEach((v,i)=> sumSuppYear[i]+=v);
-    if (!isAnnual) {
-      r.perPersonSuppPeriod.forEach((v,i)=> sumSuppPeriod[i]+=v); // <-- THÊM DÒNG NÀY
-    }
-    sumTotalYear += r.totalYear;
-    if (!isAnnual) {
-      sumTotalPeriod += r.totalPeriod;
-      sumDiff += r.diff;
-    }
+  const body = rows.map(r => {
+    sumMainBase += r.mainYearBase;
+    sumExtraBase += r.extraYearBase;
+    sumAnnualEq += r.totalAnnualEq;
+    sumBase += r.totalYearBase;
+    sumDiff += r.diff;
+
+    activePersonIdx.forEach((idx,pos) => {
+      sumSuppAnnualEq[pos] += r.perPersonSuppAnnualEq[idx];
+      sumSuppBase[pos]     += r.perPersonSuppBase[idx];
+    });
+
     return `
       <tr>
         <td class="p-2 border text-center">${r.year}</td>
         <td class="p-2 border text-center">${r.age}</td>
-        <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYear)}</td>
-        ${!extraAllZero ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYear)}</td>` : ''}
-        ${r.perPersonSuppYear.map((v,i) => {
-          const annualSuppDisplay = isAnnual ? v : (r.perPersonSuppPeriod[i] * periods); // factored annual
-          return `<td class="p-2 border text-right">${formatDisplayCurrency(annualSuppDisplay)}</td>`;
+        <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYearBase)}</td>
+        ${rows.some(x=>x.extraYearBase>0) ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYearBase)}</td>` : ''}
+        ${activePersonIdx.map(i => {
+          const val = r.perPersonSuppAnnualEq[i];
+          return `<td class="p-2 border text-right">${val?formatDisplayCurrency(val):'0'}</td>`;
         }).join('')}
-        ${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalPeriod)}</td>` : ''}
-        <td class="p-2 border text-right">${formatDisplayCurrency(r.totalYear)}</td>
-        ${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? formatDiffCell(r.diff) : '0'}</td>` : ''}
+        <td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>
+        <td class="p-2 border text-right">${formatDisplayCurrency(r.totalYearBase)}</td>
+        ${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? `<span class="text-red-600 font-bold">${formatDisplayCurrency(r.diff)}</span>` : '0'}</td>` : ''}
       </tr>
     `;
   });
 
-  // TOTAL line
+  // Dòng tổng
   const totalCells = [];
-  totalCells.push(`<td class="p-2 border font-semibold">Tổng cộng</td>`);
+  totalCells.push(`<td class="p-2 border font-semibold">Tổng</td>`);
   totalCells.push(`<td class="p-2 border"></td>`);
-  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumMain)}</td>`);
-  if (!extraAllZero) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtra)}</td>`);
+  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumMainBase)}</td>`);
+  if (rows.some(r=>r.extraYearBase>0)) {
+    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtraBase)}</td>`);
   }
-  sumSuppYear.forEach((v,i) => {
-      const display = isAnnual ? v : (sumSuppPeriod[i] * periods); // factored annual
-      totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(display)}</td>`);
-    });
+  totalCells.push(...activePersonIdx.map((_,pos)=>{
+    return `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumSuppAnnualEq[pos])}</td>`;
+  }));
+  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>`);
+  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumBase)}</td>`);
   if (!isAnnual) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumTotalPeriod)}</td>`);
-  }
-  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumTotalYear)}</td>`);
-  if (!isAnnual) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDiffCell(sumDiff)}</td>`);
+    totalCells.push(`<td class="p-2 border text-right font-semibold">${sumDiff?`<span class="text-red-600 font-bold">${formatDisplayCurrency(sumDiff)}</span>`:'0'}</td>`);
   }
 
   return `
     <h3 class="text-lg font-bold mt-6 mb-2">Phần 2 · Bảng phí</h3>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse text-sm">
-        <thead><tr>${headerCols.join('')}</tr></thead>
+        <thead><tr>${header.join('')}</tr></thead>
         <tbody>
-          ${bodyRows.join('')}
+          ${body.join('')}
           <tr class="bg-gray-50">${totalCells.join('')}</tr>
         </tbody>
       </table>
