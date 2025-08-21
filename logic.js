@@ -2889,7 +2889,8 @@ function buildPart2Section(data) {
 function buildFooterSection() {
   return `
     <div class="mt-6 text-xs text-gray-600 italic">
-      (*) Đây là bảng minh họa – không phải cam kết chính thức. <!-- Bạn có thể viết lại nội dung này -->
+      (*) Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA. Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành. 
+          Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức <!-- Bạn có thể viết lại nội dung này -->
     </div>
   `;
 }
