@@ -787,7 +787,7 @@ function updateSummaryUI(fees) {
   const perMain  = periods===1 ? 0 : Math.round((f.baseMain||0)/periods/1000)*1000;
   const perExtra = periods===1 ? 0 : Math.round((f.extra||0)/periods/1000)*1000;
   // Riders áp dụng factor
-  const perSupp  = periods===1 ? 0 : Math.round(((f.totalSupp||0)*factor)/periods/1000)*1000;
+  const perSupp  = periods===1 ? 0 : roundDownTo1000(((f.totalSupp||0)*factor)/periods);
 
   const perTotal = periods===1 ? 0 : (perMain + perExtra + perSupp);
   const annualEquivalent = periods===1 ? f.total : (perTotal * periods);         // Tổng quy năm (đã nhân factor riders)
