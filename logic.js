@@ -2429,7 +2429,7 @@ function computePart1LifetimeData(summaryData) {
       stbhDisplay,
       payYears,
       perPeriod,
-      firstYearAnnual: firstAnnualBase, // “Phí năm đầu”
+      firstYearAnnual: (isAnnual ? firstAnnualBase : annualEq), // “Phí năm đầu”
       annualBase,                       // “Phí theo năm” (năm đầu)
       annualEq,
       diff,
@@ -2442,7 +2442,7 @@ function computePart1LifetimeData(summaryData) {
     agg.perPeriodSum += perPeriod;
     agg.annualEqSum += annualEq;
     agg.diffSum += diff;
-    agg.firstYearAnnualSum += firstAnnualBase;
+    agg.firstYearAnnualSum += (isAnnual ? firstAnnualBase : annualEq);
     agg.annualBaseSum += annualBase;
     agg.lifetimeSum += lifetimeSum;
   }
