@@ -2120,40 +2120,50 @@ function buildPart1RowsData(ctx) {
   let rows = [];
   let perPersonTotals = []; // tổng theo từng người (để hiển thị trước các dòng chi tiết)
   let grand = { per:0, eq:0, base:0, diff:0 };
+    const pushRow = (acc, personName, prodName, stbhDisplay, years, baseAnnual, isRider) => {
+      const baseRounded = baseAnnual;
+    
+      let perPeriod = 0, annualEq = 0, diff = 0;
+      if (!isAnnual) {
+        if (isRider) {
+          const annualEqRider = riderAnnualEquivalent(baseRounded, periods, riderFactor);
+          annualEq = annualEqRider;
+          perPeriod = riderPerPeriod(baseRounded, periods, riderFactor);
+          diff = annualEqRider - baseRounded;
+        } else {
+          // Sản phẩm chính / phí đóng thêm: không nhân factor
+          perPeriod = roundDownTo1000(baseRounded / periods);
+          annualEq = perPeriod * periods;
+          diff = annualEq - baseRounded;
+        }
+      }
+    
+      acc.per += perPeriod;
+      acc.eq += annualEq;
+      acc.base += baseRounded;
+      acc.diff += diff;
+    
+      rows.push({
+        personName,
+        prodName,
+        stbhDisplay,
+        years,
+        perPeriod,
+        annualEq,
+        diff,
+        annualBase: baseRounded,
+        factorRider: !!isRider
+      });
+    };
 
-  const pushRow = (acc, personName, prodName, stbhDisplay, years, baseAnnual, factorRider) => {
-    const baseRounded = baseAnnual; // đã là số “năm” gốc
-    // Nếu là rider và không phải annual → nhân factor để tính phần "quy năm" & per-period
-    const displayAnnual = (!isAnnual && factorRider) ? roundTo1000(baseRounded * riderFactor) : baseRounded;
-    const perPeriod = isAnnual ? 0 : roundTo1000(displayAnnual / periods);
-    const annualEq = isAnnual ? 0 : perPeriod * periods;
-    const diff = isAnnual ? 0 : (annualEq - baseRounded); // chênh lệch so với base gốc
-
-    acc.per += perPeriod;
-    acc.eq += annualEq;
-    acc.base += baseRounded;
-    acc.diff += diff;
-
-    rows.push({
-      personName,
-      prodName,
-      stbhDisplay,
-      years,
-      perPeriod,
-      annualEq,
-      diff,
-      annualBase: baseRounded,
-      factorRider
-    });
-  };
-
+  
   persons.forEach(p => {
     const acc = { per:0, eq:0, base:0, diff:0 };
     // SP chính
     if (p.isMain && appState.mainProduct.key){
       const baseAnnual = calculateMainPremium(p, appState.mainProduct);
       const stbhVal = (appState.mainProduct.key === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0);
-      pushRow(acc, p.name, 'Sản phẩm chính', formatDisplayCurrency(stbhVal), paymentTerm || '—', baseAnnual, false);
+      pushRow(acc, p.name, getProductLabel(appState.mainProduct.key), formatDisplayCurrency(stbhVal), paymentTerm || '—', baseAnnual, false);
     }
     // Đóng thêm
     if (p.isMain && (appState.mainProduct.extraPremium||0) > 0){
@@ -2607,19 +2617,19 @@ function buildPart1Section(summaryData) {
       <tr class="bg-gray-50 font-bold">
         <td class="p-2 border">${sanitizeHtml(agg.name)}</td>
         <td class="p-2 border">Tổng theo người</td>
-        <td class="p-2 border text-right">—</td>
-        <td class="p-2 border text-center">—</td>
+        <td class="p-2 border text-right"></td>
+        <td class="p-2 border text-center"></td>
         ${isAnnual ? `
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
-          <td class="p-2 border text-right">—</td>
+          <td class="p-2 border text-right"></td>
         ` : `
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.perPeriodSum))}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.firstYearAnnualSum))}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.annualBaseSum))}</td>
           <td class="p-2 border text-right">${formatDiffCell(agg.diffSum)}</td>
           <td class="p-2 border text-right">${formatDisplayCurrency(r1000(agg.lifetimeSum))}</td>
-          <td class="p-2 border text-right">—</td>
+          <td class="p-2 border text-right"></td>
         `}
       </tr>
     `);
@@ -2628,7 +2638,7 @@ function buildPart1Section(summaryData) {
     rows.filter(r=>r.personId===pid).forEach(r => {
       bodyParts.push(isAnnual ? `
         <tr>
-          <td class="p-2 border">${sanitizeHtml(r.personName)}</td>
+          <td class="p-2 border"></td>
           <td class="p-2 border">${sanitizeHtml(r.productLabel)}</td>
           <td class="p-2 border text-right">${r.stbhDisplay}</td>
           <td class="p-2 border text-center">${r.payYears}</td>
@@ -2659,7 +2669,7 @@ function buildPart1Section(summaryData) {
       <td class="p-2 border" colspan="4">Tổng tất cả</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.annualBase))}</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.lifetime))}</td>
-      <td class="p-2 border text-right">—</td>
+      <td class="p-2 border text-right"></td>
     </tr>
   ` : `
     <tr class="bg-gray-100 font-bold">
@@ -2669,7 +2679,7 @@ function buildPart1Section(summaryData) {
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.annualBase))}</td>
       <td class="p-2 border text-right">${formatDiffCell(grand.diff)}</td>
       <td class="p-2 border text-right">${formatDisplayCurrency(r1000(grand.lifetime))}</td>
-      <td class="p-2 border text-right">—</td>
+      <td class="p-2 border text-right"></td>
     </tr>
   `);
 
