@@ -2774,7 +2774,7 @@ function buildPart2Section(data) {
           const val = r.perPersonSuppAnnualEq[i];
           return `<td class="p-2 border text-right">${val?formatDisplayCurrency(val):'0'}</td>`;
         }).join('')}
-        <td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>
+        ${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>` : ''}
         <td class="p-2 border text-right">${formatDisplayCurrency(r.totalYearBase)}</td>
         ${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? `<span class="text-red-600 font-bold">${formatDisplayCurrency(r.diff)}</span>` : '0'}</td>` : ''}
       </tr>
