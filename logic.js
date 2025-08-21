@@ -2066,6 +2066,18 @@ function buildSummaryData() {
       supplements:{}
     });
   }
+// PATCH #9 (optional): lọc MDP3 other invalid
+if (mdpEnabled && mdpTargetId === 'other') {
+  const form = document.getElementById('person-container-mdp3-other');
+  if (form) {
+    const info = collectPersonData(form, false);
+    if (!(info.age >= 18 && info.age <= 60)) {
+      // Loại bỏ node mdp3_other nếu tuổi không hợp lệ
+      const idx = persons.findIndex(p=>p.id==='mdp3_other');
+      if (idx >= 0) persons.splice(idx,1);
+    }
+  }
+}
 
   // Tính Part 1
   const part1 = buildPart1RowsData({
