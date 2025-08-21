@@ -134,6 +134,15 @@ function initState() {
 function roundDownTo1000(n) {
     return Math.floor(Number(n || 0) / 1000) * 1000;
 }
+// PATCH #1: chuẩn hoá tính phí riders theo kỳ
+function riderPerPeriod(baseAnnual, periods, riderFactor) {
+  if (!baseAnnual || periods === 1) return 0;
+  return roundDownTo1000((baseAnnual * riderFactor) / periods);
+}
+function riderAnnualEquivalent(baseAnnual, periods, riderFactor) {
+  if (periods === 1) return baseAnnual;
+  return riderPerPeriod(baseAnnual, periods, riderFactor) * periods;
+}
 
 function parseFormattedNumber(formattedString) {
   if (formattedString == null) return 0;
