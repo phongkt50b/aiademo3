@@ -2204,7 +2204,7 @@ function buildPart1RowsData(ctx) {
     riderFactor, periods, isAnnual,
     mdpEnabled, mdpTargetId, mdpFeeYear
   } = ctx;
-
+  const mainAge = persons.find(pp => pp.isMain)?.age || appState.mainPerson.age || 0;
   const riderMaxAge = (key)=>({ health_scl:74, bhn:85, accident:64, hospital_support:64, mdp3:64 }[key] ?? 64);
 
   let rows = [];
@@ -2269,30 +2269,35 @@ function buildPart1RowsData(ctx) {
         + (scl.dental?', Nha khoa':'');
       const baseAnnual = calculateHealthSclPremium(p, appState.fees.baseMain, 0);
       const stbh = getHealthSclStbhByProgram(scl.program);
-      const years = Math.max(0, Math.min(targetAge, riderMaxAge('health_scl')) - p.age + 1);
+      const maxA = riderMaxAge('health_scl'); // đã có hàm riderMaxAge(...)
+      const years = Math.max(0, Math.min(maxA - p.age, targetAge - mainAge) + 1);
       pushRow(acc, p.name, `Sức khoẻ Bùng Gia Lực – ${programName} (${scopeStr})`, formatDisplayCurrency(stbh), years, baseAnnual, true);
     }
     if (p.supplements?.bhn){
       const stbh = p.supplements.bhn.stbh;
       const baseAnnual = calculateBhnPremium(p, appState.fees.baseMain, 0);
-      const years = Math.max(0, Math.min(targetAge, riderMaxAge('bhn')) - p.age + 1);
+      const maxA = riderMaxAge('bhn'); // đã có hàm riderMaxAge(...)
+      const years = Math.max(0, Math.min(maxA - p.age, targetAge - mainAge) + 1);
       pushRow(acc, p.name, 'Bệnh Hiểm Nghèo 2.0', formatDisplayCurrency(stbh), years, baseAnnual, true);
     }
     if (p.supplements?.accident){
       const stbh = p.supplements.accident.stbh;
       const baseAnnual = calculateAccidentPremium(p, appState.fees.baseMain, 0);
-      const years = Math.max(0, Math.min(targetAge, riderMaxAge('accident')) - p.age + 1);
+      const maxA = riderMaxAge('accident'); // đã có hàm riderMaxAge(...)
+      const years = Math.max(0, Math.min(maxA - p.age, targetAge - mainAge) + 1);  
       pushRow(acc, p.name, 'Bảo hiểm Tai nạn', formatDisplayCurrency(stbh), years, baseAnnual, true);
     }
     if (p.supplements?.hospital_support){
       const stbh = p.supplements.hospital_support.stbh;
       const baseAnnual = calculateHospitalSupportPremium(p, appState.fees.baseMain, 0);
-      const years = Math.max(0, Math.min(targetAge, riderMaxAge('hospital_support')) - p.age + 1);
+      const maxA = riderMaxAge('hospital_support'); // đã có hàm riderMaxAge(...)
+      const years = Math.max(0, Math.min(maxA - p.age, targetAge - mainAge) + 1);
       pushRow(acc, p.name, 'Hỗ trợ chi phí nằm viện', formatDisplayCurrency(stbh), years, baseAnnual, true);
     }
     // MDP3
     if (mdpEnabled && mdpFeeYear>0 && (mdpTargetId === p.id || (mdpTargetId==='other' && p.id==='mdp3_other'))) {
-      const years = Math.max(0, Math.min(targetAge, riderMaxAge('mdp3')) - p.age + 1);
+      const maxA = riderMaxAge('mdp3');
+      const years = Math.max(0, Math.min(maxA - p.age, targetAge - mainAge) + 1);
       pushRow(acc, p.name, 'Miễn đóng phí 3.0', '—', years, mdpFeeYear, true);
     }
 
@@ -2428,6 +2433,7 @@ function computePart1LifetimeData(summaryData) {
   } = summaryData;
 
   const mainPerson = summaryData.mainInfo;
+  const mainAge = mainPerson.age;
   const globalTimelineYears = targetAge - mainPerson.age + 1;
   const r1000 = (n) => Math.round((n||0)/1000)*1000;
 
@@ -2564,7 +2570,7 @@ function computePart1LifetimeData(summaryData) {
         if (!cfg) return;
         const issueAge = person.age;
         const maxAge = cfg.maxRenewalAge;
-        const payYears = Math.max(0, Math.min(targetAge, maxAge) - issueAge + 1);
+        const payYears = Math.max(0, Math.min(cfg.maxRenewalAge - issueAge, targetAge - mainAge) + 1);
         if (payYears <= 0) return;
 
         let firstAnnualBase = 0;
@@ -2603,7 +2609,7 @@ function computePart1LifetimeData(summaryData) {
       if (issueAge < 18 || issueAge > 60) {
         // tuổi không hợp lệ -> bỏ
       } else {
-        const payYears = Math.max(0, Math.min(targetAge, cfg.maxRenewalAge) - issueAge + 1);
+        const payYears = Math.max(0, Math.min(riderCfgMap.mdp3.maxRenewalAge - issueAge, targetAge - mainAge) + 1);
         const firstAnnualBase = calcMdp3PremiumIssue(issueAge, person.gender); // level
         if (payYears > 0 && firstAnnualBase > 0) {
           let lifetimeSum = 0;
