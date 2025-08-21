@@ -2410,6 +2410,10 @@ function computePart1LifetimeData(summaryData) {
 
   function pushRow(person, productLabel, stbhDisplay, payYears, firstAnnualBase, isRider, lifetimeSum) {
     if (payYears <= 0 || firstAnnualBase <= 0 || lifetimeSum <= 0) return;
+        // PATCH: lifetime của rider phải tính theo số tiền thực trả (có factor khi không đóng năm)
+    if (!isAnnual && isRider) {
+      lifetimeSum = r1000(lifetimeSum * riderFactor);
+    }
     let perPeriod = 0, annualEq = 0, diff = 0;
     // Phí năm đầu (firstAnnualBase) khác “Phí theo năm” (annualBase) chỉ khi có kỳ đóng?? -> “Phí theo năm” là annualBase = firstAnnualBase
     const annualBase = firstAnnualBase;
