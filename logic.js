@@ -2792,7 +2792,9 @@ function buildPart2Section(data) {
   totalCells.push(...activePersonIdx.map((_,pos)=>{
     return `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumSuppAnnualEq[pos])}</td>`;
   }));
-  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>`);
+  if (!isAnnual) {
+    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>`);
+  }    
   totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumBase)}</td>`);
   if (!isAnnual) {
     totalCells.push(`<td class="p-2 border text-right font-semibold">${sumDiff?`<span class="text-red-600 font-bold">${formatDisplayCurrency(sumDiff)}</span>`:'0'}</td>`);
