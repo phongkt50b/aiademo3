@@ -1754,20 +1754,89 @@ window.MDP3 = (function () {
             stbhBase -= window.personFees[selectedId].supp || 0;
         }
         let age, gender;
-        if (selectedId === 'other') {
-            const form = document.getElementById('person-container-mdp3-other');
-            if (!form) return 0;
-            const info = collectPersonData(form, false);
-            // Hiển thị tuổi và cảnh báo ngày sinh tại chỗ
-            const ageSpan = form.querySelector('.age-span'); if (ageSpan) ageSpan.textContent = info.age || 0;
-            const dobInput = form.querySelector('.dob-input'); if (dobInput) validateDobField(dobInput);
-            age = info.age; gender = info.gender;
+         if (selectedId === 'other') {
+          const form = document.getElementById('person-container-mdp3-other');
+          if (!form) return 0;
+        
+          const dobInput = form.querySelector('.dob-input');
+          const info = collectPersonData(form, false); // hàm này bạn đang có
+          const ageSpan = form.querySelector('.age-span');
+          if (ageSpan) ageSpan.textContent = info.age || 0;
+        
+          // Tạo / lấy box lỗi
+          let errBox = form.querySelector('.mdp3-other-error');
+          if (!errBox) {
+            errBox = document.createElement('p');
+            errBox.className = 'mdp3-other-error text-sm text-red-600 mt-1';
+            if (dobInput && dobInput.parentElement) {
+              dobInput.parentElement.appendChild(errBox);
+            } else {
+              form.appendChild(errBox);
+            }
+          }
+        
+          function setError(msg) {
+            errBox.textContent = msg;
+            if (dobInput) dobInput.classList.add('border-red-500');
+            if (feeEl) feeEl.textContent = 'STBH: — | Phí: —';
+          }
+          function clearError() {
+            errBox.textContent = '';
+            if (dobInput) dobInput.classList.remove('border-red-500');
+          }
+        
+          // Validate chuỗi DOB
+          const rawDob = dobInput ? dobInput.value.trim() : '';
+          if (!rawDob) {
+            setError('Vui lòng nhập ngày sinh (DD/MM/YYYY).');
+            return 0;
+          }
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(rawDob)) {
+            setError('Định dạng ngày sinh không hợp lệ.');
+            return 0;
+          }
+        
+          // Nếu bạn đã có validateDobField thì dùng, không thì parse nhanh:
+          let dobValid = true;
+          if (typeof validateDobField === 'function') {
+            dobValid = !!validateDobField(dobInput);
+          } else {
+            const [d,m,y] = rawDob.split('/').map(Number);
+            const dt = new Date(y, m-1, d);
+            if (!(dt && dt.getFullYear() === y && dt.getMonth() === m-1 && dt.getDate() === d)) {
+              dobValid = false;
+            }
+          }
+          if (!dobValid) {
+            setError('Ngày sinh không hợp lệ.');
+            return 0;
+          }
+        
+          // Kiểm tra tuổi
+          const ageOk = info.age && info.age >= 18 && info.age <= 60;
+          if (!ageOk) {
+            setError('Tuổi phải từ 18 đến 60 để tham gia MDP3.');
+            return 0;
+          }
+        
+          // OK → clear error và dùng info.age / info.gender
+          clearError();
+          age = info.age;
+          gender = info.gender;
+        
         } else {
-            const container = document.getElementById(selectedId);
-            if (!container) { reset(); return 0; }
-            const info = collectPersonData(container, false);
-            age = info.age; gender = info.gender;
+          // (GIỮ NGUYÊN NHÁNH CŨ – đừng xoá)
+          const container = document.getElementById(selectedId);
+          if (!container) { reset(); return 0; }
+          const info = collectPersonData(container, false);
+          age = info.age;
+          gender = info.gender;
+          if (!age || age < 18 || age > 60) {
+            if (feeEl) feeEl.textContent = 'STBH: — | Phí: —';
+            return 0;
+          }
         }
+           
         if(!age || age <= 0) {
             if (feeEl) feeEl.textContent = `STBH: ${formatCurrency(stbhBase)} | Phí: —`;
             return 0;
