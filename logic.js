@@ -2735,15 +2735,15 @@ function buildPart2Section(data) {
   const header = [];
   header.push('<th class="p-2 border">Năm HĐ</th>');
   header.push('<th class="p-2 border">Tuổi NĐBH chính</th>');
-  header.push('<th class="p-2 border">Phí chính (gốc)</th>');
+  header.push('<th class="p-2 border">Phí chính</th>');
   if (rows.some(r => r.extraYearBase > 0)) {
-    header.push('<th class="p-2 border">Phí đóng thêm (gốc)</th>');
+    header.push('<th class="p-2 border">Phí đóng thêm</th>');
   }
   activePersonIdx.forEach(i => {
     header.push(`<th class="p-2 border">Phí bổ sung (${sanitizeHtml(persons[i].name)})</th>`);
   });
-  header.push('<th class="p-2 border">Tổng quy năm</th>');
-  header.push('<th class="p-2 border">Tổng năm gốc</th>');
+  if (!isAnnual) header.push('<th class="p-2 border">Tổng quy năm</th>');
+  header.push('<th class="p-2 border">Tổng đóng theo năm </th>');
   if (!isAnnual) header.push('<th class="p-2 border">Chênh lệch</th>');
 
   let sumMainBase=0, sumExtraBase=0, sumSuppAnnualEq=[], sumSuppBase=[], sumAnnualEq=0, sumBase=0, sumDiff=0;
