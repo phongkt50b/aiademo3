@@ -2710,12 +2710,16 @@ function buildPart2Section(data) {
 
   let sumMain = 0, sumExtra = 0;
   const sumSuppYear = new Array(persons.length).fill(0);
+  const sumSuppPeriod = new Array(persons.length).fill(0); // <-- THÊM DÒNG NÀY
   let sumTotalPeriod = 0, sumTotalYear = 0, sumDiff=0;
 
   const bodyRows = rows.map(r => {
     sumMain += r.mainYear;
     sumExtra += r.extraYear;
     r.perPersonSuppYear.forEach((v,i)=> sumSuppYear[i]+=v);
+    if (!isAnnual) {
+      r.perPersonSuppPeriod.forEach((v,i)=> sumSuppPeriod[i]+=v); // <-- THÊM DÒNG NÀY
+    }
     sumTotalYear += r.totalYear;
     if (!isAnnual) {
       sumTotalPeriod += r.totalPeriod;
@@ -2727,7 +2731,10 @@ function buildPart2Section(data) {
         <td class="p-2 border text-center">${r.age}</td>
         <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYear)}</td>
         ${!extraAllZero ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYear)}</td>` : ''}
-        ${r.perPersonSuppYear.map(v => `<td class="p-2 border text-right">${formatDisplayCurrency(v)}</td>`).join('')}
+        ${r.perPersonSuppYear.map((v,i) => {
+          const annualSuppDisplay = isAnnual ? v : (r.perPersonSuppPeriod[i] * periods); // factored annual
+          return `<td class="p-2 border text-right">${formatDisplayCurrency(annualSuppDisplay)}</td>`;
+        }).join('')}
         ${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalPeriod)}</td>` : ''}
         <td class="p-2 border text-right">${formatDisplayCurrency(r.totalYear)}</td>
         ${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? formatDiffCell(r.diff) : '0'}</td>` : ''}
@@ -2743,9 +2750,10 @@ function buildPart2Section(data) {
   if (!extraAllZero) {
     totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtra)}</td>`);
   }
-  sumSuppYear.forEach(v => {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(v)}</td>`);
-  });
+  sumSuppYear.forEach((v,i) => {
+      const display = isAnnual ? v : (sumSuppPeriod[i] * periods); // factored annual
+      totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(display)}</td>`);
+    });
   if (!isAnnual) {
     totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumTotalPeriod)}</td>`);
   }
