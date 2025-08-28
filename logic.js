@@ -2291,7 +2291,9 @@ function buildPart1RowsData(ctx) {
     if (p.isMain && appState.mainProduct.key){
       const baseAnnual = calculateMainPremium(p, appState.mainProduct);
       const stbhVal = (appState.mainProduct.key === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0);
-      pushRow(acc, p.name, getProductLabel(appState.mainProduct.key), formatDisplayCurrency(stbhVal), paymentTerm || '—', baseAnnual, false);
+      const mainLabel = appState.mainProduct.key === 'TRON_TAM_AN'? 'An Bình Ưu Việt': getProductLabel(appState.mainProduct.key);
+      pushRow(acc, p.name, mainLabel, formatDisplayCurrency(stbhVal), paymentTerm || '—', baseAnnual, false);
+
     }
     // Đóng thêm
     if (p.isMain && (appState.mainProduct.extraPremium||0) > 0){
