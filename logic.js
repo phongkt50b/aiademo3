@@ -2019,51 +2019,89 @@ function hideGlobalErrors() {
  * Muốn thêm nội dung đầu bảng => sửa buildIntroSection.
  * Muốn thêm ghi chú cuối => sửa buildFooterSection.
  ********************************************************************/
-
+// === PATCH v3: generateSummaryTable tích hợp Benefit Matrix ===
 function generateSummaryTable() {
-  // 1. Chạy lại workflow để state/phí mới nhất
-  try { if (typeof runWorkflow === 'function') runWorkflow(); } catch(e){}
+  try {
+    if (typeof runWorkflow === 'function') runWorkflow();
+  } catch(e) {}
 
-  // 2. Validate nhanh (dùng hệ thống lỗi đang có)
-  const simpleErrors = collectSimpleErrors ? collectSimpleErrors() : [];
+  // 1. Validate nhanh
+  const simpleErrors = (typeof collectSimpleErrors === 'function')
+    ? collectSimpleErrors()
+    : [];
   if (simpleErrors.length) {
     if (typeof showGlobalErrors === 'function') showGlobalErrors(simpleErrors);
     const box = document.getElementById('global-error-box');
     if (box) {
       const y = box.getBoundingClientRect().top + window.scrollY - 80;
       window.scrollTo({ top: y < 0 ? 0 : y, behavior: 'smooth' });
-      box.setAttribute('tabindex','-1');
-      box.focus({ preventScroll: true });
     }
     return false;
   } else if (typeof showGlobalErrors === 'function') {
     showGlobalErrors([]);
   }
 
-  // 3. Thu thập dữ liệu tóm tắt (tách riêng)
+  // 2. Build data
   const data = buildSummaryData();
 
-  // 4. Render các phần
-  let html = '';
-  html += buildIntroSection(data);
-  html += buildPart1Section(data);
-  html += buildPart2Section(data);
-  html += buildFooterSection(data);
-  html += buildExportButtonsSection();
+  // 3. Build từng phần
+  const introHtml   = buildIntroSection(data);
+  const part1Html   = buildPart1Section(data);
+  const part2Html   = (typeof buildPart2BenefitsSection === 'function')
+    ? buildPart2BenefitsSection(data)
+    : '<!-- buildPart2BenefitsSection missing -->';
 
-  // 5. Đẩy vào modal
+  // Lịch phí: dùng buildPart3ScheduleSection nếu đã “rename” thành công, fallback sang buildPart2Section
+  let scheduleHtml = '';
+  if (typeof buildPart3ScheduleSection === 'function') {
+    scheduleHtml = buildPart3ScheduleSection(data);
+  } else if (typeof buildPart2Section === 'function') {
+    // Trường hợp chưa rename được, vẫn hiển thị nhưng còn tên “Phần 2 · Bảng phí”
+    scheduleHtml = buildPart2Section(data).replace(/Phần\s*2\s*·\s*Bảng phí/i,'Phần 3 · Bảng phí');
+  } else {
+    scheduleHtml = '<div class="text-sm text-red-600">Không tìm thấy hàm render lịch phí.</div>';
+  }
+
+  const footerHtml  = buildFooterSection(data);
+  const exportBtns  = buildExportButtonsSection();
+
+  const finalHtml = introHtml + part1Html + part2Html + scheduleHtml + footerHtml + exportBtns;
+
+  // 4. Gắn vào modal
   const modal = document.getElementById('summary-modal');
   const container = document.getElementById('summary-content-container');
-  if (container) container.innerHTML = html;
+  if (container) container.innerHTML = finalHtml;
   if (modal) modal.classList.remove('hidden');
 
-  // 6. Gắn export
-  if (typeof attachExportHandlers === 'function' && container) {
+  // 5. Gắn export
+  if (typeof attachExportHandlers === 'function') {
     attachExportHandlers(container);
-  } else {
-    attachSimpleExportHandlers(container); // fallback mini (nếu cần)
+  } else if (typeof attachSimpleExportHandlers === 'function') {
+    attachSimpleExportHandlers(container);
   }
+  return true;
 }
+
+// (Tuỳ chọn) đảm bảo nút gọi đúng hàm mới — phòng trường hợp listener cũ vẫn trỏ tới bản cũ
+(function rebindSummaryButton(){
+  const btn = document.getElementById('view-summary-btn');
+  if (!btn) return;
+  // Xoá tất cả listener cũ bằng clone
+  const clone = btn.cloneNode(true);
+  btn.parentNode.replaceChild(clone, btn);
+  clone.addEventListener('click', (e)=>{
+    e.preventDefault();
+    try {
+      generateSummaryTable();
+    } catch(err) {
+      const c = document.getElementById('summary-content-container');
+      if (c) c.innerHTML = `<div class="text-red-600 font-semibold">${(err && err.message)? err.message : err}</div>`;
+      document.getElementById('summary-modal')?.classList.remove('hidden');
+    }
+  });
+})();
+
+console.info('[generateSummaryTable v3] integrated: Part2 (benefits) + Part3 (schedule).');
 
 /********************************************************************
  * DỮ LIỆU TÓM TẮT
