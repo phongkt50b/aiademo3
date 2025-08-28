@@ -3625,7 +3625,9 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
         anyVisible = true;
       } else if (benef.type==='number'){
         if (!sa && schema.key!=='HEALTH_SCL' && schema.key!=='HOSPITAL_SUPPORT') {
+         // STBH chưa nhập: vẫn hiển thị dòng (cell rỗng) để user biết quyền lợi
           cells.push('');
+          anyVisible = true;
           return;
         }
         let raw = 0;
@@ -3754,7 +3756,7 @@ function buildPart2BenefitsSection(summaryData){
 if (typeof buildPart2Section === 'function'){
   window.buildPart3ScheduleSection = function(summaryData){
     // Dùng lại code cũ
-    return buildPart2Section(summaryData).replace('Phần 2 · Bảng phí','Phần 3 · Bảng phí');
+    return buildPart2Section(summaryData).replace(/Phần\s*2\s*·\s*Bảng phí/i,'Phần 3 · Bảng phí');
   };
 } else if (typeof buildPart3ScheduleSection !== 'function'){
   // Nếu trước đó patch mình đã đổi rồi thì giữ nguyên
