@@ -2449,15 +2449,39 @@ function buildPart2ScheduleRows(ctx){
  * RENDER: INTRO
  ********************************************************************/
 function buildIntroSection(data) {
+  // Lấy luôn label đang hiển thị trong select kỳ đóng
+  const sel = document.getElementById('payment-frequency');
+  let freqLabel = data.freq; // fallback
+  if (sel && sel.selectedIndex >= 0) {
+    const txt = sel.options[sel.selectedIndex].text.trim();
+    if (txt) freqLabel = txt;
+  } else {
+    // Fallback map khi option text vẫn là mã tiếng Anh
+    switch((freqLabel || '').toLowerCase()){
+      case 'year':
+      case 'annual':
+        freqLabel = 'Năm'; break;
+      case 'half':
+      case 'semi':
+      case 'semiannual':
+        freqLabel = 'Nửa năm'; break;
+      case 'quarter':
+      case 'quarterly':
+        freqLabel = 'Quý'; break;
+      case 'month':
+      case 'monthly':
+        freqLabel = 'Tháng'; break;
+    }
+  }
+
   return `
     <div class="mb-4">
       <h2 class="text-xl font-bold">BẢNG MINH HỌA PHÍ & QUYỀN LỢI</h2>
       <div class="text-sm text-gray-700">
         Sản phẩm chính: <strong>${sanitizeHtml(getProductLabel(data.productKey) || data.productKey || '—')}</strong>
-        &nbsp;|&nbsp; Kỳ đóng: <strong>${sanitizeHtml(data.freq)}</strong>
-        &nbsp;|&nbsp; Minh họa đến tuổi: <strong>${data.targetAge}</strong>
+        &nbsp;|&nbsp; Kỳ đóng: <strong>${sanitizeHtml(freqLabel)}</strong>
+        &nbsp;|&nbsp; Minh họa đến tuổi: <strong>${sanitizeHtml(data.targetAge)}</strong>
       </div>
-      <!-- Bạn có thể thêm: Thông tin tư vấn viên / Khách hàng / Ngày in ... phía dưới -->
     </div>
   `;
 }
