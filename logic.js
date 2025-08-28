@@ -3386,8 +3386,8 @@ const BM_SCHEMAS = [
       { id:'bhn_early', labelBase:'BHN giai đoạn sớm (4 lần, tối đa 500tr/lần)', formulaLabel:'30% STBH', valueType:'number', compute:(sa)=>sa*0.30, cap:500000000 },
       { id:'bhn_mid', labelBase:'BHN giai đoạn giữa (2 lần, tối đa 1 tỷ/lần)', formulaLabel:'60% STBH', valueType:'number', compute:(sa)=>sa*0.60, cap:1000000000 },
       { id:'bhn_late', labelBase:'BHN giai đoạn cuối (1 lần)', formulaLabel:'100% STBH', valueType:'number', compute:(sa)=>sa },
-      { id:'bhn_child', labelBase:'BHN ở trẻ em (1 lần, ≤20 tuổi)', formulaLabel:'60% STBH', valueType:'number', compute:(sa)=>sa*0.60, cap:500000000, childOnly:true },
-      { id:'bhn_elder', labelBase:'BHN người lớn tuổi (1 lần, từ 55 tuổi)', formulaLabel:'20% STBH', valueType:'number', compute:(sa)=>sa*0.20, cap:500000000},
+      { id:'bhn_child', labelBase:'BHN ở trẻ em (1 lần, tối đa 500 tr, ≤20 tuổi)', formulaLabel:'60% STBH', valueType:'number', compute:(sa)=>sa*0.60, cap:500000000, childOnly:true },
+      { id:'bhn_elder', labelBase:'BHN người lớn tuổi (1 lần, tối đa 500 tr, từ 55 tuổi)', formulaLabel:'20% STBH', valueType:'number', compute:(sa)=>sa*0.20, cap:500000000},
       { id:'bhn_special', labelBase:'Quyền lợi đặc biệt (1 lần, tối đa 500tr)', formulaLabel:'30% STBH', valueType:'number', compute:(sa)=>sa*0.30, cap:500000000 },
       // Wellness text
       { id:'bhn_wellness', labelBase:'Quyền lợi sống khoẻ', formulaLabel:'', valueType:'text', minAge:18, text:'Tối đa 30% trung bình phí 5 năm' }
