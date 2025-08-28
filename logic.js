@@ -3399,8 +3399,8 @@ const BM_SCHEMAS = [
     type:'rider',
     hasTotal:false,
     benefits:[
-      { id:'hs_daily', labelBase:'Trợ cấp nằm viện (ngày)', formulaLabel:'', valueType:'number', computeDaily:(d)=>d },
-      { id:'hs_icu', labelBase:'Trợ cấp ICU (ngày)', formulaLabel:'', valueType:'number', computeDaily:(d)=>d*2 }
+      { id:'hs_daily', labelBase:'Trợ cấp nằm viện (tối đa 365 ngày/ đợt nằm viện)', formulaLabel:'', valueType:'number', computeDaily:(d)=>d },
+      { id:'hs_icu', labelBase:'Trợ cấp ICU (tối đa 25 ngày/ đợt nằm viện)', formulaLabel:'', valueType:'number', computeDaily:(d)=>d*2 }
     ]
   },
   /* ---------- Accident ---------- */
