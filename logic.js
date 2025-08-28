@@ -3352,6 +3352,7 @@ const BM_SCHEMAS = [
     benefits:[
       { id:'scl_core', labelBase:'Quyền lợi chính - STBH năm', formulaLabel:'Theo chương trình', valueType:'number', computeProg:(m)=>m.core },
       { id:'scl_double', labelBase:'Nhân đôi bảo vệ khi điều trị tại Cơ sở y tế công lập', formulaLabel:'= STBH chương trình', valueType:'number', computeProg:(m)=>m.double },
+      { id:'scl_wellness', labelBase:'Quyền lợi sống khoẻ', formulaLabel:'', valueType:'text', minAge:18, text:'Tối đa 60% trung bình phí 3 năm' },
       { id:'scl_room', labelBase:'Phòng & Giường bệnh (tối đa 100 ngày/năm; mỗi ngày)', formulaLabel:'Mức/ngày', valueType:'text', computeProg:(m)=> bm_fmt(m.room)+'/ngày' },
       { id:'scl_icu', labelBase:'Phòng Chăm sóc đặc biệt (tối đa 30 ngày/năm)', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
       { id:'scl_surgery', labelBase:'Phẫu thuật', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
@@ -3373,9 +3374,7 @@ const BM_SCHEMAS = [
       { id:'scl_mat_birth_norm', labelBase:'Thai sản - Sinh thường', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
       { id:'scl_mat_birth_cs', labelBase:'Thai sản - Sinh mổ theo chỉ định', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
       { id:'scl_mat_complication', labelBase:'Thai sản - Biến chứng thai sản', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_newborn', labelBase:'Thai sản - Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      // Sống khoẻ SCL: text
-      { id:'scl_wellness', labelBase:'Quyền lợi sống khoẻ', formulaLabel:'', valueType:'text', minAge:18, text:'Tối đa 60% trung bình phí 3 năm' }
+      { id:'scl_mat_newborn', labelBase:'Thai sản - Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' }
     ]
   },
   /* ---------- Bệnh hiểm nghèo 2.0 ---------- */
