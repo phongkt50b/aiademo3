@@ -2617,7 +2617,8 @@ function computePart1LifetimeData(summaryData) {
     // Sản phẩm chính
     if (person.isMain && appState.mainProduct.key && payYearsMain > 0 && baseMainAnnualFirst > 0) {
       const lifetimeMain = baseMainAnnualFirst * payYearsMain;
-      pushRow(person, getProductLabel(appState.mainProduct.key), formatDisplayCurrency(stbhMain),
+      const mainLabel = appState.mainProduct.key === 'TRON_TAM_AN'? 'An Bình Ưu Việt': getProductLabel(appState.mainProduct.key);
+      pushRow(person, mainLabel, formatDisplayCurrency(stbhMain),
         payYearsMain, baseMainAnnualFirst, false, lifetimeMain);
     }
 
