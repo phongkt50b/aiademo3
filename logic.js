@@ -3192,3 +3192,617 @@ function attachExportHandlers(container) {
     setTimeout(() => { try { w.print(); } catch(_e){} }, 200);
   });
 }
+/******************************************************************
+ * PATCH v2 BENEFIT MATRIX (gpt-5)
+ * - Phần 2: Bảng quyền lợi (mỗi sản phẩm 1 bảng)
+ * - Điều chỉnh grouping: tách cột nếu flags khác (tuổi/giới tính)
+ * - Wording đầy đủ Sức khỏe Bùng Gia Lực + Thai sản bổ sung
+ * - Bỏ "Tổng quyền lợi" An Bình Ưu Việt
+ * - Thêm "Tổng quyền lợi" cho Bệnh hiểm nghèo 2.0
+ * - TÁI CẤU TRÚC generateSummaryTable: Part1 → Part2 (benefits) → Part3 (schedule phí)
+ ******************************************************************/
+
+/* ================== 0. HỖ TRỢ DỮ LIỆU & ĐỊNH DẠNG ================== */
+function bm_fmt(n){
+  if (n==null || n==='') return '';
+  const x = Number(n);
+  if (!isFinite(x)) return '';
+  return x.toLocaleString('vi-VN');
+}
+function bm_escape(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function bm_isFemalePerson(p){
+  return (p.gender||'').toLowerCase().startsWith('nữ');
+}
+
+/* ================== 1. SCHEMA BENEFITS ================== */
+// Thai sản program áp dụng: toan_dien, hoan_hao
+const BM_SCL_PROGRAMS = {
+  co_ban: {
+    label:'Cơ bản',
+    core:100000000,
+    double:100000000,
+    room:750000,
+    commonDisease:5000000,
+    dialysis:5000000,
+    maternity:false,
+    maternitySum:null,
+    maternityCheck:null,
+    maternityRoom:null
+  },
+  nang_cao: {
+    label:'Nâng cao',
+    core:250000000,
+    double:250000000,
+    room:1500000,
+    commonDisease:7000000,
+    dialysis:7000000,
+    maternity:false,
+    maternitySum:null,
+    maternityCheck:null,
+    maternityRoom:null
+  },
+  toan_dien: {
+    label:'Toàn diện',
+    core:500000000,
+    double:500000000,
+    room:2500000,
+    commonDisease:10000000,
+    dialysis:10000000,
+    maternity:true,
+    maternitySum:25000000,
+    maternityCheck:1000000,
+    maternityRoom:2500000
+  },
+  hoan_hao: {
+    label:'Hoàn hảo',
+    core:1000000000,
+    double:1000000000,
+    room:5000000,
+    commonDisease:null, // Theo chi phí y tế
+    dialysis:50000000,
+    maternity:true,
+    maternitySum:25000000,
+    maternityCheck:1500000,
+    maternityRoom:5000000
+  }
+};
+
+// Danh sách sản phẩm chính (life) dùng cho block group main
+const BM_MAIN_PRODUCT_LABELS = {
+  'KHOE_BINH_AN':'MUL - Khoẻ Bình An',
+  'VUNG_TUONG_LAI':'MUL - Vững Tương Lai',
+  'PUL_TRON_DOI':'Khoẻ trọn vẹn-Trọn đời',
+  'PUL_15NAM':'Khoẻ trọn vẹn-15 năm',
+  'PUL_5NAM':'Khoẻ trọn vẹn-5 năm',
+  'AN_BINH_UU_VIET':'An Bình Ưu Việt',
+  'TRON_TAM_AN':'Trọn tâm an'
+};
+
+// Schema chung
+const BM_SCHEMAS = [
+  {
+    key:'AN_BINH_UU_VIET',
+    type:'main',
+    hasTotal:false,
+    benefits:[
+      { id:'abuv_death', label:'Quyền lợi bảo hiểm tử vong', formula:'125% STBH', type:'number', compute:(sa)=>sa*1.25 },
+      { id:'abuv_tpd', label:'Quyền lợi bảo hiểm tàn tật toàn bộ và vĩnh viễn', formula:'100% STBH', type:'number', compute:(sa)=>sa }
+    ]
+  },
+  {
+    key:'KHOE_BINH_AN',
+    type:'main',
+    hasTotal:true,
+    benefits:[
+      { id:'kba_life', label:'Quyền lợi sinh mệnh', formula:'100% STBH', type:'number', compute:(sa)=>sa },
+      { id:'kba_boost', label:'Tăng cường bảo vệ', formula:'tối đa 50% STBH vào năm thứ 11', type:'number', compute:(sa)=>sa*0.5 },
+      { id:'kba_thyroid', label:'TTTBVV do ung thư tuyến giáp – giai đoạn sớm (Tối đa 200 triệu)', formula:'10% STBH', type:'number', cap:200000000, compute:(sa)=>sa*0.10 },
+      { id:'kba_vitality', label:'Thưởng gia tăng bảo vệ AIA Vitality', formula:'tối đa 30% STBH', type:'number', compute:(sa)=>sa*0.30 },
+      { id:'kba_no_underw', label:'Tăng số tiền bảo hiểm không cần thẩm định (Tối đa 500 triệu)', formula:'tối đa 50% STBH', type:'number', cap:500000000, compute:(sa)=>sa*0.50 }
+    ]
+  },
+  {
+    key:'VUNG_TUONG_LAI',
+    type:'main',
+    hasTotal:true,
+    benefits:[
+      { id:'vtl_life', label:'Quyền lợi sinh mệnh', formula:'100% STBH', type:'number', compute:(sa)=>sa },
+      { id:'vtl_thyroid', label:'TTTBVV do ung thư tuyến giáp – giai đoạn sớm (Tối đa 200 triệu)', formula:'10% STBH', type:'number', cap:200000000, compute:(sa)=>sa*0.10 },
+      { id:'vtl_vitality', label:'Thưởng gia tăng bảo vệ AIA Vitality', formula:'tối đa 30% STBH', type:'number', compute:(sa)=>sa*0.30 },
+      { id:'vtl_no_underw', label:'Tăng số tiền bảo hiểm không cần thẩm định (Tối đa 500 triệu)', formula:'tối đa 50% STBH', type:'number', cap:500000000, compute:(sa)=>sa*0.50 }
+    ]
+  },
+  {
+    key:'PUL_FAMILY',
+    type:'main',
+    hasTotal:true,
+    productKeys:['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'],
+    benefits:[
+      { id:'pul_life', label:'Quyền lợi sinh mệnh', formula:'100% STBH', type:'number', compute:(sa)=>sa },
+      { id:'pul_thyroid', label:'TTTBVV do ung thư tuyến giáp – giai đoạn sớm (Tối đa 200 triệu)', formula:'10% STBH', type:'number', cap:200000000, compute:(sa)=>sa*0.10 },
+      { id:'pul_vitality', label:'Thưởng gia tăng bảo vệ AIA Vitality', formula:'tối đa 20% STBH', type:'number', compute:(sa)=>sa*0.20 },
+      { id:'pul_no_underw', label:'Tăng số tiền bảo hiểm không cần thẩm định (Tối đa 500 triệu)', formula:'tối đa 50% STBH', type:'number', cap:500000000, compute:(sa)=>sa*0.50 },
+      // Cam kết bảo vệ hiển thị như text riêng (không vào tổng)
+      { id:'pul_commit_5', label:'Cam kết bảo vệ', formula:'Đóng đủ phí tối thiểu 5 năm - Cam kết bảo vệ tối thiểu 30 năm', type:'text', visible:(ctx)=>ctx.productKey==='PUL_5NAM' },
+      { id:'pul_commit_15', label:'Cam kết bảo vệ', formula:'Đóng đủ phí tối thiểu 15 năm - Cam kết bảo vệ tối thiểu 30 năm', type:'text', visible:(ctx)=>ctx.productKey==='PUL_15NAM' }
+    ]
+  },
+  {
+    key:'HEALTH_SCL',
+    type:'rider',
+    hasTotal:false,
+    benefits:[
+      { id:'scl_core', label:'Quyền lợi chính – STBH năm', formula:'Theo chương trình', type:'number', compute:(_,map)=>map.core },
+      { id:'scl_double', label:'Nhân đôi bảo vệ khi điều trị tại Cơ sở y tế công lập', formula:'= STBH chương trình', type:'number', compute:(_,map)=>map.double },
+      { id:'scl_copay_child', label:'Đồng chi trả 80% (30 ngày – <5 tuổi)', formula:'80% chi phí y tế', type:'text', conditionalFlag:'childCopay', visibleFlag:'childCopay' },
+      { id:'scl_room', label:'Phòng & Giường bệnh (tối đa 100 ngày/năm; mỗi ngày)', formula:'Mức/ngày', type:'text', compute:(_,map)=> bm_fmt(map.room)+'/ngày' },
+      { id:'scl_icu', label:'Phòng Chăm sóc đặc biệt (tối đa 30 ngày/năm)', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_surgery', label:'Phẫu thuật', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_pre', label:'Điều trị trước nhập viện (tối đa 30 ngày trước khi nhập viện; mỗi đợt)', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_post', label:'Điều trị sau xuất viện (tối đa 60 ngày sau xuất viện; mỗi đợt)', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_other', label:'Chi phí y tế nội trú khác', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_transplant_pt', label:'Ghép tạng (tim, phổi, gan, tụy, thận, tủy xương) – NĐBH', formula:'Theo Chi phí y tế (mỗi lần)', type:'text' },
+      { id:'scl_transplant_donor', label:'Ghép tạng (người hiến tạng)', formula:'50% chi phí phẫu thuật', type:'text' },
+      { id:'scl_cancer', label:'Điều trị ung thư: gồm điều trị nội trú, ngoại trú và trong ngày', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_day_surgery', label:'Phẫu thuật/Thủ thuật trong ngày (mỗi Năm hợp đồng)', formula:'Theo Chi phí y tế', type:'text' },
+      { id:'scl_common', label:'Điều trị trong ngày cho các bệnh: Viêm phế quản; Viêm phổi; Sốt xuất huyết; Cúm (mỗi bệnh/mỗi Năm hợp đồng)', formula:'Theo chương trình', type:'text',
+        compute:(_,map)=> map.commonDisease?bm_fmt(map.commonDisease):'Theo Chi phí y tế'
+      },
+      { id:'scl_dialysis', label:'Lọc máu (mỗi Năm hợp đồng)', formula:'Theo chương trình', type:'text',
+        compute:(_,map)=> map.dialysis?bm_fmt(map.dialysis):'Theo Chi phí y tế'
+      },
+      // Thai sản (chỉ female 18–46 & program có maternity)
+      { id:'scl_mat_y1', label:'Thai sản – Năm 1', formula:'50%', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_y2', label:'Thai sản – Năm 2', formula:'80%', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_y3', label:'Thai sản – Từ năm 3', formula:'100%', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_sum', label:'Thai sản – STBH', formula:'Theo chương trình', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity',
+        compute:(_,map)=> map.maternitySum?bm_fmt(map.maternitySum):'' },
+      { id:'scl_mat_check', label:'Thai sản – Khám thai (tối đa 8 lần/năm; mỗi lần)', formula:'Theo chương trình', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity',
+        compute:(_,map)=> map.maternityCheck? bm_fmt(map.maternityCheck)+'/lần':'' },
+      { id:'scl_mat_room', label:'Thai sản – Phòng & Giường (tối đa 100 ngày/năm; mỗi ngày)', formula:'Theo chương trình', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity',
+        compute:(_,map)=> map.maternityRoom? bm_fmt(map.maternityRoom)+'/ngày':'' },
+      { id:'scl_mat_icu', label:'Thai sản – Phòng chăm sóc đặc biệt (tối đa 30 ngày/năm)', formula:'Theo Chi phí y tế', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_birth_norm', label:'Thai sản – Sinh thường', formula:'Theo Chi phí y tế', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_birth_cs', label:'Thai sản – Sinh mổ theo chỉ định', formula:'Theo Chi phí y tế', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_complication', label:'Thai sản – Biến chứng thai sản', formula:'Theo Chi phí y tế', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' },
+      { id:'scl_mat_newborn', label:'Thai sản – Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formula:'Theo Chi phí y tế', type:'text', conditionalFlag:'maternity', visibleFlag:'maternity' }
+    ]
+  },
+  {
+    key:'BHN_2_0',
+    type:'rider',
+    hasTotal:true,
+    benefits:[
+      { id:'bhn_early', label:'Bệnh hiểm nghèo giai đoạn sớm (tối đa 4 lần, tối đa 500 triệu/lần)', formula:'30% STBH', type:'number', cap:500000000, compute:(sa)=>sa*0.30 },
+      { id:'bhn_mid', label:'Bệnh hiểm nghèo giai đoạn giữa (tối đa 2 lần, tối đa 1 tỷ/lần)', formula:'60% STBH', type:'number', cap:1000000000, compute:(sa)=>sa*0.60 },
+      { id:'bhn_late', label:'Bệnh hiểm nghèo giai đoạn cuối (1 lần)', formula:'100% STBH', type:'number', compute:(sa)=>sa },
+      { id:'bhn_child', label:'Bệnh hiểm nghèo dành cho trẻ em (1 lần, tối đa 500 triệu) - Trước khi đạt 21 tuổi', formula:'60% STBH', type:'number', cap:500000000, personCond:(p)=>p.age<21, flag:'bhnChild', compute:(sa)=>sa*0.60 },
+      { id:'bhn_elder', label:'Bệnh hiểm nghèo dành cho người lớn tuổi (1 lần, tối đa 500 triệu) - Sau khi đạt 55 tuổi', formula:'20% STBH', type:'number', cap:500000000, personCond:(p)=>p.age>=55, flag:'bhnElder', compute:(sa)=>sa*0.20 },
+      { id:'bhn_special', label:'Quyền lợi Đặc biệt (1 lần, tối đa 500 triệu)', formula:'30% STBH', type:'number', cap:500000000, compute:(sa)=>sa*0.30 },
+      { id:'bhn_vitality', label:'Quyền lợi thưởng sống khoẻ', formula:'tối đa 30% trung bình phí 5 năm', type:'text' }
+    ]
+  },
+  {
+    key:'HOSPITAL_SUPPORT',
+    type:'rider',
+    hasTotal:false,
+    benefits:[
+      { id:'hs_daily', label:'Trợ cấp nằm viện theo ngày', formula:'100% STBH', type:'number', compute:(daily)=>daily },
+      { id:'hs_icu', label:'Trợ cấp nằm hồi sức tích cực (ICU)', formula:'200% STBH', type:'number', compute:(daily)=>daily*2 }
+    ]
+  },
+  {
+    key:'ACCIDENT',
+    type:'rider',
+    hasTotal:false,
+    benefits:[
+      { id:'acc_injury', label:'Tổn thương do tai nạn', formula:'từ 1% đến 200% STBH', type:'text' }
+    ]
+  }
+];
+
+function bm_findSchema(productKey){
+  // Main groups
+  if (productKey==='AN_BINH_UU_VIET') return BM_SCHEMAS.find(s=>s.key==='AN_BINH_UU_VIET');
+  if (['KHOE_BINH_AN'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='KHOE_BINH_AN');
+  if (['VUNG_TUONG_LAI'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='VUNG_TUONG_LAI');
+  if (['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='PUL_FAMILY');
+  // Riders
+  if (productKey==='health_scl') return BM_SCHEMAS.find(s=>s.key==='HEALTH_SCL');
+  if (productKey==='bhn') return BM_SCHEMAS.find(s=>s.key==='BHN_2_0');
+  if (productKey==='hospital_support') return BM_SCHEMAS.find(s=>s.key==='HOSPITAL_SUPPORT');
+  if (productKey==='accident') return BM_SCHEMAS.find(s=>s.key==='ACCIDENT');
+  return null;
+}
+
+/* ================== 2. THU THẬP CỘT (GROUPING) ================== */
+function bm_collectColumns(summaryData){
+  const colsBySchema = {};
+  const persons = summaryData.persons || [];
+  const mainProductKey = summaryData.productKey;
+  const mainSa = (appState.mainProduct.key && appState.mainProduct.stbh) ? appState.mainProduct.stbh : 0;
+
+  // MAIN product column (chỉ người chính)
+  if (mainProductKey){
+    const schema = bm_findSchema(mainProductKey);
+    if (schema){
+      colsBySchema[schema.key] = colsBySchema[schema.key] || [];
+      colsBySchema[schema.key].push({
+        productKey: mainProductKey,
+          sumAssured: mainSa,
+          persons: [ summaryData.mainInfo ],
+          label: (BM_MAIN_PRODUCT_LABELS[mainProductKey] || mainProductKey) + (mainSa? ' ('+bm_fmt(mainSa)+')':'')
+      });
+    }
+  }
+
+  persons.forEach(p=>{
+    const supp = p.supplements||{};
+    // SCL
+    if (supp.health_scl && supp.health_scl.program){
+      const schema = bm_findSchema('health_scl');
+      if (schema){
+        const prog = supp.health_scl.program;
+        const progMap = BM_SCL_PROGRAMS[prog];
+        // FLAGS
+        const childCopay = p.age < 5 ? 1 : 0;
+        const maternity = (bm_isFemalePerson(p) && p.age>=18 && p.age<=46 && progMap && progMap.maternity)?1:0;
+        const sig = `health_scl|${prog}|child${childCopay}|mat${maternity}`;
+        colsBySchema[schema.key] = colsBySchema[schema.key]||[];
+        let col = colsBySchema[schema.key].find(c=>c.sig===sig);
+        if (!col){
+          col = {
+            sig,
+            productKey:'health_scl',
+            program:prog,
+            flags:{childCopay, maternity},
+            persons:[],
+            label:progMap?progMap.label:prog
+          };
+          colsBySchema[schema.key].push(col);
+        }
+        col.persons.push(p);
+      }
+    }
+    // BHN
+    if (supp.bhn && supp.bhn.stbh){
+      const schema = bm_findSchema('bhn');
+      if (schema){
+        const sa = supp.bhn.stbh;
+        const child = p.age<21?1:0;
+        const elder = p.age>=55?1:0;
+        const sig = `bhn|${sa}|child${child}|elder${elder}`;
+        colsBySchema[schema.key]=colsBySchema[schema.key]||[];
+        let col = colsBySchema[schema.key].find(c=>c.sig===sig);
+        if (!col){
+          col = {
+            sig,
+            productKey:'bhn',
+            sumAssured:sa,
+            flags:{child, elder},
+            persons:[],
+            label: bm_fmt(sa)
+          };
+          colsBySchema[schema.key].push(col);
+        }
+        col.persons.push(p);
+      }
+    }
+    // Hospital support
+    if (supp.hospital_support && supp.hospital_support.stbh){
+      const schema = bm_findSchema('hospital_support');
+      if (schema){
+        const daily = supp.hospital_support.stbh;
+        const sig = `hospital_support|${daily}`;
+        colsBySchema[schema.key]=colsBySchema[schema.key]||[];
+        let col = colsBySchema[schema.key].find(c=>c.sig===sig);
+        if(!col){
+          col={
+            sig,
+            productKey:'hospital_support',
+            daily,
+            persons:[],
+            label: bm_fmt(daily) + '/ngày'
+          };
+          colsBySchema[schema.key].push(col);
+        }
+        col.persons.push(p);
+      }
+    }
+    // Accident
+    if (supp.accident && supp.accident.stbh){
+      const schema = bm_findSchema('accident');
+      if (schema){
+        const sa = supp.accident.stbh;
+        const sig = `accident|${sa}`;
+        colsBySchema[schema.key]=colsBySchema[schema.key]||[];
+        let col = colsBySchema[schema.key].find(c=>c.sig===sig);
+        if(!col){
+          col={
+            sig,
+            productKey:'accident',
+            sumAssured:sa,
+            persons:[],
+            label: bm_fmt(sa)
+          };
+          colsBySchema[schema.key].push(col);
+        }
+        col.persons.push(p);
+      }
+    }
+  });
+
+  // Gộp tên nếu >1 người
+  Object.values(colsBySchema).forEach(arr=>{
+    arr.forEach(col=>{
+      if (col.persons && col.persons.length>0){
+        const names = col.persons.map(pp=>pp.name||pp.id).join(', ');
+        // Với SCL hiển thị "Nâng cao (A, B)"
+        if (col.productKey==='health_scl'){
+          col.label = (col.label||'') + ' ('+names+')';
+        } else if (col.persons.length>1){
+          col.label = (col.label||'') + ' ('+names+')';
+        } else {
+          // 1 người: giữ nguyên
+        }
+      }
+    });
+  });
+
+  return colsBySchema;
+}
+
+/* ================== 3. RENDER BẢNG CHO 1 SCHEMA ================== */
+function bm_renderSchemaTables(schemaKey, columns, summaryData){
+  const schema = BM_SCHEMAS.find(s=>s.key===schemaKey);
+  if (!schema || !columns.length) return '';
+  const isMainGroup = schema.type==='main';
+
+  // Chuẩn bị cột header
+  const headCols = columns.map(c=> `<th class="border px-2 py-2 text-left align-top">${bm_escape(c.label)}</th>`).join('');
+
+  // Build rows
+  const rows = [];
+  schema.benefits.forEach(benef=>{
+    // Lọc visible theo context (productKey)
+    // Mỗi column hiển thị 1 giá trị
+    const cells = [];
+    let anyVisible = false;
+
+    columns.forEach(col=>{
+      let value = '';
+      // context:
+      const productKey = col.productKey;
+      const sa = col.sumAssured || (productKey && productKey===summaryData.productKey ? summaryData.mainProductSumAssured : null);
+      const programMap = col.program ? BM_SCL_PROGRAMS[col.program] : null;
+
+      const personSet = col.persons || [];
+      // Kiểm tra conditional flags per person (BHN child / elder / Thai sản / child copay)
+      // Với các dòng conditionalFlag (SCL) → hiển thị nếu tất cả? hay chỉ group? Bạn yêu cầu tách nếu khác, nên ở đây cột đã đồng nhất flags. Chỉ check flag presence:
+      let showForColumn = true;
+      if (benef.visible){
+        showForColumn = !!benef.visible({productKey});
+      }
+      if (showForColumn && benef.visibleFlag){
+        if (benef.visibleFlag==='childCopay'){
+          showForColumn = !!(col.flags && col.flags.childCopay);
+        } else if (benef.visibleFlag==='maternity'){
+          showForColumn = !!(col.flags && col.flags.maternity);
+        }
+      }
+      if (showForColumn && benef.flag){
+        if (benef.flag==='bhnChild'){
+          showForColumn = !!(col.flags && col.flags.child);
+        } else if (benef.flag==='bhnElder'){
+          showForColumn = !!(col.flags && col.flags.elder);
+        }
+      }
+
+      if (!showForColumn){
+        cells.push('');
+        return;
+      }
+
+      if (benef.type==='text'){
+        if (benef.compute){
+          if (schema.key==='HEALTH_SCL'){
+            value = benef.compute(null, programMap);
+          } else {
+            value = benef.compute(sa, programMap);
+          }
+        } else {
+          value = ''; // text không có giá trị numeric
+        }
+        // Trường hợp text thuần: vẫn hiển thị (nếu compute ra ""), giữ nguyên rỗng
+        cells.push(value?bm_escape(value): (benef.formula==='Theo Chi phí y tế' ? 'Theo Chi phí y tế':''));
+        anyVisible = true;
+      } else if (benef.type==='number'){
+        if (!sa && schema.key!=='HEALTH_SCL' && schema.key!=='HOSPITAL_SUPPORT') {
+          cells.push('');
+          return;
+        }
+        let raw = 0;
+        if (schema.key==='HEALTH_SCL'){
+          // numeric SCL dùng programMap
+          raw = benef.compute(null, programMap) || 0;
+        } else if (schema.key==='HOSPITAL_SUPPORT'){
+          const daily = col.daily || 0;
+          raw = benef.compute(daily);
+        } else {
+          raw = benef.compute(sa, programMap) || 0;
+        }
+        if (benef.cap && raw>benef.cap) raw = benef.cap;
+          value = bm_fmt(Math.round(raw));
+        cells.push(value);
+        if (value) anyVisible = true;
+      }
+    });
+
+    if (!anyVisible) return;
+    rows.push({
+      benef,
+      cells
+    });
+  });
+
+  // Thêm dòng tổng nếu schema.hasTotal
+  if (schema.hasTotal){
+    const totalCells = [];
+    // Tính tổng cột theo các dòng number xuất hiện
+    columns.forEach((_,colIdx)=>{
+      let sum = 0;
+      rows.forEach(r=>{
+        if (r.benef.type==='number'){
+          const v = r.cells[colIdx];
+          if (v){
+            const parsed = parseInt(String(v).replace(/\./g,''),10);
+            if (!isNaN(parsed)) sum += parsed;
+          }
+        }
+      });
+      totalCells.push(sum?bm_fmt(sum):'');
+    });
+    rows.push({
+      benef:{ id:'_total', label:'Tổng quyền lợi', formula:'Tổng các phần trên', isTotal:true },
+      cells: totalCells
+    });
+  }
+
+  if (!rows.length) return '';
+
+  const title = (() =>{
+    switch(schema.key){
+      case 'AN_BINH_UU_VIET': return 'An Bình Ưu Việt';
+      case 'KHOE_BINH_AN': return 'Khoẻ Bình An';
+      case 'VUNG_TUONG_LAI': return 'Vững Tương Lai';
+      case 'PUL_FAMILY': return 'Khoẻ Trọn Vẹn';
+      case 'HEALTH_SCL': return 'Sức khỏe Bùng Gia Lực';
+      case 'BHN_2_0': return 'Bệnh hiểm nghèo 2.0';
+      case 'HOSPITAL_SUPPORT': return 'Hỗ trợ Chi phí Nằm viện';
+      case 'ACCIDENT': return 'Tai nạn';
+      default: return schema.key;
+    }
+  })();
+
+  const bodyHtml = rows.map(r=>{
+    const nameCell = `<td class="border px-2 py-1 ${r.benef.isTotal?'font-semibold':''}">
+      ${bm_escape(r.benef.label)} – ${bm_escape(r.benef.formula)}
+    </td>`;
+    const valueCells = r.cells.map(c=> `<td class="border px-2 py-1 text-right ${r.benef.isTotal?'font-semibold':''}">${c||''}</td>`).join('');
+    return `<tr>${nameCell}${valueCells}</tr>`;
+  }).join('');
+
+  return `
+    <div class="mb-6">
+      <h4 class="font-semibold mb-1">${bm_escape(title)}</h4>
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th class="border px-2 py-2 text-left" style="width:42%">Tên quyền lợi</th>
+              ${headCols}
+            </tr>
+          </thead>
+          <tbody>${bodyHtml}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/* ================== 4. XÂY DỰNG PHẦN 2 (ALL TABLES) ================== */
+function buildPart2BenefitsSection(summaryData){
+  // Thêm sumAssured mainProduct vào summaryData (tiện truyền)
+  summaryData.mainProductSumAssured = appState.mainProduct.stbh || 0;
+  const colsBySchema = bm_collectColumns(summaryData);
+
+  // Thứ tự xuất hiện sản phẩm:
+  const order = [
+    'AN_BINH_UU_VIET','KHOE_BINH_AN','VUNG_TUONG_LAI','PUL_FAMILY',
+    'HEALTH_SCL','BHN_2_0','HOSPITAL_SUPPORT','ACCIDENT'
+  ];
+
+  let htmlBlocks = [];
+  order.forEach(sk=>{
+    if (colsBySchema[sk]){
+      htmlBlocks.push(bm_renderSchemaTables(sk, colsBySchema[sk], summaryData));
+    }
+  });
+
+  if (!htmlBlocks.some(b=>b.trim())){
+    return `
+      <h3 class="text-lg font-bold mt-6 mb-3">Phần 2 · Tóm tắt quyền lợi sản phẩm</h3>
+      <div class="text-sm text-gray-500 italic mb-4">Không có quyền lợi nào để hiển thị.</div>
+    `;
+  }
+
+  return `
+    <h3 class="text-lg font-bold mt-6 mb-3">Phần 2 · Tóm tắt quyền lợi sản phẩm</h3>
+    ${htmlBlocks.join('')}
+  `;
+}
+
+/* ================== 5. ĐỔI TÊN PHẦN BẢNG PHÍ (Part 3) ================== */
+// Giữ nguyên code buildPart2Section cũ nếu tồn tại → đổi tên:
+if (typeof buildPart2Section === 'function'){
+  window.buildPart3ScheduleSection = function(summaryData){
+    // Dùng lại code cũ
+    return buildPart2Section(summaryData).replace('Phần 2 · Bảng phí','Phần 3 · Bảng phí');
+  };
+} else if (typeof buildPart3ScheduleSection !== 'function'){
+  // Nếu trước đó patch mình đã đổi rồi thì giữ nguyên
+  window.buildPart3ScheduleSection = function(){ return ''; };
+}
+
+/* ================== 6. CẬP NHẬT generateSummaryTable ================== */
+const __oldGenerate = typeof generateSummaryTable === 'function' ? generateSummaryTable : null;
+// Thay thế bằng hàm mới (giữ logic kiểm tra lỗi của bản đã patch trước)
+window.generateSummaryTable = function(){
+  try { if (typeof runWorkflow==='function') runWorkflow(); } catch(e){}
+
+  const simpleErrors = (typeof collectSimpleErrors==='function') ? collectSimpleErrors() : [];
+  if (simpleErrors.length){
+    if (typeof showGlobalErrors==='function') showGlobalErrors(simpleErrors);
+    const box = document.getElementById('global-error-box');
+    if (box){
+      const y = box.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: y<0?0:y, behavior:'smooth' });
+    }
+    return false;
+  } else if (typeof showGlobalErrors==='function'){
+    showGlobalErrors([]);
+  }
+
+  const data = buildSummaryData();
+
+  // Part 1 (giữ nguyên)
+  const part1Html = buildPart1Section(data);
+  // Part 2 (benefits mới)
+  const part2BenefitsHtml = buildPart2BenefitsSection(data);
+  // Part 3 (schedule phí – code cũ rename)
+  const part3ScheduleHtml = (typeof buildPart3ScheduleSection==='function') ? buildPart3ScheduleSection(data) : '';
+
+  const intro = buildIntroSection(data);
+  const footer = buildFooterSection(data);
+  const exportBtns = buildExportButtonsSection();
+
+  const finalHtml = intro + part1Html + part2BenefitsHtml + part3ScheduleHtml + footer + exportBtns;
+
+  const modal = document.getElementById('summary-modal');
+  const container = document.getElementById('summary-content-container');
+  if (container) container.innerHTML = finalHtml;
+  if (modal) modal.classList.remove('hidden');
+
+  if (typeof attachExportHandlers==='function') attachExportHandlers(container);
+  else if (typeof attachSimpleExportHandlers==='function') attachSimpleExportHandlers(container);
+  return true;
+};
+
+console.info('[BenefitMatrixPatch] v2 applied: Part 2 (benefits) inserted before schedule.');
