@@ -3288,7 +3288,7 @@ const BM_SCHEMAS = [
   {
     key:'AN_BINH_UU_VIET',
     type:'main',
-    hasTotal:true,
+    hasTotal:false,
     benefits:[
       { id:'abuv_death',
         labelBase:'Quyền lợi bảo hiểm tử vong',
@@ -3359,8 +3359,8 @@ const BM_SCHEMAS = [
       { id:'scl_pre', labelBase:'Điều trị trước nhập viện (tối đa 30 ngày trước khi nhập viện; mỗi đợt)', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
       { id:'scl_post', labelBase:'Điều trị sau xuất viện (tối đa 60 ngày sau xuất viện; mỗi đợt)', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
       { id:'scl_other', labelBase:'Chi phí y tế nội trú khác', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
-      { id:'scl_transplant_pt', labelBase:'Ghép tạng (tim, phổi, gan, tuỵ, thận, tuỷ xương) - NĐBH', formulaLabel:'Theo Chi phí y tế (mỗi lần)', valueType:'text', text:'Theo Chi phí y tế (mỗi lần)' },
-      { id:'scl_transplant_donor', labelBase:'Ghép tạng (người hiến tạng)', formulaLabel:'50% chi phí phẫu thuật', valueType:'text', text:'50% chi phí phẫu thuật' },
+      { id:'scl_transplant_pt', labelBase:'Ghép tạng (tim, phổi, gan, tuỵ, thận, tuỷ xương) - NĐBH', formulaLabel:'', valueType:'text', text:'Theo Chi phí y tế (mỗi lần)' },
+      { id:'scl_transplant_donor', labelBase:'Ghép tạng (người hiến tạng)', formulaLabel:'', valueType:'text', text:'50% chi phí phẫu thuật' },
       { id:'scl_cancer', labelBase:'Điều trị ung thư: gồm điều trị nội trú, ngoại trú và trong ngày', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
       { id:'scl_day_surgery', labelBase:'Phẫu thuật/Thủ thuật trong ngày (mỗi Năm hợp đồng)', formulaLabel:'Theo Chi phí y tế', valueType:'text', text:'Theo Chi phí y tế' },
       { id:'scl_common', labelBase:'Điều trị trong ngày cho các bệnh: Viêm phế quản; Viêm phổi; Sốt xuất huyết; Cúm (mỗi bệnh/mỗi Năm hợp đồng)', formulaLabel:'Theo chương trình', valueType:'text', computeProg:(m)=> m.commonDisease? bm_fmt(m.commonDisease):'Theo Chi phí y tế' },
