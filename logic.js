@@ -3865,7 +3865,7 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
 
   return `
     <div class="mb-6">
-      <h4 class="font-semibold mb-1">${bm_escape(title)}</h4>
+      <h4 class="font-semibold mb-1 text-center">${bm_escape(title)}</h4>
       <div class="overflow-x-auto">
         <table class="w-full border-collapse text-sm">
           <thead>
