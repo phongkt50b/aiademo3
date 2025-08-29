@@ -3856,13 +3856,12 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
         <td colspan="${r.colspan}" class="border px-2 py-2 font-semibold">${bm_escape(r.benef.labelBase)}</td>
       </tr>`;
     }
-    const nameTd = `<td class="border px-2 py-1 ${r.benef.isTotal?'font-semibold':''}">${buildLabel(r.benef)}</td>`;
-    const valueTds = r.cells
-      .map(c=>`<td class="border px-2 py-1 text-right ${r.benef.isTotal?'font-semibold':''}">${c||''}</td>`)
-      .join('');
-    return `<tr>${nameTd}${valueTds}</tr>`;
-  }).join('');
-
+    const isTotal = !!r.benef.isTotal;
+    const labelHtml = buildLabel(r.benef);
+    const nameTd = `<td class="border px-2 py-1">${isTotal?'<strong>'+labelHtml+'</strong>':labelHtml}</td>`;
+    const valueTds = r.cells.map(c=> {
+    const v = c||'';
+    return `<td class="border px-2 py-1 text-right">${isTotal?'<strong>'+v+'</strong>':v}</td>`;}).join('');
   return `
     <div class="mb-6">
       <h4 class="font-semibold mb-1 text-center">${bm_escape(title)}</h4>
