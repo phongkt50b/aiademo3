@@ -3699,36 +3699,11 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
   const schema = BM_SCHEMAS.find(s=>s.key===schemaKey);
   if(!schema || !columns.length) return '';
 
-  const rows=[];
-  schema.benefits.forEach(benef=>{
-    const cells=[];
-    let anyVisible=false;
+  const rows = [];
 
-    columns.forEach(col=>{
-      const persons = col.persons||[];
-      // product-specific condition
-      if (benef.productCond && benef.productCond !== col.productKey){
-        cells.push('');
-        return;
-      }
-      if (benef.minAge && !bm_anyAge(persons, benef.minAge)){
-        cells.push('');
-        return;
-      }
-      if (benef.childOnly){
-        if(!(persons.some(p=>p.age<21))){
-          cells.push('');
-          return;
-        }
-      }
-      if (benef.elderOnly){
-        if(!(persons.some(p=>p.age>=55))){
-          cells.push('');
-          return;
-        }
-      }
-     if (benef.headerCategory){
-     // Kiểm tra xem có cần hiển thị không
+  schema.benefits.forEach(benef=>{
+    // 1. Header nhóm (Thai sản / Ngoại trú / Nha khoa)
+    if (benef.headerCategory){
       let need = false;
       if (benef.headerCategory === 'maternity') {
         need = columns.some(c => c.flags && c.flags.maternity);
@@ -3737,86 +3712,107 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
       } else if (benef.headerCategory === 'dental') {
         need = columns.some(c => c.flags && c.flags.dental);
       }
-      if (!need) {
-        return; // Không render header nếu không ai có quyền lợi đó
-      }
-      rowsHtml.push(
-        `<tr class="benefit-subgroup-header">
-           <td colspan="${1 + columns.length}">
-             <strong>${sanitizeHtml(benef.labelBase)}</strong>
-           </td>
-         </tr>`
-      );
-      return; // Sang benefit kế tiếp
+      if (!need) return; // Không có cột nào có quyền lợi nhóm này
+      rows.push({
+        isHeader: true,
+        benef,
+        colspan: 1 + columns.length
+      });
+      return;
     }
- 
-     if (benef.maternityOnly){
-        if(!(col.flags && col.flags.maternity)){
-          cells.push('');
-          return;
+
+    // 2. Các dòng quyền lợi thường
+    const cells = [];
+    let anyVisible = false;
+
+    columns.forEach(col=>{
+      const persons = col.persons || [];
+
+      // Điều kiện chung
+      if (benef.productCond && benef.productCond !== col.productKey){
+        cells.push(''); return;
+      }
+      if (benef.minAge && !bm_anyAge(persons, benef.minAge)){
+        cells.push(''); return;
+      }
+      if (benef.childOnly && !persons.some(p=>p.age<21)){
+        cells.push(''); return;
+      }
+      if (benef.elderOnly && !persons.some(p=>p.age>=55)){
+        cells.push(''); return;
+      }
+      if (benef.maternityOnly){
+        if (!(col.flags && col.flags.maternity)){
+          cells.push(''); return;
         }
       }
       if (benef.outpatientOnly){
-        if (!(col.flags && col.flags.outpatient)) {
-          cells.push('');
-          return;
+        if (!(col.flags && col.flags.outpatient)){
+          cells.push(''); return;
         }
       }
       if (benef.dentalOnly){
-        if (!(col.flags && col.flags.dental)) {
-          cells.push('');
-          return;
+        if (!(col.flags && col.flags.dental)){
+          cells.push(''); return;
         }
       }
-      let value='';
-      const sa = col.sumAssured || (col.productKey===summaryData.productKey ? (appState.mainProduct.stbh||0):0);
+
+      // Tính giá trị
+      let value = '';
+      const sa = col.sumAssured || (col.productKey===summaryData.productKey ? (appState.mainProduct.stbh||0) : 0);
       const progMap = col.program ? BM_SCL_PROGRAMS[col.program] : null;
       const daily = col.daily;
 
-      if (benef.valueType==='number'){
-        let raw=0;
+      if (benef.valueType === 'number'){
+        let raw = 0;
         if (benef.computeProg && progMap){
-          raw = benef.computeProg(progMap)||0;
-        } else if (benef.computeDaily && daily!=null){
-          raw = benef.computeDaily(daily)||0;
+          raw = benef.computeProg(progMap) || 0;
+        } else if (benef.computeDaily && daily != null){
+          raw = benef.computeDaily(daily) || 0;
         } else if (benef.compute){
-          raw = sa ? benef.compute(sa):0;
+          raw = sa ? benef.compute(sa) : 0;
         }
-        if (benef.cap && raw>benef.cap) raw=benef.cap;
+        if (benef.cap && raw > benef.cap) raw = benef.cap;
         raw = bm_roundToThousand(raw);
-        value = raw? bm_fmt(raw):'';
-      } else if (benef.valueType==='text'){
+        value = raw ? bm_fmt(raw) : '';
+      } else if (benef.valueType === 'text'){
         if (benef.computeProg && progMap){
-          value = benef.computeProg(progMap)||'';
+          value = benef.computeProg(progMap) || '';
         } else if (benef.computeRange && sa){
-          value = benef.computeRange(sa)||'';
+          value = benef.computeRange(sa) || '';
         } else {
-          value = benef.text||'';
+          value = benef.text || '';
         }
       }
-      if (value) anyVisible=true;
+
+      if (value) anyVisible = true;
       cells.push(value);
     });
 
-    if(!anyVisible) return;
-    rows.push({benef, cells});
+    if (!anyVisible) return;
+
+    rows.push({
+      benef,
+      cells
+    });
   });
 
-  // TOTAL (only if hasTotal)
+  // 3. Total nếu schema.hasTotal
   if (schema.hasTotal){
     const totalCells = [];
     columns.forEach((_, idx)=>{
-      let sum=0;
+      let sum = 0;
       rows.forEach(r=>{
-        if (r.benef.valueType==='number'){
+        if (r.isHeader) return;
+        if (r.benef.valueType === 'number'){
           const v = r.cells[idx];
-          if (v){
-            const parsed = parseInt(String(v).replace(/[^\d]/g,''),10);
-            if (!isNaN(parsed)) sum += parsed;
-          }
+            if (v){
+              const parsed = parseInt(String(v).replace(/[^\d]/g,''),10);
+              if (!isNaN(parsed)) sum += parsed;
+            }
         }
       });
-      totalCells.push(sum? bm_fmt(sum):'');
+      totalCells.push(sum ? bm_fmt(sum) : '');
     });
     rows.push({
       benef:{ id:'_total', labelBase:'Tổng quyền lợi', formulaLabel:'', isTotal:true, valueType:'number' },
@@ -3824,9 +3820,8 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
     });
   }
 
-  if(!rows.length) return '';
+  if (!rows.length) return '';
 
-  // Title mapping (schema-level title)
   const titleMap = {
     'AN_BINH_UU_VIET':'An Bình Ưu Việt',
     'KHOE_BINH_AN':'Khoẻ Bình An',
@@ -3839,25 +3834,32 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
   };
   const title = titleMap[schema.key] || schema.key;
 
-  // Build header row
-  const headCols = columns.map(c=>`<th class="border px-2 py-2 text-left align-top">${bm_escape(c.label)}</th>`).join('');
+  const headCols = columns
+    .map(c=>`<th class="border px-2 py-2 text-left align-top">${bm_escape(c.label)}</th>`)
+    .join('');
 
   function buildLabel(benef){
     const base = benef.labelBase || '';
     const form = benef.formulaLabel || '';
     if (!form) return bm_escape(base);
-    // RULE: Với SCL bỏ phần sau nếu nằm trong tập và value cell sẽ thể hiện tương tự
-    // Tập loại bỏ: 'Theo Chi phí y tế','Mức/ngày','Theo chương trình','= STBH chương trình'
-    if (schema.key==='HEALTH_SCL'){
+    // Rút gọn phần công thức ở SCL nếu thuộc nhóm loại bỏ
+    if (schema.key === 'HEALTH_SCL'){
       const removable = ['Theo Chi phí y tế','Mức/ngày','Theo chương trình','= STBH chương trình'];
       if (removable.includes(form.trim())) return bm_escape(base);
     }
-    return bm_escape(base+' - '+form);
+    return bm_escape(base + ' - ' + form);
   }
 
   const bodyHtml = rows.map(r=>{
+    if (r.isHeader){
+      return `<tr class="benefit-subgroup-header">
+        <td colspan="${r.colspan}" class="border px-2 py-2 font-semibold">${bm_escape(r.benef.labelBase)}</td>
+      </tr>`;
+    }
     const nameTd = `<td class="border px-2 py-1 ${r.benef.isTotal?'font-semibold':''}">${buildLabel(r.benef)}</td>`;
-    const valueTds = r.cells.map(c=> `<td class="border px-2 py-1 text-right ${r.benef.isTotal?'font-semibold':''}">${c||''}</td>`).join('');
+    const valueTds = r.cells
+      .map(c=>`<td class="border px-2 py-1 text-right ${r.benef.isTotal?'font-semibold':''}">${c||''}</td>`)
+      .join('');
     return `<tr>${nameTd}${valueTds}</tr>`;
   }).join('');
 
