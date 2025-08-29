@@ -3476,8 +3476,8 @@ const BM_SCHEMAS = [
 
       // --- Nha khoa (chỉ hiển thị nếu chọn dental) ---
       { id:'scl_dental_header', labelBase:'Quyền lợi Nha khoa', headerCategory:'dental' },
-      { id:'scl_dental_title', labelBase:'Nha khoa - Tỷ lệ chi trả', formulaLabel:'80%', valueType:'text', dentalOnly:true, text:'80%' },
-      { id:'scl_dental_limit', labelBase:'Nha khoa - Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', dentalOnly:true,
+      { id:'scl_dental_title', labelBase:'Tỷ lệ chi trả', formulaLabel:'', valueType:'text', dentalOnly:true, text:'80%' },
+      { id:'scl_dental_limit', labelBase:'Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', dentalOnly:true,
         computeProg:(m)=> m.dentalLimit ? bm_fmt(m.dentalLimit) : '' }
 
     ]
