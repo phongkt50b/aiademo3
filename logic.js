@@ -3293,10 +3293,71 @@ function bm_roundToThousand(x){
 
 /* =================== Program Maps (SCL) =================== */
 const BM_SCL_PROGRAMS = {
-  co_ban:   { label:'Cơ bản',    core:100000000, double:100000000, room:750000,  commonDisease:5000000,  dialysis:5000000,  maternity:false, maternitySum:null, maternityCheck:null, maternityRoom:null },
-  nang_cao: { label:'Nâng cao',  core:250000000, double:250000000, room:1500000, commonDisease:7000000,  dialysis:7000000,  maternity:false, maternitySum:null, maternityCheck:null, maternityRoom:null },
-  toan_dien:{ label:'Toàn diện', core:500000000, double:500000000, room:2500000, commonDisease:10000000, dialysis:10000000, maternity:true,  maternitySum:25000000, maternityCheck:1000000, maternityRoom:2500000 },
-  hoan_hao: { label:'Hoàn hảo',  core:1000000000,double:1000000000,room:5000000, commonDisease:null,     dialysis:50000000, maternity:true,  maternitySum:25000000, maternityCheck:1500000, maternityRoom:5000000 }
+  co_ban: {
+    label:'Cơ bản',
+    core:100000000,
+    double:100000000,
+    room:750000,
+    commonDisease:5000000,
+    dialysis:5000000,
+    maternity:false,
+    maternitySum:null,
+    maternityCheck:null,
+    maternityRoom:null,
+    // NEW:
+    outLimit:5000000,          // Hạn mức ngoại trú / năm
+    outVisit:500000,           // Mỗi lần khám
+    outMental:null,            // Không áp dụng
+    dentalLimit:1000000        // Hạn mức nha khoa / năm
+  },
+  nang_cao: {
+    label:'Nâng cao',
+    core:250000000,
+    double:250000000,
+    room:1500000,
+    commonDisease:7000000,
+    dialysis:7000000,
+    maternity:false,
+    maternitySum:null,
+    maternityCheck:null,
+    maternityRoom:null,
+    outLimit:10000000,
+    outVisit:1000000,
+    outMental:null,
+    dentalLimit:2000000
+  },
+  toan_dien: {
+    label:'Toàn diện',
+    core:500000000,
+    double:500000000,
+    room:2500000,
+    commonDisease:10000000,
+    dialysis:10000000,
+    maternity:true,
+    maternitySum:25000000,
+    maternityCheck:1000000,
+    maternityRoom:2500000,
+    outLimit:20000000,
+    outVisit:2000000,
+    outMental:2000000,
+    dentalLimit:5000000
+  },
+  hoan_hao: {
+    label:'Hoàn hảo',
+    core:1000000000,
+    double:1000000000,
+    room:5000000,
+    commonDisease:null,
+    dialysis:50000000,
+    maternity:true,
+    maternitySum:25000000,
+    maternityCheck:1500000,
+    maternityRoom:5000000,
+    outLimit:40000000,
+    outVisit:4000000,
+    outMental:4000000,
+    dentalLimit:10000000
+  }
 };
 
 /* =================== Schemas =================== */
@@ -3401,7 +3462,21 @@ const BM_SCHEMAS = [
       { id:'scl_mat_birth_norm', labelBase:'Thai sản - Sinh thường', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
       { id:'scl_mat_birth_cs', labelBase:'Thai sản - Sinh mổ theo chỉ định', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
       { id:'scl_mat_complication', labelBase:'Thai sản - Biến chứng thai sản', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_newborn', labelBase:'Thai sản - Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' }
+      { id:'scl_mat_newborn', labelBase:'Thai sản - Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+          // --- Ngoại trú (chỉ hiển thị nếu chọn outpatient) ---
+      { id:'scl_out_title', labelBase:'Ngoại trú - Tỷ lệ chi trả', formulaLabel:'80%', valueType:'text', outpatientOnly:true, text:'80%' },
+      { id:'scl_out_limit', labelBase:'Ngoại trú - Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+        computeProg:(m)=> m.outLimit ? bm_fmt(m.outLimit) : '' },
+      { id:'scl_out_visit', labelBase:'Ngoại trú - Mỗi lần khám', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+        computeProg:(m)=> m.outVisit ? bm_fmt(m.outVisit) : '' },
+      { id:'scl_out_mental', labelBase:'Ngoại trú - Tư vấn / Điều trị sức khoẻ tâm thần', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+        computeProg:(m)=> m.outMental ? bm_fmt(m.outMental) : 'Không áp dụng' },
+
+      // --- Nha khoa (chỉ hiển thị nếu chọn dental) ---
+      { id:'scl_dental_title', labelBase:'Nha khoa - Tỷ lệ chi trả', formulaLabel:'80%', valueType:'text', dentalOnly:true, text:'80%' },
+      { id:'scl_dental_limit', labelBase:'Nha khoa - Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', dentalOnly:true,
+        computeProg:(m)=> m.dentalLimit ? bm_fmt(m.dentalLimit) : '' }
+
     ]
   },
   /* ---------- Bệnh hiểm nghèo 2.0 ---------- */
@@ -3505,7 +3580,9 @@ function bm_collectColumns(summaryData){
         const progMap = BM_SCL_PROGRAMS[prog];
         const childCopay = p.age<5?1:0;
         const maternity = (bm_isFemale(p) && p.age>=18 && p.age<=46 && progMap && progMap.maternity)?1:0;
-        const sig = `scl|${prog}|c${childCopay}|m${maternity}`;
+        const outpatient = !!(p.supplements.health_scl.outpatient);
+        const dental = !!(p.supplements.health_scl.dental);
+        const sig = `scl|${prog}|c${childCopay}|m${maternity}|o${outpatient?1:0}|d${dental?1:0}`;
         colsBySchema[schema.key]=colsBySchema[schema.key]||[];
         let col = colsBySchema[schema.key].find(c=>c.sig===sig);
         if(!col){
@@ -3649,6 +3726,18 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
       }
       if (benef.maternityOnly){
         if(!(col.flags && col.flags.maternity)){
+          cells.push('');
+          return;
+        }
+      }
+      if (benef.outpatientOnly){
+        if (!(col.flags && col.flags.outpatient)) {
+          cells.push('');
+          return;
+        }
+      }
+      if (benef.dentalOnly){
+        if (!(col.flags && col.flags.dental)) {
           cells.push('');
           return;
         }
