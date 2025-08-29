@@ -3454,25 +3454,28 @@ const BM_SCHEMAS = [
       { id:'scl_common', labelBase:'Điều trị trong ngày cho các bệnh: Viêm phế quản; Viêm phổi; Sốt xuất huyết; Cúm (mỗi bệnh/mỗi Năm hợp đồng)', formulaLabel:'Theo chương trình', valueType:'text', computeProg:(m)=> m.commonDisease? bm_fmt(m.commonDisease):'Theo Chi phí y tế' },
       { id:'scl_dialysis', labelBase:'Lọc máu (mỗi Năm hợp đồng)', formulaLabel:'Theo chương trình', valueType:'text', computeProg:(m)=> m.dialysis? bm_fmt(m.dialysis):'Theo Chi phí y tế' },
       // Thai sản gộp
+      { id:'scl_maternity_header', labelBase:'Quyền lợi Thai sản', headerCategory:'maternity' },
       { id:'scl_maternity_ratio', labelBase:'Tỷ lệ chi trả thai sản', formulaLabel:'', valueType:'text', maternityOnly:true, text:'Năm 1: 50% | Năm 2: 80% | Từ năm 3: 100%' },
-      { id:'scl_mat_sum', labelBase:'Thai sản - STBH', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternitySum? bm_fmt(m.maternitySum):'' },
-      { id:'scl_mat_check', labelBase:'Thai sản - Khám thai (tối đa 8 lần/năm; mỗi lần)', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternityCheck? bm_fmt(m.maternityCheck)+'/lần':'' },
-      { id:'scl_mat_room', labelBase:'Thai sản - Phòng & Giường (tối đa 100 ngày/năm; mỗi ngày)', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternityRoom? bm_fmt(m.maternityRoom)+'/ngày':'' },
-      { id:'scl_mat_icu', labelBase:'Thai sản - Phòng chăm sóc đặc biệt (tối đa 30 ngày/năm)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_birth_norm', labelBase:'Thai sản - Sinh thường', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_birth_cs', labelBase:'Thai sản - Sinh mổ theo chỉ định', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_complication', labelBase:'Thai sản - Biến chứng thai sản', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
-      { id:'scl_mat_newborn', labelBase:'Thai sản - Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+      { id:'scl_mat_sum', labelBase:'Hạn mức', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternitySum? bm_fmt(m.maternitySum):'' },
+      { id:'scl_mat_check', labelBase:'Khám thai (tối đa 8 lần/năm; mỗi lần)', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternityCheck? bm_fmt(m.maternityCheck)+'/lần':'' },
+      { id:'scl_mat_room', labelBase:'Phòng & Giường (tối đa 100 ngày/năm; mỗi ngày)', formulaLabel:'Theo chương trình', valueType:'text', maternityOnly:true, computeProg:(m)=> m.maternityRoom? bm_fmt(m.maternityRoom)+'/ngày':'' },
+      { id:'scl_mat_icu', labelBase:'Phòng chăm sóc đặc biệt (tối đa 30 ngày/năm)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+      { id:'scl_mat_birth_norm', labelBase:'Sinh thường', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+      { id:'scl_mat_birth_cs', labelBase:'Sinh mổ theo chỉ định', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+      { id:'scl_mat_complication', labelBase:'Biến chứng thai sản', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
+      { id:'scl_mat_newborn', labelBase:'Chăm sóc trẻ sơ sinh (tối đa 7 ngày sau sinh)', formulaLabel:'Theo Chi phí y tế', valueType:'text', maternityOnly:true, text:'Theo Chi phí y tế' },
           // --- Ngoại trú (chỉ hiển thị nếu chọn outpatient) ---
-      { id:'scl_out_title', labelBase:'Ngoại trú - Tỷ lệ chi trả', formulaLabel:'80%', valueType:'text', outpatientOnly:true, text:'80%' },
-      { id:'scl_out_limit', labelBase:'Ngoại trú - Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+      { id:'scl_out_header', labelBase:'Quyền lợi Ngoại trú', headerCategory:'outpatient' },
+      { id:'scl_out_title', labelBase:'Tỷ lệ chi trả', formulaLabel:'', valueType:'text', outpatientOnly:true, text:'80%' },
+      { id:'scl_out_limit', labelBase:'Hạn mức ', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
         computeProg:(m)=> m.outLimit ? bm_fmt(m.outLimit) : '' },
-      { id:'scl_out_visit', labelBase:'Ngoại trú - Mỗi lần khám', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+      { id:'scl_out_visit', labelBase:'Mỗi lần khám', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
         computeProg:(m)=> m.outVisit ? bm_fmt(m.outVisit) : '' },
-      { id:'scl_out_mental', labelBase:'Ngoại trú - Tư vấn / Điều trị sức khoẻ tâm thần', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
+      { id:'scl_out_mental', labelBase:'Tư vấn / Điều trị sức khoẻ tâm thần', formulaLabel:'Theo chương trình', valueType:'text', outpatientOnly:true,
         computeProg:(m)=> m.outMental ? bm_fmt(m.outMental) : 'Không áp dụng' },
 
       // --- Nha khoa (chỉ hiển thị nếu chọn dental) ---
+      { id:'scl_dental_header', labelBase:'Quyền lợi Nha khoa', headerCategory:'dental' },
       { id:'scl_dental_title', labelBase:'Nha khoa - Tỷ lệ chi trả', formulaLabel:'80%', valueType:'text', dentalOnly:true, text:'80%' },
       { id:'scl_dental_limit', labelBase:'Nha khoa - Hạn mức năm', formulaLabel:'Theo chương trình', valueType:'text', dentalOnly:true,
         computeProg:(m)=> m.dentalLimit ? bm_fmt(m.dentalLimit) : '' }
@@ -3724,7 +3727,30 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
           return;
         }
       }
-      if (benef.maternityOnly){
+     if (benef.headerCategory){
+     // Kiểm tra xem có cần hiển thị không
+      let need = false;
+      if (benef.headerCategory === 'maternity') {
+        need = columns.some(c => c.flags && c.flags.maternity);
+      } else if (benef.headerCategory === 'outpatient') {
+        need = columns.some(c => c.flags && c.flags.outpatient);
+      } else if (benef.headerCategory === 'dental') {
+        need = columns.some(c => c.flags && c.flags.dental);
+      }
+      if (!need) {
+        return; // Không render header nếu không ai có quyền lợi đó
+      }
+      rowsHtml.push(
+        `<tr class="benefit-subgroup-header">
+           <td colspan="${1 + columns.length}">
+             <strong>${sanitizeHtml(benef.labelBase)}</strong>
+           </td>
+         </tr>`
+      );
+      return; // Sang benefit kế tiếp
+    }
+ 
+     if (benef.maternityOnly){
         if(!(col.flags && col.flags.maternity)){
           cells.push('');
           return;
