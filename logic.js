@@ -3590,7 +3590,7 @@ function bm_collectColumns(summaryData){
             sig,
             productKey:'health_scl',
             program:prog,
-            flags:{childCopay,maternity},
+            flags:{childCopay,maternity, outpatient, dental},
             persons:[],
             label:'', // sẽ build sau
           };
