@@ -3702,60 +3702,32 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
   const rows = [];
 
   schema.benefits.forEach(benef=>{
-    // 1. Header nhóm (Thai sản / Ngoại trú / Nha khoa)
+    // 1. Header nhóm
     if (benef.headerCategory){
       let need = false;
-      if (benef.headerCategory === 'maternity') {
-        need = columns.some(c => c.flags && c.flags.maternity);
-      } else if (benef.headerCategory === 'outpatient') {
-        need = columns.some(c => c.flags && c.flags.outpatient);
-      } else if (benef.headerCategory === 'dental') {
-        need = columns.some(c => c.flags && c.flags.dental);
-      }
-      if (!need) return; // Không có cột nào có quyền lợi nhóm này
-      rows.push({
-        isHeader: true,
-        benef,
-        colspan: 1 + columns.length
-      });
+      if (benef.headerCategory === 'maternity') need = columns.some(c => c.flags && c.flags.maternity);
+      else if (benef.headerCategory === 'outpatient') need = columns.some(c => c.flags && c.flags.outpatient);
+      else if (benef.headerCategory === 'dental') need = columns.some(c => c.flags && c.flags.dental);
+      if (!need) return;
+      rows.push({ isHeader:true, benef, colspan: 1 + columns.length });
       return;
     }
 
-    // 2. Các dòng quyền lợi thường
+    // 2. Dòng quyền lợi thường
     const cells = [];
     let anyVisible = false;
 
     columns.forEach(col=>{
       const persons = col.persons || [];
 
-      // Điều kiện chung
-      if (benef.productCond && benef.productCond !== col.productKey){
-        cells.push(''); return;
-      }
-      if (benef.minAge && !bm_anyAge(persons, benef.minAge)){
-        cells.push(''); return;
-      }
-      if (benef.childOnly && !persons.some(p=>p.age<21)){
-        cells.push(''); return;
-      }
-      if (benef.elderOnly && !persons.some(p=>p.age>=55)){
-        cells.push(''); return;
-      }
-      if (benef.maternityOnly){
-        if (!(col.flags && col.flags.maternity)){
-          cells.push(''); return;
-        }
-      }
-      if (benef.outpatientOnly){
-        if (!(col.flags && col.flags.outpatient)){
-          cells.push(''); return;
-        }
-      }
-      if (benef.dentalOnly){
-        if (!(col.flags && col.flags.dental)){
-          cells.push(''); return;
-        }
-      }
+      // Điều kiện loại trừ
+      if (benef.productCond && benef.productCond !== col.productKey){ cells.push(''); return; }
+      if (benef.minAge && !bm_anyAge(persons, benef.minAge)){ cells.push(''); return; }
+      if (benef.childOnly && !persons.some(p=>p.age<21)){ cells.push(''); return; }
+      if (benef.elderOnly && !persons.some(p=>p.age>=55)){ cells.push(''); return; }
+      if (benef.maternityOnly && !(col.flags && col.flags.maternity)){ cells.push(''); return; }
+      if (benef.outpatientOnly && !(col.flags && col.flags.outpatient)){ cells.push(''); return; }
+      if (benef.dentalOnly && !(col.flags && col.flags.dental)){ cells.push(''); return; }
 
       // Tính giá trị
       let value = '';
@@ -3765,24 +3737,16 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
 
       if (benef.valueType === 'number'){
         let raw = 0;
-        if (benef.computeProg && progMap){
-          raw = benef.computeProg(progMap) || 0;
-        } else if (benef.computeDaily && daily != null){
-          raw = benef.computeDaily(daily) || 0;
-        } else if (benef.compute){
-          raw = sa ? benef.compute(sa) : 0;
-        }
+        if (benef.computeProg && progMap) raw = benef.computeProg(progMap) || 0;
+        else if (benef.computeDaily && daily != null) raw = benef.computeDaily(daily) || 0;
+        else if (benef.compute) raw = sa ? benef.compute(sa) : 0;
         if (benef.cap && raw > benef.cap) raw = benef.cap;
         raw = bm_roundToThousand(raw);
         value = raw ? bm_fmt(raw) : '';
-      } else if (benef.valueType === 'text'){
-        if (benef.computeProg && progMap){
-          value = benef.computeProg(progMap) || '';
-        } else if (benef.computeRange && sa){
-          value = benef.computeRange(sa) || '';
-        } else {
-          value = benef.text || '';
-        }
+      } else { // text
+        if (benef.computeProg && progMap) value = benef.computeProg(progMap) || '';
+        else if (benef.computeRange && sa) value = benef.computeRange(sa) || '';
+        else value = benef.text || '';
       }
 
       if (value) anyVisible = true;
@@ -3790,14 +3754,10 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
     });
 
     if (!anyVisible) return;
-
-    rows.push({
-      benef,
-      cells
-    });
+    rows.push({ benef, cells });
   });
 
-  // 3. Total nếu schema.hasTotal
+  // 3. Total (nếu cần)
   if (schema.hasTotal){
     const totalCells = [];
     columns.forEach((_, idx)=>{
@@ -3806,10 +3766,10 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
         if (r.isHeader) return;
         if (r.benef.valueType === 'number'){
           const v = r.cells[idx];
-            if (v){
-              const parsed = parseInt(String(v).replace(/[^\d]/g,''),10);
-              if (!isNaN(parsed)) sum += parsed;
-            }
+          if (v){
+            const parsed = parseInt(String(v).replace(/[^\d]/g,''),10);
+            if (!isNaN(parsed)) sum += parsed;
+          }
         }
       });
       totalCells.push(sum ? bm_fmt(sum) : '');
@@ -3842,7 +3802,6 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
     const base = benef.labelBase || '';
     const form = benef.formulaLabel || '';
     if (!form) return bm_escape(base);
-    // Rút gọn phần công thức ở SCL nếu thuộc nhóm loại bỏ
     if (schema.key === 'HEALTH_SCL'){
       const removable = ['Theo Chi phí y tế','Mức/ngày','Theo chương trình','= STBH chương trình'];
       if (removable.includes(form.trim())) return bm_escape(base);
@@ -3858,13 +3817,15 @@ function bm_renderSchemaTables(schemaKey, columns, summaryData){
     }
     const isTotal = !!r.benef.isTotal;
     const labelHtml = buildLabel(r.benef);
-    const nameTd = `<td class="border px-2 py-1">${isTotal?'<strong>'+labelHtml+'</strong>':labelHtml}</td>`;
-    const valueTds = r.cells.map(c=> {
-    const v = c||'';
-    return `<td class="border px-2 py-1 text-right">${isTotal?'<strong>'+v+'</strong>':v}</td>`;}).join('');
+    return `<tr>
+      <td class="border px-2 py-1 ${isTotal?'font-semibold':''}">${labelHtml}</td>
+      ${r.cells.map(c=>`<td class="border px-2 py-1 text-right ${isTotal?'font-semibold':''}">${c||''}</td>`).join('')}
+    </tr>`;
+  }).join('');
+
   return `
     <div class="mb-6">
-      <h4 class="font-semibold mb-1 text-center">${bm_escape(title)}</h4>
+      <h4 class="font-semibold mb-1">${bm_escape(title)}</h4>
       <div class="overflow-x-auto">
         <table class="w-full border-collapse text-sm">
           <thead>
