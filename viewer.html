@@ -227,8 +227,9 @@
         fig.appendChild(img);
         fig.addEventListener('click',()=>openLightbox(u));
         wrap.appendChild(fig);
-        state.images.push(u);
       });
+      // Cập nhật state.images theo thứ tự ảnh được render
+      state.images = state.images.concat(urls);
       return wrap;
     }
 
@@ -285,59 +286,75 @@
       const main = qs('#content');
       const statusEl = qs('#status');
       statusEl.classList.add('hidden');
+      main.innerHTML = ''; // Xoá nội dung cũ
+      state.images = [];   // Reset danh sách ảnh lightbox
 
-      // 1. Gắn nguyên văn summaryHtml
+      // 1. Gắn summaryHtml
       const summaryHtml = buildSummaryHtmlFromPayload(payload);
       const container = document.createElement('div');
-      container.id='summary-wrapper';
+      container.id = 'summary-wrapper';
       container.innerHTML = summaryHtml;
       main.appendChild(container);
 
-      // 2. Chèn ảnh công ty trước Phần 1
-      const part1Heading = qa('h3', container).find(h=>/Phần\s*1/i.test(h.textContent));
+      // 2. Chèn ảnh công ty trước phần 1
+      const part1Heading = qa('h3', container).find(h => /Phần\s*1/i.test(h.textContent));
       const companyImgs = await collectSequential('images/company','company',50);
+      console.log('Company images:', companyImgs);
       const companyBlock = renderImageBlock(companyImgs);
       if(companyBlock){
-        if(part1Heading) container.insertBefore(companyBlock, part1Heading.parentElement);
-        else container.prepend(companyBlock);
+        if(part1Heading){
+          container.insertBefore(companyBlock, part1Heading);
+        } else {
+          container.prepend(companyBlock);
+        }
       }
 
-      // 3. Chèn ảnh sản phẩm chính + ảnh riders sau Phần 3
-      const part3Headings = qa('h3', container).filter(h=>/Phần\s*3/i.test(h.textContent));
-      const lastPart3 = part3Headings.length ? part3Headings[part3Head3.length-1].parentElement : container.lastElementChild;
-      
+      // 3. Chèn ảnh sản phẩm chính và riders sau phần 3
+      const part3Headings = qa('h3', container).filter(h => /Phần\s*3/i.test(h.textContent));
+      const lastPart3 = part3Headings.length ? part3Headings[part3Headings.length - 1] : null;
+      let insertAfterNode = lastPart3 ? lastPart3.parentElement : container.lastElementChild;
+
       // 3.1 Ảnh sản phẩm chính
-      const prodSlug = payload.productSlug || (payload.productKey||'').toLowerCase();
+      const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
       const productImgs = await collectSequential(`images/products/${prodSlug}`, prodSlug, 60);
+      console.log('Product images:', productImgs);
       if(productImgs.length){
         const prodBlock = renderImageBlock(productImgs);
-        lastPart3.after(prodBlock);
+        if(insertAfterNode && insertAfterNode.parentNode){
+          insertAfterNode.parentNode.insertBefore(prodBlock, insertAfterNode.nextSibling);
+          insertAfterNode = prodBlock;
+        } else {
+          container.appendChild(prodBlock);
+          insertAfterNode = prodBlock;
+        }
       }
-      
-      // 3.2 Ảnh riders theo thứ tự trong payload.premiums.riders
+
+      // 3.2 Ảnh riders
       if(Array.isArray(payload.premiums?.riders)){
-        let lastNode = lastPart3.nextElementSibling || lastPart3;
         for(const r of payload.premiums.riders){
           if(!r.selected) continue;
-          // Map slug rider sang thư mục ảnh
           const riderSlugMap = {
             health_scl:'bung-gia-luc',
             bhn:'benh-hiem-ngheo-20',
             accident:'tai-nan',
             hospital_support:'ho-tro-vien-phi',
-            mdp3:null // MDP3 không có ảnh
           };
           const rSlug = riderSlugMap[r.slug];
           if(!rSlug) continue;
           const riderImgs = await collectSequential(`images/products/${rSlug}`, rSlug, 60);
+          console.log(`Rider images (${r.slug}):`, riderImgs);
           if(riderImgs.length){
             const riderBlock = renderImageBlock(riderImgs);
-            lastNode.after(riderBlock);
-            lastNode = riderBlock;
+            if(insertAfterNode && insertAfterNode.parentNode){
+              insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
+              insertAfterNode = riderBlock;
+            } else {
+              container.appendChild(riderBlock);
+              insertAfterNode = riderBlock;
+            }
           }
         }
       }
-
     }
 
     function setupButtons(){
