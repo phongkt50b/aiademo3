@@ -408,21 +408,6 @@
       </div>
     </div>
   </template>
-
-  <!-- LIGHTBOX OVERLAY -->
-  <div id="img-lightbox" class="img-lightbox" style="display:none;">
-    <div class="img-lightbox-backdrop"></div>
-    <div class="img-lightbox-dialog">
-      <button type="button" class="img-lightbox-close" aria-label="Đóng">&times;</button>
-      <img id="img-lightbox-main" src="" alt="">
-      <div id="img-lightbox-caption" class="img-lightbox-caption"></div>
-      <div class="img-lightbox-nav">
-        <button type="button" id="img-lightbox-prev">&lt;</button>
-        <button type="button" id="img-lightbox-next">&gt;</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     window.addEventListener('error', e => {
       const box = document.getElementById('error-message') || document.body.appendChild(Object.assign(document.createElement('div'), {id:'error-message'}));
