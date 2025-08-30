@@ -302,15 +302,42 @@
         else container.prepend(companyBlock);
       }
 
-      // 3. Chèn ảnh sản phẩm chính sau Phần 3
+      // 3. Chèn ảnh sản phẩm chính + ảnh riders sau Phần 3
       const part3Headings = qa('h3', container).filter(h=>/Phần\s*3/i.test(h.textContent));
-      const lastPart3 = part3Headings.length ? part3Headings[part3Headings.length-1].parentElement : container.lastElementChild;
+      const lastPart3 = part3Headings.length ? part3Headings[part3Head3.length-1].parentElement : container.lastElementChild;
+      
+      // 3.1 Ảnh sản phẩm chính
       const prodSlug = payload.productSlug || (payload.productKey||'').toLowerCase();
       const productImgs = await collectSequential(`images/products/${prodSlug}`, prodSlug, 60);
-      const prodBlock = renderImageBlock(productImgs);
-      if(prodBlock){
+      if(productImgs.length){
+        const prodBlock = renderImageBlock(productImgs);
         lastPart3.after(prodBlock);
       }
+      
+      // 3.2 Ảnh riders theo thứ tự trong payload.premiums.riders
+      if(Array.isArray(payload.premiums?.riders)){
+        let lastNode = lastPart3.nextElementSibling || lastPart3;
+        for(const r of payload.premiums.riders){
+          if(!r.selected) continue;
+          // Map slug rider sang thư mục ảnh
+          const riderSlugMap = {
+            health_scl:'bung-gia-luc',
+            bhn:'benh-hiem-ngheo-20',
+            accident:'tai-nan',
+            hospital_support:'ho-tro-vien-phi',
+            mdp3:null // MDP3 không có ảnh
+          };
+          const rSlug = riderSlugMap[r.slug];
+          if(!rSlug) continue;
+          const riderImgs = await collectSequential(`images/products/${rSlug}`, rSlug, 60);
+          if(riderImgs.length){
+            const riderBlock = renderImageBlock(riderImgs);
+            lastNode.after(riderBlock);
+            lastNode = riderBlock;
+          }
+        }
+      }
+
     }
 
     function setupButtons(){
