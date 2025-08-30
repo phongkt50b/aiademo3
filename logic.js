@@ -3872,45 +3872,65 @@ if (typeof buildPart2Section === 'function'){
 }
 
 console.info('[BenefitMatrixPatch] v3.2 applied.');
-/* ================= IMAGE & PRODUCT GALLERY MODULE v2.3 =================
-   Mục tiêu: Thứ tự trong modal:
-     1. Ảnh Công ty
-     2. Phần 1 (Tóm tắt sản phẩm)
-     3. Phần 2 (Tóm tắt quyền lợi)
-     4. Phần 3 (Bảng phí)
-     5. Ảnh Sản phẩm đã chọn
-   Khác biệt v2.2: Product gallery chuyển xuống SAU Section 3 / Bảng phí.
-*/
+/* ================= IMAGE & PRODUCT GALLERY MODULE v2.4 =================
+   Mục tiêu:
+     - Inject gallery CHỈ BÊN TRONG modal (#summary-content-container)
+     - Thứ tự trong modal:
+         1. Company gallery
+         2. Section 1
+         3. Section 2
+         4. Section 3 (Fee)
+         5. Product gallery (ảnh các sản phẩm đã chọn)
+     - Linh hoạt anchor: dùng ID / data-attr nếu có, fallback dò text heading.
+     - Hỗ trợ đa extension: webp, jpg, jpeg, png.
+     - Retry khi nội dung modal render async.
+   ====================================================================== */
 (function(){
   const DEBUG = true;
   const LOG = (...a)=>{ if(DEBUG) console.log('[Gallery]', ...a); };
   const WARN = (...a)=>console.warn('[Gallery]', ...a);
 
-  // ---------- CONFIG ----------
+  // ------------ CONFIG -------------
   const IMAGE_EXTENSIONS = ['webp','jpg','jpeg','png'];
+  const SUMMARY_MODAL_ID = 'summary-modal';
   const SUMMARY_CONTAINER_ID = 'summary-content-container';
   const OPEN_SUMMARY_BTN_ID = 'view-summary-btn';
-  const SUMMARY_MODAL_ID = 'summary-modal';
 
-  // Điểm neo:
-  const INSERT_POINTS = {
-    companyBeforeSelectors: '#section-1, #summary-table-1, h2[data-table="1"], h2[data-section="1"], h3[data-section="1"]',
-    productAfterSelectors: '#section-3, #fee-table, #summary-fee-table, h2[data-section="3"], h3[data-section="3"]'
+  // Selectors ưu tiên (nếu bạn thêm các id khuyến nghị)
+  const ANCHOR_SELECTORS = {
+    beforeCompany: [ // Section 1 (Company gallery đứng trước)
+      '#summary-section-1',
+      '#section-1',
+      '[data-summary-section="1"]'
+    ],
+    afterProduct: [ // Section 3 (Product gallery đứng sau)
+      '#summary-section-3',
+      '#section-3',
+      '#summary-fee-table',
+      '#fee-table',
+      '[data-summary-section="3"]'
+    ]
+  };
+
+  // Pattern dò text fallback (dò gần đúng, không phân biệt hoa thường)
+  const TEXT_PATTERNS = {
+    section1: /(phần\s*1\b|tóm tắt sản phẩm)/i,
+    section3: /(phần\s*3\b|bảng phí)/i
   };
 
   const GALLERY_CONFIG = {
     company: {
       enabled: true,
-      maxImages: 20,
       basePath: 'images/company',
+      maxImages: 20,
       filenameBase: i => `company-${String(i).padStart(2,'0')}`,
-      containerId: 'company-intro-gallery',
-      title: 'Giới thiệu AIA Việt Nam'
+      title: 'Giới thiệu AIA Việt Nam',
+      containerId: 'company-intro-gallery'
     },
     product: {
       enabled: true,
-      maxImagesPerProduct: 25,
       basePath: 'images/products',
+      maxImagesPerProduct: 25,
       productSlugMap: {
         'PUL_TRON_DOI': 'khoe-tron-ven',
         'PUL_15NAM': 'khoe-tron-ven',
@@ -3921,24 +3941,25 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
         'AN_BINH_UU_VIET': 'an-binh-uu-viet'
       },
       filenameBase: (slug,i)=> `${slug}-${String(i).padStart(2,'0')}`,
-      containerId: 'product-image-gallery',
-      title: 'Hình ảnh minh họa sản phẩm'
+      title: 'Hình ảnh minh họa sản phẩm',
+      containerId: 'product-image-gallery'
     },
     retry: {
-      maxAttempts: 15,
-      intervalMs: 120
+      maxAttempts: 18,
+      intervalMs: 140
     }
   };
 
-  // ---------- STATE ----------
+  // ------------ STATE -------------
   const state = {
     companyLoaded: false,
     productLoadedFor: new Set(),
     lightboxItems: [],
-    lightboxIndex: 0
+    lightboxIndex: 0,
+    lastProductId: null
   };
 
-  // ---------- UTIL ----------
+  // ------------ IMAGE UTIL -------------
   function imageExistsOnce(src){
     return new Promise(res=>{
       const img = new Image();
@@ -3957,6 +3978,40 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     return null;
   }
 
+  // ------------ DOM HELPERS -------------
+  function qsAll(root, selectors){
+    return selectors.flatMap(sel => Array.from(root.querySelectorAll(sel)));
+  }
+
+  function findAnchorBefore(container){
+    // Ưu tiên selectors
+    for(const sel of ANCHOR_SELECTORS.beforeCompany){
+      const el = container.querySelector(sel);
+      if(el) return el;
+    }
+    // Fallback dò text
+    return scanHeadingByText(container, TEXT_PATTERNS.section1);
+  }
+  function findAnchorAfter(container){
+    for(const sel of ANCHOR_SELECTORS.afterProduct){
+      const el = container.querySelector(sel);
+      if(el) return el;
+    }
+    return scanHeadingByText(container, TEXT_PATTERNS.section3, true); // true => lấy heading cuối cùng match (nếu nhiều)
+  }
+  function scanHeadingByText(container, regex, takeLast=false){
+    const heads = container.querySelectorAll('h1,h2,h3,h4');
+    let found=null;
+    heads.forEach(h=>{
+      if(regex.test(h.textContent.trim())){
+        if(!takeLast && !found) found = h;
+        else if(takeLast) found = h;
+      }
+    });
+    return found;
+  }
+
+  // ------------ FIGURE / LIGHTBOX -------------
   function buildFigure({src, caption, group}){
     const fig = document.createElement('figure');
     fig.className='img-figure';
@@ -3972,14 +4027,14 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     img.addEventListener('load', ()=>{
       img.classList.remove('loading');
       if(img.naturalWidth && img.naturalHeight){
-        const ratio = img.naturalWidth / img.naturalHeight;
-        fig.classList.add(ratio>=1?'orientation-landscape':'orientation-portrait');
+        const r = img.naturalWidth / img.naturalHeight;
+        fig.classList.add(r>=1?'orientation-landscape':'orientation-portrait');
       }
     });
     img.addEventListener('error', ()=>{
       img.classList.add('img-thumb-error');
       const cap = fig.querySelector('.img-caption');
-      if(cap) cap.textContent='Không tải được ảnh';
+      if(cap) cap.textContent = 'Không tải được ảnh';
     });
     const cap = document.createElement('figcaption');
     cap.className='img-caption';
@@ -3990,13 +4045,12 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     fig.addEventListener('keypress', e=>{
       if(e.key==='Enter'||e.key===' '){
         e.preventDefault();
-        openLightboxBySrc(src);
+          openLightboxBySrc(src);
       }
     });
     return fig;
   }
 
-  // ---------- LIGHTBOX ----------
   let lbRoot, lbImg, lbCaption, lbPrev, lbNext, lbClose;
   function initLightbox(){
     if(lbRoot) return;
@@ -4049,10 +4103,10 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
   function shiftLightbox(delta){
     const len = state.lightboxItems.length;
     if(!len) return;
-    let next = state.lightboxIndex + delta;
-    if(next<0) next=0;
-    if(next>=len) next=len-1;
-    state.lightboxIndex = next;
+    let n = state.lightboxIndex + delta;
+    if(n<0) n=0;
+    if(n>=len) n=len-1;
+    state.lightboxIndex = n;
     showLightbox();
   }
   function updateLightboxNav(){
@@ -4078,20 +4132,21 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     LOG('Lightbox items:', list.length);
   }
 
-  // ---------- GALLERY BUILDERS ----------
+  // ------------ GALLERY BUILDERS -------------
   async function buildCompanyGallery(container){
-    if(!GALLERY_CONFIG.company.enabled) return;
+    if(!GALLERY_CONFIG.company.enabled) return null;
     if(state.companyLoaded){
-      if(container.querySelector('#'+GALLERY_CONFIG.company.containerId)) return;
+      // Đã load => không load thêm
+      return container.querySelector('#'+GALLERY_CONFIG.company.containerId);
     }
     const wrap = document.createElement('div');
     wrap.id = GALLERY_CONFIG.company.containerId;
     wrap.className = 'img-company-gallery';
-    const h = document.createElement('h3');
-    h.textContent = GALLERY_CONFIG.company.title;
-    wrap.appendChild(h);
+    const h3 = document.createElement('h3');
+    h3.textContent = GALLERY_CONFIG.company.title;
+    wrap.appendChild(h3);
     const grid = document.createElement('div');
-    grid.className = 'img-company-grid';
+    grid.className='img-company-grid';
     wrap.appendChild(grid);
 
     let count=0;
@@ -4115,22 +4170,23 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       state.companyLoaded = true;
     }
     insertCompanyGallery(container, wrap);
+    return wrap;
   }
 
   async function buildProductGallery(container){
-    if(!GALLERY_CONFIG.product.enabled) return;
-    const mainSelect = document.getElementById('main-product');
-    if(!mainSelect || !mainSelect.value){
+    if(!GALLERY_CONFIG.product.enabled) return null;
+    const select = document.getElementById('main-product');
+    if(!select || !select.value){
       LOG('Chưa chọn sản phẩm chính.');
-      return;
+      return null;
     }
-    const productId = mainSelect.value;
+    const productId = select.value;
     const slug = GALLERY_CONFIG.product.productSlugMap[productId];
     if(!slug){
-      WARN('Không tìm thấy slug cho', productId);
-      return;
+      WARN('Không có slug cho', productId);
+      return null;
     }
-    // Wrapper tổng
+
     let outer = container.querySelector('#'+GALLERY_CONFIG.product.containerId);
     if(!outer){
       outer = document.createElement('div');
@@ -4139,26 +4195,25 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       const h = document.createElement('h3');
       h.textContent = GALLERY_CONFIG.product.title;
       outer.appendChild(h);
-      // Chưa insert, chờ block đầu xong để quyết định vị trí
     }
-    // Đã load slug này?
     if(state.productLoadedFor.has(slug)){
+      // Đảm bảo outer đã được chèn đúng vị trí (sau Section 3)
       if(!outer.isConnected){
         insertProductGallery(container, outer);
       }
-      return;
+      return outer;
     }
-    // Block sản phẩm
+    // Block 1 slug
     let block = outer.querySelector(`[data-product-slug="${slug}"]`);
     if(block){
-      return;
+      return outer;
     }
     block = document.createElement('div');
-    block.className='img-product-block';
+    block.className = 'img-product-block';
     block.dataset.productSlug = slug;
     const titleDiv = document.createElement('div');
     titleDiv.className='img-product-title';
-    titleDiv.textContent = mainSelect.options[mainSelect.selectedIndex].text;
+    titleDiv.textContent = select.options[select.selectedIndex].text;
     const grid = document.createElement('div');
     grid.className='img-grid';
     block.appendChild(titleDiv);
@@ -4167,7 +4222,7 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
 
     let count=0;
     for(let i=1;i<=GALLERY_CONFIG.product.maxImagesPerProduct;i++){
-      const baseNoExt = `${GALLERY_CONFIG.product.basePath}/${slug}/${GALLERY_CONFIG.product.filenameBase(slug, i)}`;
+      const baseNoExt = `${GALLERY_CONFIG.product.basePath}/${slug}/${GALLERY_CONFIG.product.filenameBase(slug,i)}`;
       /* eslint-disable no-await-in-loop */
       const resolved = await resolveFirstExistingImage(baseNoExt);
       if(resolved){
@@ -4180,45 +4235,61 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       }
     }
     if(count===0){
-      LOG('Không có ảnh sản phẩm cho', slug);
       block.remove();
+      LOG('Không có ảnh sản phẩm cho', slug);
     } else {
       state.productLoadedFor.add(slug);
+    }
+    if(!outer.querySelector('.img-product-block')){
+      outer.remove();
+      return null;
     }
     if(!outer.isConnected){
       insertProductGallery(container, outer);
     }
-    if(!outer.querySelector('.img-product-block')){
-      outer.remove();
-    }
+    return outer;
   }
 
-  // ---------- INSERT HELPERS ----------
+  // ------------ INSERT LOGIC -------------
   function insertCompanyGallery(container, galleryEl){
-    const anchors = container.querySelectorAll(INSERT_POINTS.companyBeforeSelectors);
-    if(anchors.length){
-      container.insertBefore(galleryEl, anchors[0]);
+    if(galleryEl.isConnected) return;
+    const anchor1 = findAnchorBefore(container);
+    if(anchor1){
+      container.insertBefore(galleryEl, anchor1);
+      LOG('Company gallery inserted BEFORE Section 1 anchor.');
     } else {
       container.prepend(galleryEl);
+      LOG('Company gallery prepended (fallback).');
     }
   }
   function insertProductGallery(container, galleryEl){
-    // Chèn SAU anchor cuối (phần 3)
-    const anchors = container.querySelectorAll(INSERT_POINTS.productAfterSelectors);
-    if(anchors.length){
-      const last = anchors[anchors.length-1];
-      last.after(galleryEl);
+    if(galleryEl.isConnected){
+      // Đảm bảo nó nằm sau Section 3; nếu không đúng thứ tự thì di chuyển
+      const anchorAfter = findAnchorAfter(container);
+      if(anchorAfter){
+        // Nếu product gallery xuất hiện trước anchorAfter => di chuyển xuống sau anchorAfter
+          if(galleryEl.compareDocumentPosition(anchorAfter) & Node.DOCUMENT_POSITION_FOLLOWING){
+          // galleryEl trước anchorAfter: di chuyển
+          anchorAfter.after(galleryEl);
+        }
+      }
+      return;
+    }
+    const anchorAfter = findAnchorAfter(container);
+    if(anchorAfter){
+      anchorAfter.after(galleryEl);
+      LOG('Product gallery inserted AFTER Section 3 anchor.');
     } else {
-      // nếu không tìm thấy, chèn cuối container
       container.appendChild(galleryEl);
+      LOG('Product gallery appended (fallback).');
     }
   }
 
-  // ---------- INJECT FLOW ----------
+  // ------------ MASTER INJECT -------------
   async function injectAll(){
     const container = document.getElementById(SUMMARY_CONTAINER_ID);
     if(!container){
-      WARN('Missing summary container', SUMMARY_CONTAINER_ID);
+      WARN('Chưa thấy summary container.');
       return;
     }
     await buildCompanyGallery(container);
@@ -4233,13 +4304,14 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       return;
     }
     if(attempt >= GALLERY_CONFIG.retry.maxAttempts){
-      WARN('Hết số lần thử inject.');
+      WARN('Hết số lần retry injectAll.');
       return;
     }
     setTimeout(()=>attemptInject(attempt+1), GALLERY_CONFIG.retry.intervalMs);
   }
 
-  function hookBtn(){
+  // ------------ EVENT HOOKS -------------
+  function hookOpenBtn(){
     const btn = document.getElementById(OPEN_SUMMARY_BTN_ID);
     const modal = document.getElementById(SUMMARY_MODAL_ID);
     if(!btn || !modal){
@@ -4247,16 +4319,17 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       return;
     }
     btn.addEventListener('click', ()=>{
+      // Lùi 1 tick: chờ logic khác build nội dung Sections trước.
       setTimeout(()=> attemptInject(1), 0);
     });
   }
 
   document.getElementById('main-product')?.addEventListener('change', ()=>{
-    LOG('main-product changed; sẽ load thêm product gallery lúc mở modal.');
+    LOG('main-product changed -> product gallery sẽ bổ sung khi mở modal.');
   });
 
   document.addEventListener('DOMContentLoaded', ()=>{
     initLightbox();
-    hookBtn();
+    hookOpenBtn();
   });
 })();
