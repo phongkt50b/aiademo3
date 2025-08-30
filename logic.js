@@ -2079,6 +2079,16 @@ function generateSummaryTable() {
   } else if (typeof attachSimpleExportHandlers === 'function') {
     attachSimpleExportHandlers(container);
   }
+  try {
+  if (window.__rebuildGallery) {
+    console.log('[Gallery DEBUG] Gọi rebuild ngay sau generateSummaryTable');
+    setTimeout(()=> window.__rebuildGallery(), 20);
+  } else {
+    console.warn('[Gallery DEBUG] Chưa có __rebuildGallery');
+  }
+} catch(e){
+  console.error('[Gallery DEBUG] lỗi gọi rebuild:', e);
+}
   return true;
 }
 
