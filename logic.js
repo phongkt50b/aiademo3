@@ -4298,23 +4298,28 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     };
   }
 
-  function openFullViewer() {
-    try {
-      const payload = buildViewerPayload();
-      // Chuẩn hóa tối thiểu
-      if (!payload.productKey) {
-        alert('Chưa chọn sản phẩm chính.');
-        return;
-      }
-      const json = JSON.stringify(payload);
-      const b64 = btoa(unescape(encodeURIComponent(json)));
-      const url = `${location.origin}/viewer.html#v=${b64}`;
-      window.open(url, '_blank', 'noopener');
-    } catch(e) {
-      console.error('[FullViewer] Lỗi tạo payload:', e);
-      alert('Không tạo được dữ liệu chia sẻ.');
+ function openFullViewer() {
+  try {
+    const payload = buildViewerPayload();
+    if (!payload.productKey) {
+      alert('Chưa chọn sản phẩm chính.');
+      return;
     }
+    const json = JSON.stringify(payload);
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+
+    // Dùng đường dẫn tương đối tới viewer.html (cùng thư mục với index.html)
+    // new URL('viewer.html', location.href) sẽ tự thêm subfolder nếu đang ở /aiademo3/
+    const viewerUrl = new URL('viewer.html', location.href);
+    viewerUrl.hash = `v=${b64}`;
+
+    window.open(viewerUrl.toString(), '_blank', 'noopener');
+  } catch (e) {
+    console.error('[FullViewer] Lỗi tạo payload:', e);
+    alert('Không tạo được dữ liệu chia sẻ.');
   }
+}
+
 
   document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('btnFullViewer');
