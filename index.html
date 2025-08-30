@@ -1,430 +1,838 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Công Cụ Minh Họa Phí Bảo Hiểm AIA</title>
-<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-<link href="style.css" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Công Cụ Minh Họa Phí Bảo Hiểm AIA</title>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <link href="style.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 
-<!-- === IMAGE GALLERY MODULE CSS (THÊM MỚI) === -->
-<style id="image-gallery-module-styles">
-  .img-company-gallery{
-    margin:24px 0 32px;
-    padding:16px 12px 4px;
-    border:1px solid #e5e7eb;
-    border-radius:12px;
-    background:#fff;
-  }
-  .img-company-gallery h3{
-    margin:0 0 14px;
-    font-size:18px;
-    font-weight:600;
-  }
-  .img-company-grid{
-    display:grid;
-    gap:14px;
-    grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
-  }
-  .img-product-gallery{
-    margin:40px 0 60px;
-    padding:20px 16px 8px;
-    border:1px solid #e5e7eb;
-    border-radius:14px;
-    background:#fff;
-  }
-  .img-product-gallery h3{
-    margin:0 0 18px;
-    font-size:20px;
-    font-weight:700;
-  }
-  .img-product-block{ margin-bottom:36px; }
-  .img-product-title{
-    font-size:16px;
-    font-weight:600;
-    margin:0 0 8px;
-    color:#333;
-  }
-  .img-grid{
-    display:grid;
-    gap:14px;
-    grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
-  }
-  .img-figure{
-    margin:0;
-    padding:10px;
-    background:#fafafa;
-    border:1px solid #ececec;
-    border-radius:10px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    position:relative;
-    cursor:zoom-in;
-    transition:box-shadow .2s;
-  }
-  .img-figure:hover{ box-shadow:0 2px 6px rgba(0,0,0,.12); }
-  .img-thumb{
-    width:100%;
-    background:#fff;
-    border-radius:6px;
-    object-fit:contain;
-    max-height:250px;
-    transition:transform .2s ease, opacity .2s;
-  }
-  .img-thumb.loading{ opacity:0.3; }
-  .img-caption{
-    font-size:12px;
-    line-height:1.35;
-    text-align:center;
-    color:#444;
-    min-height:28px;
-    overflow-wrap:break-word;
-  }
-  .orientation-portrait .img-thumb{ max-height:320px; }
-  .orientation-landscape .img-thumb{ max-height:210px; }
-  .img-thumb-error{
-    opacity:.5;
-    filter:grayscale(1);
-    outline:2px dashed #d33;
-  }
-  .img-lightbox{
-    position:fixed;
-    inset:0;
-    z-index:9999;
-    display:none;
-    font-family:inherit;
-  }
-  .img-lightbox.show{ display:block; }
-  .img-lightbox-backdrop{
-    position:absolute;
-    inset:0;
-    background:rgba(0,0,0,0.75);
-    backdrop-filter:blur(2px);
-  }
-  .img-lightbox-dialog{
-    position:absolute;
-    top:50%;left:50%;
-    transform:translate(-50%,-50%);
-    max-width:92vw;
-    max-height:90vh;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:14px;
-    color:#fff;
-  }
-  .img-lightbox-dialog img{
-    max-width:92vw;
-    max-height:70vh;
-    object-fit:contain;
-    background:#111;
-    border-radius:10px;
-    box-shadow:0 0 0 1px #444;
-  }
-  .img-lightbox-caption{
-    font-size:14px;
-    max-width:80ch;
-    text-align:center;
-    line-height:1.35;
-  }
-  .img-lightbox-close{
-    position:absolute;
-    top:-44px;
-    right:-8px;
-    background:transparent;
-    color:#fff;
-    font-size:42px;
-    border:none;
-    cursor:pointer;
-    line-height:1;
-  }
-  .img-lightbox-nav{
-    display:flex;
-    gap:16px;
-  }
-  .img-lightbox-nav button{
-    background:#fff;
-    color:#000;
-    border:none;
-    padding:8px 16px;
-    font-size:14px;
-    font-weight:600;
-    border-radius:24px;
-    cursor:pointer;
-  }
-  .img-lightbox-nav button:disabled{
-    opacity:.35;
-    cursor:default;
-  }
-</style>
+  <!-- IMAGE GALLERY MODULE CSS -->
+  <style id="image-gallery-module-styles">
+    .img-company-gallery{
+      margin:24px 0 32px;
+      padding:16px 12px 4px;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      background:#fff;
+    }
+    .img-company-gallery h3{
+      margin:0 0 14px;
+      font-size:18px;
+      font-weight:600;
+    }
+    .img-company-grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+    }
+    .img-product-gallery{
+      margin:40px 0 60px;
+      padding:20px 16px 8px;
+      border:1px solid #e5e7eb;
+      border-radius:14px;
+      background:#fff;
+    }
+    .img-product-gallery h3{
+      margin:0 0 18px;
+      font-size:20px;
+      font-weight:700;
+    }
+    .img-product-block{ margin-bottom:36px; }
+    .img-product-title{
+      font-size:16px;
+      font-weight:600;
+      margin:0 0 8px;
+      color:#333;
+    }
+    .img-grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+    }
+    .img-figure{
+      margin:0;
+      padding:10px;
+      background:#fafafa;
+      border:1px solid #ececec;
+      border-radius:10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      position:relative;
+      cursor:zoom-in;
+      transition:box-shadow .2s;
+    }
+    .img-figure:hover{ box-shadow:0 2px 6px rgba(0,0,0,.12); }
+    .img-thumb{
+      width:100%;
+      background:#fff;
+      border-radius:6px;
+      object-fit:contain;
+      max-height:250px;
+      transition:transform .2s ease, opacity .2s;
+    }
+    .img-thumb.loading{ opacity:0.3; }
+    .img-caption{
+      font-size:12px;
+      line-height:1.35;
+      text-align:center;
+      color:#444;
+      min-height:28px;
+      overflow-wrap:break-word;
+    }
+    .orientation-portrait .img-thumb{ max-height:320px; }
+    .orientation-landscape .img-thumb{ max-height:210px; }
+    .img-thumb-error{
+      opacity:.5;
+      filter:grayscale(1);
+      outline:2px dashed #d33;
+    }
+    .img-lightbox{
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      display:none;
+      font-family:inherit;
+    }
+    .img-lightbox.show{ display:block; }
+    .img-lightbox-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(0,0,0,0.75);
+      backdrop-filter:blur(2px);
+    }
+    .img-lightbox-dialog{
+      position:absolute;
+      top:50%;left:50%;
+      transform:translate(-50%,-50%);
+      max-width:92vw;
+      max-height:90vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:14px;
+      color:#fff;
+    }
+    .img-lightbox-dialog img{
+      max-width:92vw;
+      max-height:70vh;
+      object-fit:contain;
+      background:#111;
+      border-radius:10px;
+      box-shadow:0 0 0 1px #444;
+    }
+    .img-lightbox-caption{
+      font-size:14px;
+      max-width:80ch;
+      text-align:center;
+      line-height:1.35;
+    }
+    .img-lightbox-close{
+      position:absolute;
+      top:-44px;
+      right:-8px;
+      background:transparent;
+      color:#fff;
+      font-size:42px;
+      border:none;
+      cursor:pointer;
+      line-height:1;
+    }
+    .img-lightbox-nav{
+      display:flex;
+      gap:16px;
+    }
+    .img-lightbox-nav button{
+      background:#fff;
+      color:#000;
+      border:none;
+      padding:8px 16px;
+      font-size:14px;
+      font-weight:600;
+      border-radius:24px;
+      cursor:pointer;
+    }
+    .img-lightbox-nav button:disabled{
+      opacity:.35;
+      cursor:default;
+    }
+  </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
-<div class="container mx-auto p-4 sm:p-6 lg:p-8">
-<header class="flex items-center justify-between pb-6 border-b-2 border-red-600 mb-6">
-  <img src="https://www.aia.com.vn/content/dam/group-wise/images/system/icons/aia-logo-red.svg" alt="AIA Logo" class="h-8" />
-  <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 text-right">Công Cụ Minh Họa Phí Bảo Hiểm</h1>
-</header>
+  <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <header class="flex items-center justify-between pb-6 border-b-2 border-red-600 mb-6">
+      <img src="https://www.aia.com.vn/content/dam/group-wise/images/system/icons/aia-logo-red.svg" alt="AIA Logo" class="h-8" />
+      <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 text-right">Công Cụ Minh Họa Phí Bảo Hiểm</h1>
+    </header>
 
-<main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-  <div class="lg:col-span-2 space-y-6">
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div class="lg:col-span-2 space-y-6">
 
-    <!-- (THÊM MỚI) GALLERY ẢNH CÔNG TY -->
-    <div id="company-intro-gallery" class="img-company-gallery"></div>
+        <!-- ĐÃ GỠ gallery công ty & product khỏi trang chính theo yêu cầu -->
 
-    <div id="main-person-container" class="person-container space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h2 class="text-xl font-bold text-aia-red mb-4">1. Thông Tin Người Được Bảo Hiểm Chính</h2>
+        <div id="main-person-container" class="person-container space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h2 class="text-xl font-bold text-aia-red mb-4">1. Thông Tin Người Được Bảo Hiểm Chính</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="font-medium block mb-1">Họ và Tên</label>
+              <input type="text" class="form-input name-input" placeholder="Nguyễn Văn A">
+            </div>
+            <div>
+              <label class="font-medium block mb-1">Ngày sinh</label>
+              <input type="text" class="form-input dob-input" placeholder="DD/MM/YYYY">
+            </div>
+            <div>
+              <label class="font-medium block mb-1">Giới tính</label>
+              <select class="form-select gender-select">
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <p class="text-lg">Tuổi: <span class="font-bold text-aia-red age-span">0</span></p>
+            </div>
+            <div class="relative">
+              <label class="font-medium block mb-1">Nghề nghiệp</label>
+              <input type="text" class="form-input occupation-input" placeholder="Gõ để tìm nghề nghiệp...">
+              <div class="occupation-autocomplete hidden absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto"></div>
+            </div>
+            <div class="flex items-end">
+              <p class="text-lg">Nhóm nghề: <span class="font-bold text-aia-red risk-group-span">...</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h2 class="text-xl font-bold text-aia-red mb-4">2. Lựa Chọn Sản Phẩm Chính</h2>
+          <div>
+            <select id="main-product" class="form-select">
+              <option value="">-- Chọn sản phẩm chính --</option>
+              <option value="PUL_TRON_DOI">Khoẻ trọn vẹn - Trọn đời</option>
+              <option value="PUL_15NAM">Khoẻ trọn vẹn - 15 năm</option>
+              <option value="PUL_5NAM">Khoẻ trọn vẹn - 5 năm</option>
+              <option value="KHOE_BINH_AN">MUL - Khoẻ Bình An</option>
+              <option value="VUNG_TUONG_LAI">MUL - Vững Tương Lai</option>
+              <option value="TRON_TAM_AN">Trọn tâm an</option>
+              <option value="AN_BINH_UU_VIET">An Bình Ưu Việt</option>
+            </select>
+          </div>
+          <div id="main-product-options" class="mt-4 space-y-4"></div>
+          <div id="main-product-fee-display" class="text-right font-bold text-lg text-aia-red mt-2 min-h-[1.75rem]"></div>
+        </div>
+
+          <div id="main-supp-container" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h2 class="text-xl font-bold text-aia-red mb-4">3. Lựa Chọn Sản Phẩm Bổ Sung (Cho NĐBH Chính)</h2>
+          <div class="supplementary-products-container space-y-6"></div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <h2 class="text-xl font-bold text-aia-red mb-4">4. Người Được Bảo Hiểm Bổ Sung</h2>
+          <div id="supplementary-insured-container" class="space-y-6"></div>
+          <button id="add-supp-insured-btn" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors w-full text-left flex items-center space-x-2">
+            <span>+ Thêm Người Được Bảo Hiểm Bổ Sung</span>
+          </button>
+        </div>
+
+        <div id="mdp3-section" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hidden">
+          <h2 class="text-xl font-bold text-aia-red mb-4">5. Miễn Đóng Phí 3.0 (Bên mua bảo hiểm)</h2>
+          <div class="flex items-center space-x-2 mb-3">
+            <input type="checkbox" id="mdp3-enable" class="form-checkbox">
+            <label for="mdp3-enable" class="text-gray-700 font-medium">Miễn đóng phí 3.0</label>
+          </div>
+          <div id="mdp3-select-container"></div>
+          <div id="mdp3-fee-display" class="mt-3 text-aia-red font-bold"></div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-1">
+        <div id="results-container" class="bg-white p-5 rounded-xl shadow-sm border-2 border-aia-red sticky top-8 space-y-3">
+
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-700">Tổng phí (năm)</h2>
+          </div>
+          <div class="text-2xl font-extrabold text-aia-red tracking-tight">
+            <span id="summary-total">0</span>
+          </div>
+
+          <div class="border-t pt-3">
+            <ul class="text-base space-y-1">
+              <li class="flex justify-between">
+                <span>Phí sản phẩm chính</span><span id="main-insured-main-fee">0</span>
+              </li>
+              <li class="flex justify-between">
+                <span>Phí đóng thêm</span><span id="main-insured-extra-fee">0</span>
+              </li>
+              <li class="flex justify-between">
+                <span>Phí sản phẩm bổ sung</span><span id="summary-supp-fee">0</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="border-t pt-3">
+            <div id="supp-insured-summary-line" class="flex justify-between text-base mt-1">
+              <button id="toggle-supp-list-btn" class="text-base text-aia-red underline">Xem từng người</button>
+            </div>
+            <div id="supp-insured-summaries" class="mt-2 hidden text-base space-y-1"></div>
+          </div>
+        
+          <div>
+            <label for="payment-frequency" class="font-medium text-gray-700 block mb-1">Kỳ đóng phí</label>
+            <select id="payment-frequency" class="form-select w-full" aria-label="Kỳ đóng phí">
+              <option value="year" selected>Năm (mặc định)</option>
+              <option value="half">Nửa năm</option>
+              <option value="quarter">Quý</option>
+            </select>
+          </div>
+
+          <div id="frequency-breakdown" class="space-y-1 text-gray-700 hidden text-base">
+            <div class="flex justify-between">
+              <span>Phí chính:</span><span id="freq-main">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Phí đóng thêm:</span><span id="freq-extra">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Phí sản phẩm bổ sung:</span><span id="freq-supp-total">0</span>
+            </div>
+            <div class="flex justify-between font-semibold">
+              <span>Tổng:</span><span id="freq-total-period" class="text-aia-red">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Tổng quy năm:</span><span id="freq-total-year-equivalent">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Tổng năm:</span><span id="freq-total-year">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Chênh lệch:</span><span id="freq-diff" class="text-red-600 font-bold">0</span>
+            </div>
+          </div>
+
+          <div class="border-t pt-3 space-y-2" id="target-age-block">
+            <div>
+              <label for="target-age-input" id="target-age-label" class="font-medium text-gray-700 block mb-1">
+                Minh họa phí đến năm (tuổi NĐBH chính)
+              </label>
+              <input type="number" id="target-age-input" class="form-input" placeholder="VD: 75" min="0" max="100">
+              <p id="target-age-hint" class="text-sm text-gray-500 mt-1"></p>
+              <p id="target-age-error" class="text-sm text-red-600 mt-1 hidden"></p>
+            </div>
+            <div id="global-error-box" class="hidden" aria-live="assertive"></div>
+
+            <button id="view-summary-btn" class="w-full bg-aia-red text-white font-bold py-3 px-4 rounded-lg hover:bg-red-700 transition-colors" aria-controls="summary-modal">Xem Bảng Minh Họa Chi Tiết</button>
+            <div id="error-message" class="text-center text-red-500 font-medium min-h-[1.25rem]" aria-live="assertive"></div>
+          </div>
+        </div>
+
+        <div id="compat-shim" class="hidden">
+          <span id="main-premium-result">0</span>
+          <div id="supplementary-premiums-results"></div>
+          <span id="total-premium-result">0</span>
+        </div>
+      </div>
+    </main>
+
+    <footer class="text-center text-gray-500 mt-12 py-4 border-t">
+      Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA. Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành. 
+      Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức
+    </footer>
+  </div>
+
+  <div id="summary-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="summary-modal-title">
+    <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+      <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+        <h2 id="summary-modal-title" class="text-2xl font-bold text-aia-red">Bảng Tóm Tắt Quyền Lợi và Phí</h2>
+        <button id="close-summary-modal-btn" class="text-3xl font-light leading-none hover:text-red-600" aria-label="Đóng bảng tóm tắt">&times;</button>
+      </div>
+      <div id="summary-content-container" class="p-6 overflow-y-auto">
+        <!-- GỢI Ý (nếu bạn tự sinh HTML bằng logic.js, thêm id như sau để anchor ổn định):
+             <h2 id="summary-section-1">Phần 1 - Tóm tắt sản phẩm</h2>
+             ...
+             <h2 id="summary-section-2">Phần 2 - Tóm tắt quyền lợi</h2>
+             ...
+             <h2 id="summary-section-3">Phần 3 - Bảng phí</h2>
+             Module sẽ chèn:
+             [Company Gallery] trước Section 1
+             [Product Gallery] sau Section 3
+             Nếu không có ID, fallback sẽ dò text ("Phần 1"/"Tóm tắt sản phẩm", "Phần 3"/"Bảng phí"). -->
+      </div>
+      <div class="p-6 border-t">
+        <p class="font-bold text-gray-800">
+          Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA.
+          Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành.
+          Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <template id="supplementary-person-template">
+    <div class="person-container space-y-6 bg-gray-100 p-4 rounded-lg mt-4">
+      <button class="w-full text-right text-sm text-red-600 font-semibold remove-supp-btn">Xóa NĐBH này</button>
+      <h3 class="text-lg font-bold text-gray-700 mb-2 border-t pt-4" data-template-id="title">NĐBH Bổ Sung</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label class="font-medium block mb-1">Họ và Tên</label>
-          <input type="text" class="form-input name-input" placeholder="Nguyễn Văn A">
+          <label class="font-medium text-gray-700 block mb-1" data-template-id="name-label">Họ và Tên</label>
+          <input type="text" class="form-input name-input" placeholder="Trần Thị B" data-template-id="name">
+        </div>
+          <div>
+          <label class="font-medium text-gray-700 block mb-1" data-template-id="dob-label">Ngày sinh</label>
+          <input type="text" class="form-input dob-input" placeholder="DD/MM/YYYY" data-template-id="dob">
         </div>
         <div>
-          <label class="font-medium block mb-1">Ngày sinh</label>
-          <input type="text" class="form-input dob-input" placeholder="DD/MM/YYYY">
-        </div>
-        <div>
-          <label class="font-medium block mb-1">Giới tính</label>
-          <select class="form-select gender-select">
+          <label class="font-medium text-gray-700 block mb-1" data-template-id="gender-label">Giới tính</label>
+          <select class="form-select gender-select" data-template-id="gender">
             <option value="Nam">Nam</option>
             <option value="Nữ">Nữ</option>
           </select>
         </div>
-          <div class="flex items-end">
-          <p class="text-lg">Tuổi: <span class="font-bold text-aia-red age-span">0</span></p>
+        <div class="flex items-end space-x-4">
+          <p class="text-lg">Tuổi: <span class="font-bold text-aia-red age-span" data-template-id="age-span">0</span></p>
         </div>
         <div class="relative">
-          <label class="font-medium block mb-1">Nghề nghiệp</label>
-          <input type="text" class="form-input occupation-input" placeholder="Gõ để tìm nghề nghiệp...">
-          <div class="occupation-autocomplete hidden absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-y-auto"></div>
+          <label class="font-medium text-gray-700 block mb-1" data-template-id="occupation-label">Nghề nghiệp</label>
+          <input type="text" class="form-input occupation-input" placeholder="Gõ để tìm nghề nghiệp..." data-template-id="occupation-input">
+          <div class="occupation-autocomplete absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 hidden max-h-60 overflow-y-auto"></div>
         </div>
-        <div class="flex items-end">
-          <p class="text-lg">Nhóm nghề: <span class="font-bold text-aia-red risk-group-span">...</span></p>
+        <div class="flex items-end space-x-4">
+          <p class="text-lg">Nhóm nghề: <span class="font-bold text-aia-red risk-group-span" data-template-id="risk-group-span">...</span></p>
         </div>
       </div>
-    </div>
-
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h2 class="text-xl font-bold text-aia-red mb-4">2. Lựa Chọn Sản Phẩm Chính</h2>
-      <div>
-        <select id="main-product" class="form-select">
-          <option value="">-- Chọn sản phẩm chính --</option>
-          <option value="PUL_TRON_DOI">Khoẻ trọn vẹn - Trọn đời</option>
-          <option value="PUL_15NAM">Khoẻ trọn vẹn - 15 năm</option>
-          <option value="PUL_5NAM">Khoẻ trọn vẹn - 5 năm</option>
-          <option value="KHOE_BINH_AN">MUL - Khoẻ Bình An</option>
-          <option value="VUNG_TUONG_LAI">MUL - Vững Tương Lai</option>
-          <option value="TRON_TAM_AN">Trọn tâm an</option>
-          <option value="AN_BINH_UU_VIET">An Bình Ưu Việt</option>
-        </select>
+      <div class="mt-4">
+        <h4 class="text-md font-semibold text-gray-800 mb-2">Sản phẩm bổ sung cho người này</h4>
+        <div class="supplementary-products-container space-y-6"></div>
       </div>
-      <div id="main-product-options" class="mt-4 space-y-4"></div>
-      <div id="main-product-fee-display" class="text-right font-bold text-lg text-aia-red mt-2 min-h-[1.75rem]"></div>
     </div>
+  </template>
 
-    <div id="main-supp-container" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h2 class="text-xl font-bold text-aia-red mb-4">3. Lựa Chọn Sản Phẩm Bổ Sung (Cho NĐBH Chính)</h2>
-      <div class="supplementary-products-container space-y-6"></div>
-    </div>
-
-    <!-- (THÊM MỚI) GALLERY ẢNH SẢN PHẨM -->
-    <div id="product-image-gallery" class="img-product-gallery" style="display:none;"></div>
-
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-      <h2 class="text-xl font-bold text-aia-red mb-4">4. Người Được Bảo Hiểm Bổ Sung</h2>
-      <div id="supplementary-insured-container" class="space-y-6"></div>
-      <button id="add-supp-insured-btn" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors w-full text-left flex items-center space-x-2">
-        <span>+ Thêm Người Được Bảo Hiểm Bổ Sung</span>
-      </button>
-    </div>
-
-    <div id="mdp3-section" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hidden">
-      <h2 class="text-xl font-bold text-aia-red mb-4">5. Miễn Đóng Phí 3.0 (Bên mua bảo hiểm)</h2>
-      <div class="flex items-center space-x-2 mb-3">
-        <input type="checkbox" id="mdp3-enable" class="form-checkbox">
-        <label for="mdp3-enable" class="text-gray-700 font-medium">Miễn đóng phí 3.0</label>
+  <!-- LIGHTBOX OVERLAY -->
+  <div id="img-lightbox" class="img-lightbox" style="display:none;">
+    <div class="img-lightbox-backdrop"></div>
+    <div class="img-lightbox-dialog">
+      <button type="button" class="img-lightbox-close" aria-label="Đóng">&times;</button>
+      <img id="img-lightbox-main" src="" alt="">
+      <div id="img-lightbox-caption" class="img-lightbox-caption"></div>
+      <div class="img-lightbox-nav">
+        <button type="button" id="img-lightbox-prev">&lt;</button>
+        <button type="button" id="img-lightbox-next">&gt;</button>
       </div>
-      <div id="mdp3-select-container"></div>
-      <div id="mdp3-fee-display" class="mt-3 text-aia-red font-bold"></div>
     </div>
   </div>
 
-  <div class="lg:col-span-1">
-    <div id="results-container" class="bg-white p-5 rounded-xl shadow-sm border-2 border-aia-red sticky top-8 space-y-3">
+  <script>
+    window.addEventListener('error', e => {
+      const box = document.getElementById('error-message') || document.body.appendChild(Object.assign(document.createElement('div'), {id:'error-message'}));
+      box.style.cssText = 'position:fixed;left:8px;bottom:8px;background:#fee;color:#b00;padding:8px 12px;border:1px solid #f99;border-radius:6px;z-index:99999';
+      box.textContent = (e.message||'JS error') + ' @ ' + (e.filename||'') + ':' + (e.lineno||'');
+    });
+  </script>
+  <script type="module" src="logic.js"></script>
+  <script type="module" src="data.js"></script>
 
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-semibold text-gray-700">Tổng phí (năm)</h2>
-      </div>
-      <div class="text-2xl font-extrabold text-aia-red tracking-tight">
-        <span id="summary-total">0</span>
-      </div>
+  <!-- GALLERY MODULE v2.4 (Standalone; nếu đã thêm trong logic.js thì bỏ đoạn này để tránh trùng) -->
+  <script>
+    (function(){
+      const DEBUG = true;
+      const LOG = (...a)=>{ if(DEBUG) console.log('[Gallery]', ...a); };
+      const WARN = (...a)=>console.warn('[Gallery]', ...a);
+      const IMAGE_EXTENSIONS = ['webp','jpg','jpeg','png'];
+      const SUMMARY_MODAL_ID = 'summary-modal';
+      const SUMMARY_CONTAINER_ID = 'summary-content-container';
+      const OPEN_SUMMARY_BTN_ID = 'view-summary-btn';
 
-      <div class="border-t pt-3">
-        <ul class="text-base space-y-1">
-          <li class="flex justify-between">
-            <span>Phí sản phẩm chính</span><span id="main-insured-main-fee">0</span>
-          </li>
-          <li class="flex justify-between">
-            <span>Phí đóng thêm</span><span id="main-insured-extra-fee">0</span>
-          </li>
-          <li class="flex justify-between">
-            <span>Phí sản phẩm bổ sung</span><span id="summary-supp-fee">0</span>
-          </li>
-        </ul>
-      </div>
+      const ANCHOR_SELECTORS = {
+        beforeCompany: ['#summary-section-1','#section-1','[data-summary-section="1"]'],
+        afterProduct: ['#summary-section-3','#section-3','#summary-fee-table','#fee-table','[data-summary-section="3"]']
+      };
+      const TEXT_PATTERNS = {
+        section1: /(phần\s*1\b|tóm tắt sản phẩm)/i,
+        section3: /(phần\s*3\b|bảng phí)/i
+      };
+      const GALLERY_CONFIG = {
+        company:{
+          enabled:true,
+          basePath:'images/company',
+          maxImages:20,
+          filenameBase:i=>`company-${String(i).padStart(2,'0')}`,
+          title:'Giới thiệu AIA Việt Nam',
+          containerId:'company-intro-gallery'
+        },
+          product:{
+          enabled:true,
+          basePath:'images/products',
+          maxImagesPerProduct:25,
+          productSlugMap:{
+            'PUL_TRON_DOI':'khoe-tron-ven',
+            'PUL_15NAM':'khoe-tron-ven',
+            'PUL_5NAM':'khoe-tron-ven',
+            'KHOE_BINH_AN':'khoe-binh-an',
+            'VUNG_TUONG_LAI':'vung-tuong-lai',
+            'TRON_TAM_AN':'tron-tam-an',
+            'AN_BINH_UU_VIET':'an-binh-uu-viet'
+          },
+          filenameBase:(slug,i)=>`${slug}-${String(i).padStart(2,'0')}`,
+          title:'Hình ảnh minh họa sản phẩm',
+          containerId:'product-image-gallery'
+        },
+        retry:{
+          maxAttempts:18,
+          intervalMs:140
+        }
+      };
+      const state = {
+        companyLoaded:false,
+        productLoadedFor:new Set(),
+        lightboxItems:[],
+        lightboxIndex:0
+      };
 
-      <div class="border-t pt-3">
-        <div id="supp-insured-summary-line" class="flex justify-between text-base mt-1">
-          <button id="toggle-supp-list-btn" class="text-base text-aia-red underline">Xem từng người</button>
-        </div>
-        <div id="supp-insured-summaries" class="mt-2 hidden text-base space-y-1"></div>
-      </div>
-    
-      <div>
-        <label for="payment-frequency" class="font-medium text-gray-700 block mb-1">Kỳ đóng phí</label>
-        <select id="payment-frequency" class="form-select w-full" aria-label="Kỳ đóng phí">
-          <option value="year" selected>Năm (mặc định)</option>
-          <option value="half">Nửa năm</option>
-          <option value="quarter">Quý</option>
-        </select>
-      </div>
+      function imageExistsOnce(src){
+        return new Promise(res=>{
+          const img = new Image();
+          img.onload = ()=>res(true);
+          img.onerror = ()=>res(false);
+          img.src = src + (src.includes('?')?'&':'?') + 't=' + Date.now();
+        });
+      }
+      async function resolveFirstExistingImage(baseNoExt){
+        for(const ext of IMAGE_EXTENSIONS){
+          const candidate = `${baseNoExt}.${ext}`;
+          /* eslint-disable no-await-in-loop */
+          const ok = await imageExistsOnce(candidate);
+          if(ok) return candidate;
+        }
+        return null;
+      }
 
-      <div id="frequency-breakdown" class="space-y-1 text-gray-700 hidden text-base">
-        <div class="flex justify-between">
-          <span>Phí chính:</span><span id="freq-main">0</span>
-        </div>
-        <div class="flex justify-between">
-          <span>Phí đóng thêm:</span><span id="freq-extra">0</span>
-        </div>
-        <div class="flex justify-between">
-          <span>Phí sản phẩm bổ sung:</span><span id="freq-supp-total">0</span>
-        </div>
-          <div class="flex justify-between font-semibold">
-          <span>Tổng:</span><span id="freq-total-period" class="text-aia-red">0</span>
-        </div>
-        <div class="flex justify-between">
-        <span>Tổng quy năm:</span><span id="freq-total-year-equivalent">0</span>
-        </div>
-        <div class="flex justify-between">
-          <span>Tổng năm:</span><span id="freq-total-year">0</span>
-        </div>
-        <div class="flex justify-between">
-          <span>Chênh lệch:</span><span id="freq-diff" class="text-red-600 font-bold">0</span>
-        </div>
-      </div>
+      function findAnchorBefore(container){
+        for(const sel of ANCHOR_SELECTORS.beforeCompany){
+          const el = container.querySelector(sel);
+          if(el) return el;
+        }
+        return scanHeadingByText(container, TEXT_PATTERNS.section1);
+      }
+      function findAnchorAfter(container){
+        for(const sel of ANCHOR_SELECTORS.afterProduct){
+          const el = container.querySelector(sel);
+          if(el) return el;
+        }
+        return scanHeadingByText(container, TEXT_PATTERNS.section3, true);
+      }
+      function scanHeadingByText(container, regex, takeLast=false){
+        const heads = container.querySelectorAll('h1,h2,h3,h4');
+        let found=null;
+        heads.forEach(h=>{
+          if(regex.test(h.textContent.trim())){
+            if(!takeLast && !found) found=h;
+            else if(takeLast) found=h;
+          }
+        });
+        return found;
+      }
 
-      <div class="border-t pt-3 space-y-2" id="target-age-block">
-      <div>
-        <label for="target-age-input" id="target-age-label" class="font-medium text-gray-700 block mb-1">
-          Minh họa phí đến năm (tuổi NĐBH chính)
-        </label>
-        <input type="number" id="target-age-input" class="form-input" placeholder="VD: 75" min="0" max="100">
-        <p id="target-age-hint" class="text-sm text-gray-500 mt-1"></p>
-        <p id="target-age-error" class="text-sm text-red-600 mt-1 hidden"></p>
-      </div>
-        <!-- Global error box (tự thêm) -->
-        <div id="global-error-box" class="hidden" aria-live="assertive"></div>
+      function buildFigure({src, caption, group}){
+        const fig = document.createElement('figure');
+        fig.className='img-figure';
+        fig.tabIndex=0;
+        fig.dataset.group=group;
+        fig.dataset.src=src;
+        const img = document.createElement('img');
+        img.loading='lazy';
+        img.decoding='async';
+        img.src=src;
+        img.alt=caption||'';
+        img.className='img-thumb loading';
+        img.addEventListener('load', ()=>{
+          img.classList.remove('loading');
+          if(img.naturalWidth && img.naturalHeight){
+            const r = img.naturalWidth/img.naturalHeight;
+            fig.classList.add(r>=1?'orientation-landscape':'orientation-portrait');
+          }
+        });
+        img.addEventListener('error', ()=>{
+          img.classList.add('img-thumb-error');
+          const cap = fig.querySelector('.img-caption');
+          if(cap) cap.textContent='Không tải được ảnh';
+        });
+        const cap = document.createElement('figcaption');
+        cap.className='img-caption';
+        cap.textContent=caption||'';
+        fig.appendChild(img);
+        fig.appendChild(cap);
+        fig.addEventListener('click', ()=> openLightboxBySrc(src));
+        fig.addEventListener('keypress', e=>{
+          if(e.key==='Enter'||e.key===' '){
+            e.preventDefault();
+            openLightboxBySrc(src);
+          }
+        });
+        return fig;
+      }
 
-        <button id="view-summary-btn" class="w-full bg-aia-red text-white font-bold py-3 px-4 rounded-lg hover:bg-red-700 transition-colors" aria-controls="summary-modal">Xem Bảng Minh Họa Chi Tiết</button>
-        <div id="error-message" class="text-center text-red-500 font-medium min-h-[1.25rem]" aria-live="assertive"></div>
-      </div>
-      </div>
+      let lbRoot, lbImg, lbCaption, lbPrev, lbNext, lbClose;
+      function initLightbox(){
+        if(lbRoot) return;
+        lbRoot = document.getElementById('img-lightbox');
+        if(!lbRoot){
+          WARN('Thiếu markup lightbox.');
+          return;
+        }
+          lbImg = document.getElementById('img-lightbox-main');
+        lbCaption = document.getElementById('img-lightbox-caption');
+        lbPrev = document.getElementById('img-lightbox-prev');
+        lbNext = document.getElementById('img-lightbox-next');
+        lbClose = lbRoot.querySelector('.img-lightbox-close');
+        const closeFn = ()=> hideLightbox();
+        lbClose && lbClose.addEventListener('click', closeFn);
+        lbRoot.querySelector('.img-lightbox-backdrop')?.addEventListener('click', closeFn);
+        lbPrev && lbPrev.addEventListener('click', ()=> shiftLightbox(-1));
+        lbNext && lbNext.addEventListener('click', ()=> shiftLightbox(1));
+        document.addEventListener('keydown', e=>{
+          if(lbRoot.style.display!=='block') return;
+          if(e.key==='Escape') hideLightbox();
+          if(e.key==='ArrowLeft') shiftLightbox(-1);
+          if(e.key==='ArrowRight') shiftLightbox(1);
+        });
+      }
+      function openLightboxBySrc(src){
+        const idx = state.lightboxItems.findIndex(i=>i.src===src);
+        if(idx>=0){
+          state.lightboxIndex=idx;
+          showLightbox();
+        }
+      }
+      function showLightbox(){
+        initLightbox();
+        if(!lbRoot) return;
+        const item = state.lightboxItems[state.lightboxIndex];
+        if(!item) return;
+        lbImg.src = item.src;
+        lbImg.alt = item.caption||'';
+        lbCaption.textContent = item.caption||'';
+        lbRoot.style.display='block';
+        lbRoot.classList.add('show');
+        updateLightboxNav();
+      }
+      function hideLightbox(){
+        if(!lbRoot) return;
+        lbRoot.style.display='none';
+        lbRoot.classList.remove('show');
+      }
+      function shiftLightbox(delta){
+        const len = state.lightboxItems.length;
+        if(!len) return;
+        let n = state.lightboxIndex + delta;
+        if(n<0) n=0;
+        if(n>=len) n=len-1;
+        state.lightboxIndex=n;
+        showLightbox();
+      }
+      function updateLightboxNav(){
+        if(!lbPrev||!lbNext) return;
+        lbPrev.disabled = (state.lightboxIndex===0);
+        lbNext.disabled = (state.lightboxIndex===state.lightboxItems.length-1);
+      }
+      function rebuildLightboxList(){
+        const container = document.getElementById(SUMMARY_CONTAINER_ID);
+        if(!container) return;
+        const figs = [...container.querySelectorAll('figure.img-figure')];
+        const seen = new Set();
+        const list = [];
+        figs.forEach(f=>{
+          const src = f.dataset.src;
+          if(src && !seen.has(src)){
+            seen.add(src);
+            const cap = f.querySelector('.img-caption')?.textContent||'';
+            list.push({src, caption:cap});
+          }
+        });
+        state.lightboxItems = list;
+        LOG('Lightbox items:', list.length);
+      }
 
-      <div id="compat-shim" class="hidden">
-        <span id="main-premium-result">0</span>
-        <div id="supplementary-premiums-results"></div>
-        <span id="total-premium-result">0</span>
-      </div>
-  </div>
-</main>
+      async function buildCompanyGallery(container){
+        if(!GALLERY_CONFIG.company.enabled) return;
+        if(state.companyLoaded){
+          return container.querySelector('#'+GALLERY_CONFIG.company.containerId);
+        }
+        const wrap = document.createElement('div');
+        wrap.id = GALLERY_CONFIG.company.containerId;
+        wrap.className='img-company-gallery';
+        const h3 = document.createElement('h3');
+        h3.textContent = GALLERY_CONFIG.company.title;
+        wrap.appendChild(h3);
+        const grid = document.createElement('div');
+        grid.className='img-company-grid';
+        wrap.appendChild(grid);
+        let count=0;
+        for(let i=1;i<=GALLERY_CONFIG.company.maxImages;i++){
+          const base = `${GALLERY_CONFIG.company.basePath}/${GALLERY_CONFIG.company.filenameBase(i)}`;
+          /* eslint-disable no-await-in-loop */
+          const resolved = await resolveFirstExistingImage(base);
+          if(resolved){
+            count++;
+            grid.appendChild(buildFigure({
+              src:resolved,
+              caption:`AIA - ${String(i).padStart(2,'0')}`,
+              group:'company'
+            }));
+          }
+        }
+        if(count===0){
+          wrap.style.display='none';
+          LOG('Không có ảnh company.');
+        } else {
+          state.companyLoaded = true;
+        }
+        insertCompanyGallery(container, wrap);
+        return wrap;
+      }
 
-<footer class="text-center text-gray-500 mt-12 py-4 border-t">
-  Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA. Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành. 
-  Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức
-</footer>
-</div>
+      async function buildProductGallery(container){
+        if(!GALLERY_CONFIG.product.enabled) return;
+        const select = document.getElementById('main-product');
+        if(!select || !select.value){
+          LOG('Chưa chọn sản phẩm chính.');
+          return;
+        }
+        const productId = select.value;
+        const slug = GALLERY_CONFIG.product.productSlugMap[productId];
+        if(!slug){
+          WARN('Không có slug cho', productId);
+          return;
+        }
+        let outer = container.querySelector('#'+GALLERY_CONFIG.product.containerId);
+        if(!outer){
+          outer = document.createElement('div');
+          outer.id = GALLERY_CONFIG.product.containerId;
+          outer.className='img-product-gallery';
+          const h = document.createElement('h3');
+          h.textContent = GALLERY_CONFIG.product.title;
+          outer.appendChild(h);
+        }
+        if(state.productLoadedFor.has(slug)){
+          if(!outer.isConnected) insertProductGallery(container, outer);
+          return outer;
+        }
+        let block = outer.querySelector(`[data-product-slug="${slug}"]`);
+        if(block) return outer;
+        block = document.createElement('div');
+          block.className='img-product-block';
+        block.dataset.productSlug = slug;
+        const titleDiv = document.createElement('div');
+        titleDiv.className='img-product-title';
+        titleDiv.textContent = select.options[select.selectedIndex].text;
+        const grid = document.createElement('div');
+        grid.className='img-grid';
+        block.appendChild(titleDiv);
+        block.appendChild(grid);
+        outer.appendChild(block);
+        let count=0;
+        for(let i=1;i<=GALLERY_CONFIG.product.maxImagesPerProduct;i++){
+          const base = `${GALLERY_CONFIG.product.basePath}/${slug}/${GALLERY_CONFIG.product.filenameBase(slug,i)}`;
+          /* eslint-disable no-await-in-loop */
+          const resolved = await resolveFirstExistingImage(base);
+          if(resolved){
+            count++;
+            grid.appendChild(buildFigure({
+              src:resolved,
+              caption:`${titleDiv.textContent} - ${String(i).padStart(2,'0')}`,
+              group:`product-${slug}`
+            }));
+          }
+        }
+        if(count===0){
+          block.remove();
+          LOG('Không có ảnh sản phẩm cho', slug);
+        } else {
+          state.productLoadedFor.add(slug);
+        }
+        if(!outer.querySelector('.img-product-block')){
+          outer.remove();
+          return;
+        }
+        if(!outer.isConnected){
+          insertProductGallery(container, outer);
+        }
+        return outer;
+      }
 
-<div id="summary-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-labelledby="summary-modal-title">
-  <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
-    <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
-      <h2 id="summary-modal-title" class="text-2xl font-bold text-aia-red">Bảng Tóm Tắt Quyền Lợi và Phí</h2>
-      <button id="close-summary-modal-btn" class="text-3xl font-light leading-none hover:text-red-600" aria-label="Đóng bảng tóm tắt">&times;</button>
-    </div>
-    <div id="summary-content-container" class="p-6 overflow-y-auto"></div>
-    <div class="p-6 border-t">
-      <p class="font-bold text-gray-800">
-        Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA.
-        Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành.
-        Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức.
-      </p>
-    </div>
-  </div>
-</div>
+      function insertCompanyGallery(container, galleryEl){
+        if(galleryEl.isConnected) return;
+        const anchor1 = findAnchorBefore(container);
+        if(anchor1){
+          container.insertBefore(galleryEl, anchor1);
+          LOG('Company gallery BEFORE Section 1.');
+        } else {
+          container.prepend(galleryEl);
+          LOG('Company gallery prepended fallback.');
+        }
+      }
+      function insertProductGallery(container, galleryEl){
+        if(galleryEl.isConnected){
+          const anchorAfter = findAnchorAfter(container);
+          if(anchorAfter){
+            if(galleryEl.compareDocumentPosition(anchorAfter) & Node.DOCUMENT_POSITION_FOLLOWING){
+              anchorAfter.after(galleryEl);
+            }
+          }
+          return;
+        }
+        const anchorAfter = findAnchorAfter(container);
+        if(anchorAfter){
+          anchorAfter.after(galleryEl);
+          LOG('Product gallery AFTER Section 3.');
+        } else {
+          container.appendChild(galleryEl);
+          LOG('Product gallery appended fallback.');
+        }
+      }
 
-<template id="supplementary-person-template">
-    <div class="person-container space-y-6 bg-gray-100 p-4 rounded-lg mt-4">
-        <button class="w-full text-right text-sm text-red-600 font-semibold remove-supp-btn">Xóa NĐBH này</button>
-        <h3 class="text-lg font-bold text-gray-700 mb-2 border-t pt-4" data-template-id="title">NĐBH Bổ Sung</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="font-medium text-gray-700 block mb-1" data-template-id="name-label">Họ và Tên</label>
-                <input type="text" class="form-input name-input" placeholder="Trần Thị B" data-template-id="name">
-            </div>
-            <div>
-                <label class="font-medium text-gray-700 block mb-1" data-template-id="dob-label">Ngày sinh</label>
-                <input type="text" class="form-input dob-input" placeholder="DD/MM/YYYY" data-template-id="dob">
-            </div>
-            <div>
-                <label class="font-medium text-gray-700 block mb-1" data-template-id="gender-label">Giới tính</label>
-                <select class="form-select gender-select" data-template-id="gender">
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                </select>
-            </div>
-            <div class="flex items-end space-x-4">
-                <p class="text-lg">Tuổi: <span class="font-bold text-aia-red age-span" data-template-id="age-span">0</span></p>
-            </div>
-            <div class="relative">
-                <label class="font-medium text-gray-700 block mb-1" data-template-id="occupation-label">Nghề nghiệp</label>
-                <input type="text" class="form-input occupation-input" placeholder="Gõ để tìm nghề nghiệp..." data-template-id="occupation-input">
-                <div class="occupation-autocomplete absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 hidden max-h-60 overflow-y-auto"></div>
-            </div>
-            <div class="flex items-end space-x-4">
-                <p class="text-lg">Nhóm nghề: <span class="font-bold text-aia-red risk-group-span" data-template-id="risk-group-span">...</span></p>
-            </div>
-        </div>
-        <div class="mt-4">
-            <h4 class="text-md font-semibold text-gray-800 mb-2">Sản phẩm bổ sung cho người này</h4>
-            <div class="supplementary-products-container space-y-6"></div>
-        </div>
-    </div>
-</template>
-
-<!-- (THÊM MỚI) LIGHTBOX OVERLAY -->
-<div id="img-lightbox" class="img-lightbox" style="display:none;">
-  <div class="img-lightbox-backdrop"></div>
-  <div class="img-lightbox-dialog">
-    <button type="button" class="img-lightbox-close" aria-label="Đóng">&times;</button>
-    <img id="img-lightbox-main" src="" alt="">
-    <div id="img-lightbox-caption" class="img-lightbox-caption"></div>
-    <div class="img-lightbox-nav">
-      <button type="button" id="img-lightbox-prev">&lt;</button>
-      <button type="button" id="img-lightbox-next">&gt;</button>
-    </div>
-  </div>
-</div>
-
-<script>
-window.addEventListener('error', e => {
-  const box = document.getElementById('error-message') || document.body.appendChild(Object.assign(document.createElement('div'), {id:'error-message'}));
-  box.style.cssText = 'position:fixed;left:8px;bottom:8px;background:#fee;color:#b00;padding:8px 12px;border:1px solid #f99;border-radius:6px;z-index:99999';
-  box.textContent = (e.message||'JS error') + ' @ ' + (e.filename||'') + ':' + (e.lineno||'');
-});
-</script>  
-<script type="module" src="logic.js"></script>
-<script type="module" src="data.js"></script>
+      async function injectAll(){
+        const container = document.getElementById(SUMMARY_CONTAINER_ID);
+        if(!container){
+          WARN('Chưa thấy summary container.');
+          return;
+        }
+        await buildCompanyGallery(container);
+        await buildProductGallery(container);
+        rebuildLightboxList();
+      }
+      function attemptInject(attempt=1){
+        const container = document.getElementById(SUMMARY_CONTAINER_ID);
+        if(container){
+          injectAll();
+          return;
+        }
+        if(attempt>=GALLERY_CONFIG.retry.maxAttempts){
+          WARN('Hết retry injectAll.');
+          return;
+        }
+        setTimeout(()=>attemptInject(attempt+1), GALLERY_CONFIG.retry.intervalMs);
+      }
+      function hookOpenBtn(){
+        const btn = document.getElementById(OPEN_SUMMARY_BTN_ID);
+        const modal = document.getElementById(SUMMARY_MODAL_ID);
+        if(!btn || !modal){
+          WARN('Thiếu nút hoặc modal.');
+          return;
+        }
+        btn.addEventListener('click', ()=>{
+          setTimeout(()=> attemptInject(1), 0);
+        });
+      }
+      document.getElementById('main-product')?.addEventListener('change', ()=>{
+        LOG('main-product changed -> sẽ nạp product gallery khi mở modal.');
+      });
+      document.addEventListener('DOMContentLoaded', ()=>{
+        initLightbox();
+        hookOpenBtn();
+      });
+    })();
+  </script>
 </body>
 </html>
