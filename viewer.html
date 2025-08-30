@@ -426,7 +426,7 @@
         if (!anchor) return;
 
         // Company gallery (ở đầu trang)
-        const companyImages = await findImages('/images/company', 'company', 10);
+        const companyImages = await findImages('images/company', 'company', 10);
         if (companyImages.length) {
           const sec = buildGallerySection('Hình ảnh Công ty', companyImages);
           if (sec) {
@@ -436,7 +436,7 @@
         }
 
         // Product gallery (sau bảng phí)
-        const productImages = await findImages(`/images/product/${p.productSlug}`, p.productSlug, 10);
+        const productImages = await findImages(`images/products/${p.productSlug}`, p.productSlug, 10);
         if (productImages.length) {
           const sec = buildGallerySection('Hình ảnh Sản phẩm chính', productImages);
           if (sec) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
@@ -448,7 +448,7 @@
             if (!r.selected) continue;
             const riderSlug = riderSlugMap(r.slug);
             if (!riderSlug) continue;
-            const imgs = await findImages(`/images/rider/${riderSlug}`, riderSlug, 10);
+            const imgs = await findImages(`images/products/${riderSlug}`, riderSlug, 10);
             if (!imgs.length) continue;
             const sec = buildGallerySection(`Hình ảnh Rider: ${RIDER_NAME_MAP[r.slug] || r.slug}`, imgs);
             if (sec) anchor.parentNode.appendChild(sec);
