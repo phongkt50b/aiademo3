@@ -255,7 +255,6 @@
     function qa(sel,root=document){ return Array.from(root.querySelectorAll(sel)); }
 
     function buildSummaryHtmlFromPayload(p){
-      // p.summaryHtml đã chứa nguyên văn nội dung bảng tóm tắt (Phần 1,2,3, footer)
       return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
     }
 
@@ -266,15 +265,17 @@
         return res.ok;
       } catch(_e){ return false; }
     }
-    async function collectSequential(baseDir, baseName, max=40){
-      const out=[];
-      for(let i=1;i<=max;i++){
-        const num=String(i).padStart(2,'0');
-        const url=`${baseDir}/${baseName}-${num}.jpg`;
-        if(await headExists(url)) out.push(url);
-        else {
-          if(i===1) break;
-          else break;
+
+    // Hàm mới: tải tuần tự tối đa max ảnh, dừng khi gặp ảnh không tồn tại
+    async function collectSequentialLimited(baseDir, baseName, max=10){
+      const out = [];
+      for(let i=1; i<=max; i++){
+        const num = String(i).padStart(2,'0');
+        const url = `${baseDir}/${baseName}-${num}.jpg`;
+        if(await headExists(url)){
+          out.push(url);
+        } else {
+          break; // dừng khi ảnh kế tiếp không tồn tại
         }
       }
       return out;
@@ -289,11 +290,11 @@
         const img=document.createElement('img');
         img.src=u;
         img.alt='';
+        img.loading = 'lazy'; // Thêm lazy load ảnh
         fig.appendChild(img);
         fig.addEventListener('click',()=>openLightbox(u));
         wrap.appendChild(fig);
       });
-      // Cập nhật state.images theo thứ tự ảnh được render
       state.images = state.images.concat(urls);
       return wrap;
     }
@@ -351,8 +352,8 @@
       const main = qs('#content');
       const statusEl = qs('#status');
       statusEl.classList.add('hidden');
-      main.innerHTML = ''; // Xoá nội dung cũ
-      state.images = [];   // Reset danh sách ảnh lightbox
+      main.innerHTML = '';
+      state.images = [];
 
       // 1. Gắn summaryHtml
       const summaryHtml = buildSummaryHtmlFromPayload(payload);
@@ -361,9 +362,9 @@
       container.innerHTML = summaryHtml;
       main.appendChild(container);
 
-      // 2. Chèn ảnh công ty trước phần 1
+      // 2. Chèn ảnh công ty trước phần 1 (giới hạn 10 ảnh)
       const part1Heading = qa('h3', container).find(h => /Phần\s*1/i.test(h.textContent));
-      const companyImgs = await collectSequential('images/company','company',50);
+      const companyImgs = await collectSequentialLimited('images/company','company',10);
       console.log('Company images:', companyImgs);
       const companyBlock = renderImageBlock(companyImgs);
       if(companyBlock){
@@ -374,14 +375,14 @@
         }
       }
 
-      // 3. Chèn ảnh sản phẩm chính và riders sau phần 3
+      // 3. Chèn ảnh sản phẩm chính và riders sau phần 3 (giới hạn 10 ảnh mỗi loại)
       const part3Headings = qa('h3', container).filter(h => /Phần\s*3/i.test(h.textContent));
       const lastPart3 = part3Headings.length ? part3Headings[part3Headings.length - 1] : null;
       let insertAfterNode = lastPart3 ? lastPart3.parentElement : container.lastElementChild;
 
       // 3.1 Ảnh sản phẩm chính
       const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-      const productImgs = await collectSequential(`images/products/${prodSlug}`, prodSlug, 60);
+      const productImgs = await collectSequentialLimited(`images/products/${prodSlug}`, prodSlug, 10);
       console.log('Product images:', productImgs);
       if(productImgs.length){
         const prodBlock = renderImageBlock(productImgs);
@@ -406,7 +407,7 @@
           };
           const rSlug = riderSlugMap[r.slug];
           if(!rSlug) continue;
-          const riderImgs = await collectSequential(`images/products/${rSlug}`, rSlug, 60);
+          const riderImgs = await collectSequentialLimited(`images/products/${rSlug}`, rSlug, 10);
           console.log(`Rider images (${r.slug}):`, riderImgs);
           if(riderImgs.length){
             const riderBlock = renderImageBlock(riderImgs);
