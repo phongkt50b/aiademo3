@@ -4065,5 +4065,3 @@ function buildViewerPayload() {
     }
   });
 })();
-
-})();
