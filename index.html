@@ -9,6 +9,158 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+<!-- === IMAGE GALLERY MODULE CSS (THÊM MỚI) === -->
+<style id="image-gallery-module-styles">
+  .img-company-gallery{
+    margin:24px 0 32px;
+    padding:16px 12px 4px;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    background:#fff;
+  }
+  .img-company-gallery h3{
+    margin:0 0 14px;
+    font-size:18px;
+    font-weight:600;
+  }
+  .img-company-grid{
+    display:grid;
+    gap:14px;
+    grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  }
+  .img-product-gallery{
+    margin:40px 0 60px;
+    padding:20px 16px 8px;
+    border:1px solid #e5e7eb;
+    border-radius:14px;
+    background:#fff;
+  }
+  .img-product-gallery h3{
+    margin:0 0 18px;
+    font-size:20px;
+    font-weight:700;
+  }
+  .img-product-block{ margin-bottom:36px; }
+  .img-product-title{
+    font-size:16px;
+    font-weight:600;
+    margin:0 0 8px;
+    color:#333;
+  }
+  .img-grid{
+    display:grid;
+    gap:14px;
+    grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  }
+  .img-figure{
+    margin:0;
+    padding:10px;
+    background:#fafafa;
+    border:1px solid #ececec;
+    border-radius:10px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    position:relative;
+    cursor:zoom-in;
+    transition:box-shadow .2s;
+  }
+  .img-figure:hover{ box-shadow:0 2px 6px rgba(0,0,0,.12); }
+  .img-thumb{
+    width:100%;
+    background:#fff;
+    border-radius:6px;
+    object-fit:contain;
+    max-height:250px;
+    transition:transform .2s ease, opacity .2s;
+  }
+  .img-thumb.loading{ opacity:0.3; }
+  .img-caption{
+    font-size:12px;
+    line-height:1.35;
+    text-align:center;
+    color:#444;
+    min-height:28px;
+    overflow-wrap:break-word;
+  }
+  .orientation-portrait .img-thumb{ max-height:320px; }
+  .orientation-landscape .img-thumb{ max-height:210px; }
+  .img-thumb-error{
+    opacity:.5;
+    filter:grayscale(1);
+    outline:2px dashed #d33;
+  }
+  .img-lightbox{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:none;
+    font-family:inherit;
+  }
+  .img-lightbox.show{ display:block; }
+  .img-lightbox-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,0.75);
+    backdrop-filter:blur(2px);
+  }
+  .img-lightbox-dialog{
+    position:absolute;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    max-width:92vw;
+    max-height:90vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    color:#fff;
+  }
+  .img-lightbox-dialog img{
+    max-width:92vw;
+    max-height:70vh;
+    object-fit:contain;
+    background:#111;
+    border-radius:10px;
+    box-shadow:0 0 0 1px #444;
+  }
+  .img-lightbox-caption{
+    font-size:14px;
+    max-width:80ch;
+    text-align:center;
+    line-height:1.35;
+  }
+  .img-lightbox-close{
+    position:absolute;
+    top:-44px;
+    right:-8px;
+    background:transparent;
+    color:#fff;
+    font-size:42px;
+    border:none;
+    cursor:pointer;
+    line-height:1;
+  }
+  .img-lightbox-nav{
+    display:flex;
+    gap:16px;
+  }
+  .img-lightbox-nav button{
+    background:#fff;
+    color:#000;
+    border:none;
+    padding:8px 16px;
+    font-size:14px;
+    font-weight:600;
+    border-radius:24px;
+    cursor:pointer;
+  }
+  .img-lightbox-nav button:disabled{
+    opacity:.35;
+    cursor:default;
+  }
+</style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
 <div class="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -19,6 +171,9 @@
 
 <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
   <div class="lg:col-span-2 space-y-6">
+
+    <!-- (THÊM MỚI) GALLERY ẢNH CÔNG TY -->
+    <div id="company-intro-gallery" class="img-company-gallery"></div>
 
     <div id="main-person-container" class="person-container space-y-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h2 class="text-xl font-bold text-aia-red mb-4">1. Thông Tin Người Được Bảo Hiểm Chính</h2>
@@ -38,7 +193,7 @@
             <option value="Nữ">Nữ</option>
           </select>
         </div>
-        <div class="flex items-end">
+          <div class="flex items-end">
           <p class="text-lg">Tuổi: <span class="font-bold text-aia-red age-span">0</span></p>
         </div>
         <div class="relative">
@@ -74,6 +229,9 @@
       <h2 class="text-xl font-bold text-aia-red mb-4">3. Lựa Chọn Sản Phẩm Bổ Sung (Cho NĐBH Chính)</h2>
       <div class="supplementary-products-container space-y-6"></div>
     </div>
+
+    <!-- (THÊM MỚI) GALLERY ẢNH SẢN PHẨM -->
+    <div id="product-image-gallery" class="img-product-gallery" style="display:none;"></div>
 
     <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h2 class="text-xl font-bold text-aia-red mb-4">4. Người Được Bảo Hiểm Bổ Sung</h2>
@@ -144,7 +302,7 @@
         <div class="flex justify-between">
           <span>Phí sản phẩm bổ sung:</span><span id="freq-supp-total">0</span>
         </div>
-        <div class="flex justify-between font-semibold">
+          <div class="flex justify-between font-semibold">
           <span>Tổng:</span><span id="freq-total-period" class="text-aia-red">0</span>
         </div>
         <div class="flex justify-between">
@@ -244,6 +402,21 @@
         </div>
     </div>
 </template>
+
+<!-- (THÊM MỚI) LIGHTBOX OVERLAY -->
+<div id="img-lightbox" class="img-lightbox" style="display:none;">
+  <div class="img-lightbox-backdrop"></div>
+  <div class="img-lightbox-dialog">
+    <button type="button" class="img-lightbox-close" aria-label="Đóng">&times;</button>
+    <img id="img-lightbox-main" src="" alt="">
+    <div id="img-lightbox-caption" class="img-lightbox-caption"></div>
+    <div class="img-lightbox-nav">
+      <button type="button" id="img-lightbox-prev">&lt;</button>
+      <button type="button" id="img-lightbox-next">&gt;</button>
+    </div>
+  </div>
+</div>
+
 <script>
 window.addEventListener('error', e => {
   const box = document.getElementById('error-message') || document.body.appendChild(Object.assign(document.createElement('div'), {id:'error-message'}));
