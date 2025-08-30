@@ -3872,464 +3872,244 @@ if (typeof buildPart2Section === 'function'){
 }
 
 console.info('[BenefitMatrixPatch] v3.2 applied.');
-/* ================= IMAGE & PRODUCT GALLERY MODULE v2.4 =================
-   Mục tiêu:
-     - Inject gallery CHỈ BÊN TRONG modal (#summary-content-container)
-     - Thứ tự trong modal:
-         1. Company gallery
-         2. Section 1
-         3. Section 2
-         4. Section 3 (Fee)
-         5. Product gallery (ảnh các sản phẩm đã chọn)
-     - Linh hoạt anchor: dùng ID / data-attr nếu có, fallback dò text heading.
-     - Hỗ trợ đa extension: webp, jpg, jpeg, png.
-     - Retry khi nội dung modal render async.
-   ====================================================================== */
+/* === GALLERY MODULE – SIMPLE v1 (gpt-5) ===
+   - Luôn hiển thị khung + thông báo khi chưa có ảnh
+   - Không tạo trùng lặp
+   - Company gallery đặt TRƯỚC "Phần 1"
+   - Product gallery đặt SAU "Phần 3" (hoặc cuối nếu không tìm thấy heading)
+   - Ảnh:
+       + Company: images/company/company-01.jpg (02, 03, ...)
+       + Product: images/products/<slug>/<slug>-01.jpg ...
+         slug map:
+           PUL_TRON_DOI / PUL_15NAM / PUL_5NAM -> khoe-tron-ven
+           KHOE_BINH_AN -> khoe-binh-an
+           VUNG_TUONG_LAI -> vung-tuong-lai
+           TRON_TAM_AN -> tron-tam-an
+           AN_BINH_UU_VIET -> an-binh-uu-viet
+   - Chỉ cần tạo 1 file company-01.jpg để test.
+*/
 (function(){
-  const DEBUG = true;
-  const LOG = (...a)=>{ if(DEBUG) console.log('[Gallery]', ...a); };
-  const WARN = (...a)=>console.warn('[Gallery]', ...a);
-
-  // ------------ CONFIG -------------
-  const IMAGE_EXTENSIONS = ['webp','jpg','jpeg','png'];
-  const SUMMARY_MODAL_ID = 'summary-modal';
-  const SUMMARY_CONTAINER_ID = 'summary-content-container';
-  const OPEN_SUMMARY_BTN_ID = 'view-summary-btn';
-
-  // Selectors ưu tiên (nếu bạn thêm các id khuyến nghị)
-  const ANCHOR_SELECTORS = {
-    beforeCompany: [ // Section 1 (Company gallery đứng trước)
-      '#summary-section-1',
-      '#section-1',
-      '[data-summary-section="1"]'
-    ],
-    afterProduct: [ // Section 3 (Product gallery đứng sau)
-      '#summary-section-3',
-      '#section-3',
-      '#summary-fee-table',
-      '#fee-table',
-      '[data-summary-section="3"]'
-    ]
-  };
-
-  // Pattern dò text fallback (dò gần đúng, không phân biệt hoa thường)
-  const TEXT_PATTERNS = {
-    section1: /(phần\s*1\b|tóm tắt sản phẩm)/i,
-    section3: /(phần\s*3\b|bảng phí)/i
-  };
-
-  const GALLERY_CONFIG = {
+  const CFG = {
     company: {
-      enabled: true,
-      basePath: 'images/company',
-      maxImages: 20,
-      filenameBase: i => `company-${String(i).padStart(2,'0')}`,
+      base: 'images/company',
+      max: 20,
+      id: 'company-intro-gallery',
       title: 'Giới thiệu AIA Việt Nam',
-      containerId: 'company-intro-gallery'
+      file: i => `company-${String(i).padStart(2,'0')}`
     },
     product: {
-      enabled: true,
-      basePath: 'images/products',
-      maxImagesPerProduct: 25,
-      productSlugMap: {
-        'PUL_TRON_DOI': 'khoe-tron-ven',
-        'PUL_15NAM': 'khoe-tron-ven',
-        'PUL_5NAM': 'khoe-tron-ven',
-        'KHOE_BINH_AN': 'khoe-binh-an',
-        'VUNG_TUONG_LAI': 'vung-tuong-lai',
-        'TRON_TAM_AN': 'tron-tam-an',
-        'AN_BINH_UU_VIET': 'an-binh-uu-viet'
-      },
-      filenameBase: (slug,i)=> `${slug}-${String(i).padStart(2,'0')}`,
+      base: 'images/products',
+      max: 25,
+      id: 'product-image-gallery',
       title: 'Hình ảnh minh họa sản phẩm',
-      containerId: 'product-image-gallery'
+      slugMap: {
+        'PUL_TRON_DOI':'khoe-tron-ven',
+        'PUL_15NAM':'khoe-tron-ven',
+        'PUL_5NAM':'khoe-tron-ven',
+        'KHOE_BINH_AN':'khoe-binh-an',
+        'VUNG_TUONG_LAI':'vung-tuong-lai',
+        'TRON_TAM_AN':'tron-tam-an',
+        'AN_BINH_UU_VIET':'an-binh-uu-viet'
+      },
+      file: (slug,i)=>`${slug}-${String(i).padStart(2,'0')}`
     },
-    retry: {
-      maxAttempts: 18,
-      intervalMs: 140
-    }
+    exts: ['webp','jpg','jpeg','png']
   };
 
-  // ------------ STATE -------------
-  const state = {
-    companyLoaded: false,
-    productLoadedFor: new Set(),
-    lightboxItems: [],
-    lightboxIndex: 0,
-    lastProductId: null
-  };
-
-  // ------------ IMAGE UTIL -------------
-  function imageExistsOnce(src){
-    return new Promise(res=>{
-      const img = new Image();
-      img.onload = ()=>res(true);
-      img.onerror = ()=>res(false);
-      img.src = src + (src.includes('?')?'&':'?') + 't=' + Date.now();
+  // Lightbox helpers (tận dụng HTML đã dán)
+  let lbRoot, lbImg, lbCap, lbPrev, lbNext, lbClose;
+  function initLightbox(){
+    lbRoot = document.getElementById('img-lightbox');
+    if(!lbRoot) return;
+    lbImg  = document.getElementById('img-lightbox-main');
+    lbCap  = document.getElementById('img-lightbox-caption');
+    lbPrev = document.getElementById('img-lightbox-prev');
+    lbNext = document.getElementById('img-lightbox-next');
+    lbClose= lbRoot.querySelector('.img-lightbox-close');
+    lbPrev && lbPrev.addEventListener('click', ()=>shift(-1));
+    lbNext && lbNext.addEventListener('click', ()=>shift(1));
+    lbClose && lbClose.addEventListener('click', hide);
+    lbRoot.querySelector('.img-lightbox-backdrop')?.addEventListener('click', hide);
+    document.addEventListener('keydown', e=>{
+      if(lbRoot.style.display!=='block') return;
+      if(e.key==='Escape') hide();
+      if(e.key==='ArrowLeft') shift(-1);
+      if(e.key==='ArrowRight') shift(1);
     });
   }
-  async function resolveFirstExistingImage(baseNoExt){
-    for(const ext of IMAGE_EXTENSIONS){
-      const candidate = `${baseNoExt}.${ext}`;
+  const state = { items:[], index:0 };
+  function open(src){
+    const i = state.items.findIndex(x=>x.src===src);
+    if(i<0) return;
+    state.index=i; show();
+  }
+  function show(){
+    const it = state.items[state.index];
+    if(!it) return;
+    lbImg.src = it.src;
+    lbImg.alt = it.cap||'';
+    lbCap.textContent = it.cap||'';
+    lbRoot.style.display='block';
+    updateNav();
+  }
+  function hide(){ lbRoot.style.display='none'; }
+  function shift(d){
+    let n = state.index + d;
+    if(n<0) n=0;
+    if(n>=state.items.length) n=state.items.length-1;
+    state.index = n; show();
+  }
+  function updateNav(){
+    if(lbPrev) lbPrev.disabled = (state.index===0);
+    if(lbNext) lbNext.disabled = (state.index===state.items.length-1);
+  }
+
+  // Image existence
+  function testImg(url){
+    return new Promise(res=>{
+      const im = new Image();
+      im.onload = ()=>res(true);
+      im.onerror = ()=>res(false);
+      im.src = url+'?t='+(Date.now());
+    });
+  }
+  async function firstExisting(base){
+    for(const e of CFG.exts){
+      const full = `${base}.${e}`;
       /* eslint-disable no-await-in-loop */
-      const ok = await imageExistsOnce(candidate);
-      if(ok) return candidate;
+      if(await testImg(full)) return full;
     }
     return null;
   }
 
-  // ------------ DOM HELPERS -------------
-  function qsAll(root, selectors){
-    return selectors.flatMap(sel => Array.from(root.querySelectorAll(sel)));
-  }
-
-  function findAnchorBefore(container){
-    // Ưu tiên selectors
-    for(const sel of ANCHOR_SELECTORS.beforeCompany){
-      const el = container.querySelector(sel);
-      if(el) return el;
-    }
-    // Fallback dò text
-    return scanHeadingByText(container, TEXT_PATTERNS.section1);
-  }
-  function findAnchorAfter(container){
-    for(const sel of ANCHOR_SELECTORS.afterProduct){
-      const el = container.querySelector(sel);
-      if(el) return el;
-    }
-    return scanHeadingByText(container, TEXT_PATTERNS.section3, true); // true => lấy heading cuối cùng match (nếu nhiều)
-  }
-  function scanHeadingByText(container, regex, takeLast=false){
-    const heads = container.querySelectorAll('h1,h2,h3,h4');
-    let found=null;
-    heads.forEach(h=>{
-      if(regex.test(h.textContent.trim())){
-        if(!takeLast && !found) found = h;
-        else if(takeLast) found = h;
-      }
-    });
-    return found;
-  }
-
-  // ------------ FIGURE / LIGHTBOX -------------
-  function buildFigure({src, caption, group}){
-    const fig = document.createElement('figure');
-    fig.className='img-figure';
-    fig.tabIndex=0;
-    fig.dataset.group = group;
-    fig.dataset.src = src;
+  // Build a figure
+  function fig(src, caption){
+    const f = document.createElement('figure');
+    f.className='aiag-figure';
+    f.style.cssText='margin:0;padding:4px;border:1px solid #eee;border-radius:4px;display:flex;flex-direction:column;gap:4px;cursor:pointer;background:#fff;';
     const img = document.createElement('img');
-    img.loading='lazy';
-    img.decoding='async';
-    img.src = src;
-    img.alt = caption || '';
-    img.className='img-thumb loading';
-    img.addEventListener('load', ()=>{
-      img.classList.remove('loading');
-      if(img.naturalWidth && img.naturalHeight){
-        const r = img.naturalWidth / img.naturalHeight;
-        fig.classList.add(r>=1?'orientation-landscape':'orientation-portrait');
-      }
-    });
-    img.addEventListener('error', ()=>{
-      img.classList.add('img-thumb-error');
-      const cap = fig.querySelector('.img-caption');
-      if(cap) cap.textContent = 'Không tải được ảnh';
-    });
+    img.src=src;
+    img.alt=caption||'';
+    img.style.cssText='width:100%;height:120px;object-fit:cover;border-radius:3px;';
     const cap = document.createElement('figcaption');
-    cap.className='img-caption';
-    cap.textContent = caption || '';
-    fig.appendChild(img);
-    fig.appendChild(cap);
-    fig.addEventListener('click', ()=> openLightboxBySrc(src));
-    fig.addEventListener('keypress', e=>{
-      if(e.key==='Enter'||e.key===' '){
-        e.preventDefault();
-          openLightboxBySrc(src);
-      }
-    });
-    return fig;
+    cap.textContent = caption||'';
+    cap.style.cssText='font-size:11px;text-align:center;color:#444;';
+    f.appendChild(img); f.appendChild(cap);
+    f.addEventListener('click', ()=>open(src));
+    return f;
   }
 
-  let lbRoot, lbImg, lbCaption, lbPrev, lbNext, lbClose;
-  function initLightbox(){
-    if(lbRoot) return;
-    lbRoot = document.getElementById('img-lightbox');
-    if(!lbRoot){
-      WARN('Thiếu markup lightbox (#img-lightbox).');
-      return;
-    }
-    lbImg = document.getElementById('img-lightbox-main');
-    lbCaption = document.getElementById('img-lightbox-caption');
-    lbPrev = document.getElementById('img-lightbox-prev');
-    lbNext = document.getElementById('img-lightbox-next');
-    lbClose = lbRoot.querySelector('.img-lightbox-close');
-    const closeFn = ()=> hideLightbox();
-    lbClose && lbClose.addEventListener('click', closeFn);
-    lbRoot.querySelector('.img-lightbox-backdrop')?.addEventListener('click', closeFn);
-    lbPrev && lbPrev.addEventListener('click', ()=> shiftLightbox(-1));
-    lbNext && lbNext.addEventListener('click', ()=> shiftLightbox(1));
-    document.addEventListener('keydown', e=>{
-      if(lbRoot.style.display!=='block') return;
-      if(e.key==='Escape') hideLightbox();
-      if(e.key==='ArrowLeft') shiftLightbox(-1);
-      if(e.key==='ArrowRight') shiftLightbox(1);
-    });
-  }
-  function openLightboxBySrc(src){
-    const idx = state.lightboxItems.findIndex(i=>i.src===src);
-    if(idx>=0){
-      state.lightboxIndex = idx;
-      showLightbox();
-    }
-  }
-  function showLightbox(){
-    initLightbox();
-    if(!lbRoot) return;
-    const item = state.lightboxItems[state.lightboxIndex];
-    if(!item) return;
-    lbImg.src = item.src;
-    lbImg.alt = item.caption || '';
-    lbCaption.textContent = item.caption || '';
-    lbRoot.style.display='block';
-    lbRoot.classList.add('show');
-    updateLightboxNav();
-  }
-  function hideLightbox(){
-    if(!lbRoot) return;
-    lbRoot.style.display='none';
-    lbRoot.classList.remove('show');
-  }
-  function shiftLightbox(delta){
-    const len = state.lightboxItems.length;
-    if(!len) return;
-    let n = state.lightboxIndex + delta;
-    if(n<0) n=0;
-    if(n>=len) n=len-1;
-    state.lightboxIndex = n;
-    showLightbox();
-  }
-  function updateLightboxNav(){
-    if(!lbPrev||!lbNext) return;
-    lbPrev.disabled = (state.lightboxIndex===0);
-    lbNext.disabled = (state.lightboxIndex===state.lightboxItems.length-1);
-  }
-  function rebuildLightboxList(){
-    const container = document.getElementById(SUMMARY_CONTAINER_ID);
-    if(!container) return;
-    const figs = [...container.querySelectorAll('figure.img-figure')];
-    const seen = new Set();
-    const list = [];
-    figs.forEach(f=>{
-      const src = f.dataset.src;
-      if(src && !seen.has(src)){
-        seen.add(src);
-        const cap = f.querySelector('.img-caption')?.textContent || '';
-        list.push({src, caption: cap});
-      }
-    });
-    state.lightboxItems = list;
-    LOG('Lightbox items:', list.length);
-  }
-
-  // ------------ GALLERY BUILDERS -------------
-  async function buildCompanyGallery(container){
-    if(!GALLERY_CONFIG.company.enabled) return null;
-    if(state.companyLoaded){
-      // Đã load => không load thêm
-      return container.querySelector('#'+GALLERY_CONFIG.company.containerId);
-    }
-    const wrap = document.createElement('div');
-    wrap.id = GALLERY_CONFIG.company.containerId;
-    wrap.className = 'img-company-gallery';
-    const h3 = document.createElement('h3');
-    h3.textContent = GALLERY_CONFIG.company.title;
-    wrap.appendChild(h3);
+  function wrapBlock(id, title){
+    const box = document.createElement('div');
+    box.id = id;
+    box.style.cssText='margin:12px 0;padding:12px;border:1px solid #ddd;border-radius:8px;background:#fafafa;';
+    const h = document.createElement('h3');
+    h.textContent = title;
+    h.style.cssText='margin:0 0 8px;font-size:16px;font-weight:600;';
     const grid = document.createElement('div');
-    grid.className='img-company-grid';
-    wrap.appendChild(grid);
-
-    let count=0;
-    for(let i=1;i<=GALLERY_CONFIG.company.maxImages;i++){
-      const baseNoExt = `${GALLERY_CONFIG.company.basePath}/${GALLERY_CONFIG.company.filenameBase(i)}`;
-      /* eslint-disable no-await-in-loop */
-      const resolved = await resolveFirstExistingImage(baseNoExt);
-      if(resolved){
-        count++;
-        grid.appendChild(buildFigure({
-          src: resolved,
-          caption: `AIA - ${String(i).padStart(2,'0')}`,
-          group: 'company'
-        }));
-      }
-    }
-    if(count===0){
-      wrap.style.display='none';
-      LOG('Không có ảnh company.');
-    } else {
-      state.companyLoaded = true;
-    }
-    insertCompanyGallery(container, wrap);
-    return wrap;
+    grid.className='aiag-grid';
+    grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;';
+    box.appendChild(h); box.appendChild(grid);
+    return {box,grid};
   }
 
-  async function buildProductGallery(container){
-    if(!GALLERY_CONFIG.product.enabled) return null;
+  function insertBeforeSection1(container, el){
+    const headings=[...container.querySelectorAll('h1,h2,h3,h4')];
+    const target = headings.find(h=>/phần\s*1|tóm tắt sản phẩm/i.test(h.textContent));
+    if(target) container.insertBefore(el, target);
+    else container.prepend(el);
+  }
+  function insertAfterSection3(container, el){
+    const headings=[...container.querySelectorAll('h1,h2,h3,h4')];
+    const list = headings.filter(h=>/phần\s*3|bảng phí/i.test(h.textContent));
+    const target = list.length? list[list.length-1]: null;
+    if(target) target.after(el);
+    else container.appendChild(el);
+  }
+
+  async function buildCompany(container){
+    // Xóa cũ (nếu reload modal)
+    container.querySelector('#'+CFG.company.id)?.remove();
+    const {box,grid} = wrapBlock(CFG.company.id, CFG.company.title);
+    let found=0;
+    for(let i=1;i<=CFG.company.max;i++){
+      const base = `${CFG.company.base}/${CFG.company.file(i)}`;
+      /* eslint-disable no-await-in-loop */
+      const resolved = await firstExisting(base);
+      if(resolved){
+        found++;
+        grid.appendChild(fig(resolved, 'AIA - '+String(i).padStart(2,'0')));
+        state.items.push({src:resolved, cap:'AIA - '+String(i).padStart(2,'0')});
+      }
+    }
+    if(!found){
+      const note=document.createElement('div');
+      note.style.cssText='font-size:12px;color:#666;font-style:italic;';
+      note.textContent='(Chưa có ảnh công ty - tạo file: images/company/company-01.jpg)';
+      box.appendChild(note);
+    }
+    insertBeforeSection1(container, box);
+  }
+
+  async function buildProduct(container){
+    container.querySelector('#'+CFG.product.id)?.remove();
     const select = document.getElementById('main-product');
-    if(!select || !select.value){
-      LOG('Chưa chọn sản phẩm chính.');
-      return null;
-    }
-    const productId = select.value;
-    const slug = GALLERY_CONFIG.product.productSlugMap[productId];
-    if(!slug){
-      WARN('Không có slug cho', productId);
-      return null;
-    }
-
-    let outer = container.querySelector('#'+GALLERY_CONFIG.product.containerId);
-    if(!outer){
-      outer = document.createElement('div');
-      outer.id = GALLERY_CONFIG.product.containerId;
-      outer.className = 'img-product-gallery';
-      const h = document.createElement('h3');
-      h.textContent = GALLERY_CONFIG.product.title;
-      outer.appendChild(h);
-    }
-    if(state.productLoadedFor.has(slug)){
-      // Đảm bảo outer đã được chèn đúng vị trí (sau Section 3)
-      if(!outer.isConnected){
-        insertProductGallery(container, outer);
-      }
-      return outer;
-    }
-    // Block 1 slug
-    let block = outer.querySelector(`[data-product-slug="${slug}"]`);
-    if(block){
-      return outer;
-    }
-    block = document.createElement('div');
-    block.className = 'img-product-block';
-    block.dataset.productSlug = slug;
-    const titleDiv = document.createElement('div');
-    titleDiv.className='img-product-title';
-    titleDiv.textContent = select.options[select.selectedIndex].text;
-    const grid = document.createElement('div');
-    grid.className='img-grid';
-    block.appendChild(titleDiv);
-    block.appendChild(grid);
-    outer.appendChild(block);
-
-    let count=0;
-    for(let i=1;i<=GALLERY_CONFIG.product.maxImagesPerProduct;i++){
-      const baseNoExt = `${GALLERY_CONFIG.product.basePath}/${slug}/${GALLERY_CONFIG.product.filenameBase(slug,i)}`;
+    if(!select || !select.value) return;
+    const slug = CFG.product.slugMap[select.value];
+    if(!slug) return;
+    const {box,grid} = wrapBlock(CFG.product.id, CFG.product.title);
+    let found=0;
+    for(let i=1;i<=CFG.product.max;i++){
+      const base = `${CFG.product.base}/${slug}/${CFG.product.file(slug,i)}`;
       /* eslint-disable no-await-in-loop */
-      const resolved = await resolveFirstExistingImage(baseNoExt);
+      const resolved = await firstExisting(base);
       if(resolved){
-        count++;
-        grid.appendChild(buildFigure({
-          src: resolved,
-          caption: `${titleDiv.textContent} - ${String(i).padStart(2,'0')}`,
-          group: `product-${slug}`
-        }));
+        found++;
+        const cap = select.options[select.selectedIndex].text + ' - ' + String(i).padStart(2,'0');
+        grid.appendChild(fig(resolved, cap));
+        state.items.push({src:resolved, cap});
       }
     }
-    if(count===0){
-      block.remove();
-      LOG('Không có ảnh sản phẩm cho', slug);
-    } else {
-      state.productLoadedFor.add(slug);
+    if(!found){
+      const note=document.createElement('div');
+      note.style.cssText='font-size:12px;color:#666;font-style:italic;';
+      note.textContent='(Chưa có ảnh sản phẩm - tạo: images/products/'+slug+'/'+slug+'-01.jpg)';
+      box.appendChild(note);
     }
-    if(!outer.querySelector('.img-product-block')){
-      outer.remove();
-      return null;
-    }
-    if(!outer.isConnected){
-      insertProductGallery(container, outer);
-    }
-    return outer;
+    insertAfterSection3(container, box);
   }
 
-  // ------------ INSERT LOGIC -------------
-  function insertCompanyGallery(container, galleryEl){
-    if(galleryEl.isConnected) return;
-    const anchor1 = findAnchorBefore(container);
-    if(anchor1){
-      container.insertBefore(galleryEl, anchor1);
-      LOG('Company gallery inserted BEFORE Section 1 anchor.');
-    } else {
-      container.prepend(galleryEl);
-      LOG('Company gallery prepended (fallback).');
-    }
-  }
-  function insertProductGallery(container, galleryEl){
-    if(galleryEl.isConnected){
-      // Đảm bảo nó nằm sau Section 3; nếu không đúng thứ tự thì di chuyển
-      const anchorAfter = findAnchorAfter(container);
-      if(anchorAfter){
-        // Nếu product gallery xuất hiện trước anchorAfter => di chuyển xuống sau anchorAfter
-          if(galleryEl.compareDocumentPosition(anchorAfter) & Node.DOCUMENT_POSITION_FOLLOWING){
-          // galleryEl trước anchorAfter: di chuyển
-          anchorAfter.after(galleryEl);
-        }
-      }
-      return;
-    }
-    const anchorAfter = findAnchorAfter(container);
-    if(anchorAfter){
-      anchorAfter.after(galleryEl);
-      LOG('Product gallery inserted AFTER Section 3 anchor.');
-    } else {
-      container.appendChild(galleryEl);
-      LOG('Product gallery appended (fallback).');
+  async function injectGalleries(){
+    const container = document.getElementById('summary-content-container');
+    if(!container) return;
+    state.items=[]; // reset để lightbox không giữ ảnh cũ
+    await buildCompany(container);
+    await buildProduct(container);
+    // Cập nhật nút điều hướng lightbox (ẩn nếu <2)
+    if(state.items.length<2){
+      const p=document.getElementById('img-lightbox-prev');
+      const n=document.getElementById('img-lightbox-next');
+      if(p) p.disabled=true;
+      if(n) n.disabled=true;
     }
   }
 
-  // ------------ MASTER INJECT -------------
-  async function injectAll(){
-    const container = document.getElementById(SUMMARY_CONTAINER_ID);
-    if(!container){
-      WARN('Chưa thấy summary container.');
-      return;
-    }
-    await buildCompanyGallery(container);
-    await buildProductGallery(container);
-    rebuildLightboxList();
-  }
-
-  function attemptInject(attempt=1){
-    const container = document.getElementById(SUMMARY_CONTAINER_ID);
-    if(container){
-      injectAll();
-      return;
-    }
-    if(attempt >= GALLERY_CONFIG.retry.maxAttempts){
-      WARN('Hết số lần retry injectAll.');
-      return;
-    }
-    setTimeout(()=>attemptInject(attempt+1), GALLERY_CONFIG.retry.intervalMs);
-  }
-
-  // ------------ EVENT HOOKS -------------
-  function hookOpenBtn(){
-    const btn = document.getElementById(OPEN_SUMMARY_BTN_ID);
-    const modal = document.getElementById(SUMMARY_MODAL_ID);
-    if(!btn || !modal){
-      WARN('Thiếu nút hoặc modal.');
-      return;
-    }
+  function bindOnce(){
+    if(window.__galleryBound) return;
+    window.__galleryBound = true;
+    const btn = document.getElementById('view-summary-btn');
+    if(!btn) return;
     btn.addEventListener('click', ()=>{
-      // Lùi 1 tick: chờ logic khác build nội dung Sections trước.
-      setTimeout(()=> attemptInject(1), 0);
+      // Chờ nội dung bảng minh họa (tạo đồng bộ), rồi inject
+      setTimeout(()=>injectGalleries(), 30);
     });
   }
-
-  document.getElementById('main-product')?.addEventListener('change', ()=>{
-    LOG('main-product changed -> product gallery sẽ bổ sung khi mở modal.');
-  });
 
   document.addEventListener('DOMContentLoaded', ()=>{
     initLightbox();
-    hookOpenBtn();
+    bindOnce();
   });
+
+  // Expose helper (nếu cần gọi tay qua console sau này)
+  window.__rebuildGallery = injectGalleries;
 })();
