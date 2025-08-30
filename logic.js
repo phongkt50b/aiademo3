@@ -3882,14 +3882,12 @@ if (typeof buildPart2Section === 'function'){
 }
 
 console.info('[BenefitMatrixPatch] v3.2 applied.');
-/* === GALLERY MODULE – V2 (gpt-5) ===
-   Nâng cấp:
-     - Ảnh Công ty (cố định) trước Phần 1
-     - Ảnh Sản phẩm + Riders (mỗi rider 1 lần duy nhất) sau Phần 3
-     - Thứ tự: Main → Bùng Gia Lực → Bệnh hiểm nghèo 2.0 → Tai nạn → Hỗ trợ viện phí
-     - PUL_* dùng chung slug 'khoe-tron-ven'
-     - Tự nhận orientation
-     - Tự cập nhật khi thêm/bớt file
+/* === GALLERY MODULE – V2.1 (gpt-5) DEBUG ENHANCED ===
+   Thay đổi so với V2:
+   - Gọi rebuild trực tiếp khi generateSummaryTable chạy (nếu tìm thấy hook)
+   - Thêm nhiều console.log để dò
+   - Fallback: nếu không tìm thấy heading “Phần 3” sẽ append cuối
+   - Có thể ép hiển thị dù chưa đủ validation nếu bạn gọi window.__forceGallery()
 */
 (function(){
   const CFG = {
@@ -3902,7 +3900,6 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       file: i => `company-${String(i).padStart(2,'0')}`
     },
     products: {
-      // Main products
       mainSlugMap: {
         'PUL_TRON_DOI':'khoe-tron-ven',
         'PUL_15NAM':'khoe-tron-ven',
@@ -3912,7 +3909,6 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
         'TRON_TAM_AN':'tron-tam-an',
         'AN_BINH_UU_VIET':'an-binh-uu-viet'
       },
-      // Riders
       riderSlugMap: {
         'health_scl':'bung-gia-luc',
         'bhn':'benh-hiem-ngheo-20',
@@ -3925,10 +3921,6 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
         'accident':'Bảo hiểm Tai nạn',
         'hospital_support':'Hỗ trợ viện phí'
       },
-      niceNameMain: (key,optText)=>{
-        if (!key) return 'Sản phẩm chính';
-        return optText || key;
-      },
       base:'images/products',
       max:50,
       file: (slug,i)=> `${slug}-${String(i).padStart(2,'0')}`,
@@ -3936,12 +3928,13 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     }
   };
 
-  /* ---------- Lightbox (reuse existing HTML) ---------- */
+  /* Lightbox */
   let lbRoot, lbImg, lbCap, lbPrev, lbNext, lbClose;
   const LB_STATE = { items:[], idx:0 };
+
   function initLightbox(){
     lbRoot = document.getElementById('img-lightbox');
-    if(!lbRoot) return;
+    if(!lbRoot){ console.warn('[Gallery] Không thấy #img-lightbox'); return; }
     lbImg  = document.getElementById('img-lightbox-main');
     lbCap  = document.getElementById('img-lightbox-caption');
     lbPrev = document.getElementById('img-lightbox-prev');
@@ -3980,7 +3973,6 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     if(lbNext) lbNext.disabled = (LB_STATE.idx===LB_STATE.items.length-1);
   }
 
-  /* ---------- Helpers tải ảnh ---------- */
   function testImg(url){
     return new Promise(res=>{
       const im = new Image();
@@ -3992,13 +3984,11 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
   async function firstExisting(base, exts){
     for(const e of exts){
       const full = `${base}.${e}`;
-      /* eslint-disable no-await-in-loop */
       if(await testImg(full)) return full;
     }
     return null;
   }
 
-  /* ---------- DOM helpers ---------- */
   function makeWrapper(id,title){
     const box = document.createElement('div');
     box.id = id;
@@ -4013,17 +4003,16 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     box.appendChild(h); box.appendChild(grid);
     return {box,grid};
   }
-  function insertBeforeSection1(modalCont, node){
-    const headings=[...modalCont.querySelectorAll('h1,h2,h3,h4')];
+  function beforeSection1(container, node){
+    const headings=[...container.querySelectorAll('h1,h2,h3,h4')];
     const target=headings.find(h=>/phần\s*1|tóm tắt sản phẩm/i.test(h.textContent));
-    if(target) modalCont.insertBefore(node,target);
-    else modalCont.prepend(node);
+    if(target) container.insertBefore(node,target); else container.prepend(node);
   }
-  function insertAfterSection3(modalCont, node){
-    const headings=[...modalCont.querySelectorAll('h1,h2,h3,h4')];
+  function afterSection3(container, node){
+    const headings=[...container.querySelectorAll('h1,h2,h3,h4')];
     const list=headings.filter(h=>/phần\s*3|bảng phí/i.test(h.textContent));
     const target = list.length? list[list.length-1]: null;
-    if(target) target.after(node); else modalCont.appendChild(node);
+    if(target) target.after(node); else container.appendChild(node);
   }
 
   function figure(src, caption){
@@ -4033,13 +4022,11 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     const img = document.createElement('img');
     img.src = src;
     img.alt = caption||'';
-    img.className='aiag-img';
-    img.style.cssText='width:100%;max-height:260px;object-fit:contain;border-radius:6px;transition:opacity .2s;';
+    img.style.cssText='width:100%;max-height:260px;object-fit:contain;border-radius:6px;';
     img.addEventListener('load', ()=>{
       const portrait = img.naturalHeight >= img.naturalWidth;
       fig.classList.add(portrait ? 'orientation-portrait':'orientation-landscape');
     });
-    img.addEventListener('error', ()=>{ fig.style.opacity=.4; fig.style.outline='2px dashed #d33';});
     const cap = document.createElement('figcaption');
     cap.textContent = caption||'';
     cap.style.cssText='font-size:12px;text-align:center;color:#444;min-height:28px;';
@@ -4051,98 +4038,80 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     return fig;
   }
 
-  /* ---------- Thu thập sản phẩm & riders đã chọn ---------- */
   function collectPersons(){
-    const persons = [];
-    const main = collectPersonData(document.getElementById('main-person-container'), true);
-    if (main) persons.push(main);
-    document.querySelectorAll('#supplementary-insured-container .person-container')
-      .forEach(c=>{
-        const p = collectPersonData(c,false);
-        if(p) persons.push(p);
-      });
+    const persons=[];
+    try{
+      const main = collectPersonData(document.getElementById('main-person-container'), true);
+      if(main) persons.push(main);
+      document.querySelectorAll('#supplementary-insured-container .person-container')
+        .forEach(c=>{
+          const p = collectPersonData(c,false);
+            if(p) persons.push(p);
+        });
+    }catch(e){ console.warn('[Gallery] collectPersons lỗi', e); }
     return persons;
   }
 
-  function getSelectedRidersUnique(persons){
+  function getRidersUnique(persons){
     const set = new Set();
     persons.forEach(p=>{
-      if (!p.supplements) return;
-      Object.keys(p.supplements).forEach(key=>{
-        // Chỉ nhận riders đã có tick (collectPersonData chỉ ghi khi checked)
-        set.add(key);
-      });
+      if(!p.supplements) return;
+      Object.keys(p.supplements).forEach(k=> set.add(k));
     });
     return [...set];
   }
 
-  /* ---------- Xây danh sách slug theo thứ tự yêu cầu ---------- */
-  function buildOrderedSlugList(){
+  function buildOrderedEntries(){
     const mainKey = document.getElementById('main-product')?.value || '';
     const mainSlug = CFG.products.mainSlugMap[mainKey];
-    const persons = collectPersons();
-    const ridersChosen = getSelectedRidersUnique(persons);
-
-    // Map rider -> slug
-    const riderSlugs = ridersChosen
-      .map(r => ({ id:r, slug: CFG.products.riderSlugMap[r] }))
-      .filter(o => !!o.slug);
-
-    // Thứ tự ưu tiên đã định
+    const riders = getRidersUnique(collectPersons())
+      .map(id => ({ id, slug: CFG.products.riderSlugMap[id] }))
+      .filter(x=>x.slug);
     const order = ['health_scl','bhn','accident','hospital_support'];
-    const orderedRiderSlugs = order
-      .map(id => riderSlugs.find(o=>o.id===id))
-      .filter(Boolean);
-
-    const result = [];
-    if (mainSlug) result.push({category:'main', id:mainKey, slug:mainSlug});
-    orderedRiderSlugs.forEach(o=> result.push({category:'rider', id:o.id, slug:o.slug}));
-    return result;
+    const ordered = order.map(id => riders.find(r=>r.id===id)).filter(Boolean);
+    const list=[];
+    if(mainSlug) list.push({category:'main', id:mainKey, slug:mainSlug});
+    ordered.forEach(r=> list.push({category:'rider', id:r.id, slug:r.slug}));
+    return list;
   }
 
-  function buildCaption(entry,indexInGroup){
-    if (entry.category==='main') {
+  function caption(entry,i){
+    if(entry.category==='main'){
       const sel = document.getElementById('main-product');
       const txt = sel?.options[sel.selectedIndex]?.text || 'Sản phẩm chính';
-      return `${txt} - ${String(indexInGroup).padStart(2,'0')}`;
+      return `${txt} - ${String(i).padStart(2,'0')}`;
     }
-    // rider
-    const nice = CFG.products.riderNiceName[entry.id] || entry.id;
-    return `${nice} - ${String(indexInGroup).padStart(2,'0')}`;
+    return `${CFG.products.riderNiceName[entry.id]||entry.id} - ${String(i).padStart(2,'0')}`;
   }
 
-  /* ---------- Tải block ảnh cho 1 slug ---------- */
-  async function loadImagesFor(entry, grid){
-    let found = 0;
-    for (let i=1;i<=CFG.products.max;i++){
+  async function loadImages(entry, grid){
+    let found=0;
+    for(let i=1;i<=CFG.products.max;i++){
       const base = `${CFG.products.base}/${entry.slug}/${CFG.products.file(entry.slug,i)}`;
-      /* eslint-disable no-await-in-loop */
       const url = await firstExisting(base, CFG.products.exts);
-      if (url){
+      if(url){
         found++;
-        const cap = buildCaption(entry, i);
+        const cap = caption(entry,i);
         grid.appendChild(figure(url, cap));
         LB_STATE.items.push({src:url, cap});
       }
     }
     if(!found){
-      const note = document.createElement('div');
+      const note=document.createElement('div');
       note.style.cssText='font-size:12px;color:#666;font-style:italic;';
-      note.textContent = `(Chưa có ảnh cho slug "${entry.slug}" – thêm file: ${entry.slug}-01.jpg)`;
+      note.textContent=`(Chưa có ảnh cho "${entry.slug}" – thêm ${entry.slug}-01.jpg)`;
       grid.appendChild(note);
     }
   }
 
-  /* ---------- Xây gallery Công ty ---------- */
-  async function buildCompany(modalCont){
-    modalCont.querySelector('#'+CFG.company.id)?.remove();
-    const {box,grid} = makeWrapper(CFG.company.id, CFG.company.title);
+  async function buildCompany(container){
+    container.querySelector('#'+CFG.company.id)?.remove();
+    const {box,grid}=makeWrapper(CFG.company.id, CFG.company.title);
     let found=0;
-    for (let i=1;i<=CFG.company.max;i++){
+    for(let i=1;i<=CFG.company.max;i++){
       const base = `${CFG.company.base}/${CFG.company.file(i)}`;
-      /* eslint-disable no-await-in-loop */
       const url = await firstExisting(base, CFG.products.exts);
-      if (url){
+      if(url){
         found++;
         const cap = CFG.company.name(i);
         grid.appendChild(figure(url, cap));
@@ -4150,72 +4119,106 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
       }
     }
     if(!found){
-      const note = document.createElement('div');
+      const note=document.createElement('div');
       note.style.cssText='font-size:12px;color:#666;font-style:italic;';
-      note.textContent='(Chưa có ảnh công ty – tạo: images/company/company-01.jpg)';
+      note.textContent='(Chưa có ảnh công ty – tạo images/company/company-01.jpg)';
       grid.appendChild(note);
     }
-    insertBeforeSection1(modalCont, box);
+    beforeSection1(container, box);
+    console.log('[Gallery] Company done, found =', found);
   }
 
-  /* ---------- Xây gallery Sản phẩm + Riders ---------- */
-  async function buildProductsAndRiders(modalCont){
-    const blockId = 'product-and-rider-gallery';
-    modalCont.querySelector('#'+blockId)?.remove();
-
-    const entries = buildOrderedSlugList();
-    if (!entries.length){
-      return; // không có sản phẩm
+  async function buildMainAndRiders(container){
+    const blockId='product-and-rider-gallery';
+    container.querySelector('#'+blockId)?.remove();
+    const entries = buildOrderedEntries();
+    console.log('[Gallery] Entries:', entries);
+    if(!entries.length){
+      console.log('[Gallery] Không có entries (có thể chưa chọn sản phẩm chính).');
+      return;
     }
-    const {box,grid} = makeWrapper(blockId, 'Tài liệu minh họa sản phẩm & quyền lợi bổ sung');
-
-    // Mỗi slug 1 nhóm header (nếu muốn tách nhóm rõ ràng)
-    for (const entry of entries){
-      const subWrap = document.createElement('div');
-      subWrap.style.cssText='border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:18px;background:#fdfdfd;';
-      const h = document.createElement('h4');
+    const {box,grid}=makeWrapper(blockId,'Tài liệu minh họa sản phẩm & quyền lợi bổ sung');
+    for(const entry of entries){
+      const wrap=document.createElement('div');
+      wrap.style.cssText='border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:18px;background:#fdfdfd;';
+      const h=document.createElement('h4');
       h.style.cssText='margin:0 0 10px;font-size:15px;font-weight:600;color:#111;';
       h.textContent = (entry.category==='main')
         ? (document.getElementById('main-product')?.options[document.getElementById('main-product').selectedIndex]?.text || 'Sản phẩm chính')
-        : (CFG.products.riderNiceName[entry.id] || entry.id);
-      const innerGrid = document.createElement('div');
-      innerGrid.style.cssText='display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));';
-
-      subWrap.appendChild(h);
-      subWrap.appendChild(innerGrid);
-      grid.appendChild(subWrap);
-      await loadImagesFor(entry, innerGrid);
+        : (CFG.products.riderNiceName[entry.id]||entry.id);
+      const inner=document.createElement('div');
+      inner.style.cssText='display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));';
+      wrap.appendChild(h); wrap.appendChild(inner);
+      grid.appendChild(wrap);
+      await loadImages(entry, inner);
     }
-    insertAfterSection3(modalCont, box);
+    afterSection3(container, box);
+    console.log('[Gallery] Product/Riders done. Total images =', LB_STATE.items.length);
   }
 
   async function rebuildGalleries(){
-    const cont = document.getElementById('summary-content-container');
-    if(!cont) return;
-    // reset items (lightbox)
-    LB_STATE.items = [];
-    await buildCompany(cont);
-    await buildProductsAndRiders(cont);
+    try{
+      const c = document.getElementById('summary-content-container');
+      if(!c){ console.warn('[Gallery] Không thấy #summary-content-container'); return; }
+      LB_STATE.items=[];
+      await buildCompany(c);
+      await buildMainAndRiders(c);
+      if(!LB_STATE.items.length){
+        console.warn('[Gallery] Không có ảnh nào được load.');
+      } else {
+        console.log('[Gallery] Hoàn tất. Items =', LB_STATE.items);
+      }
+    }catch(e){
+      console.error('[Gallery] rebuild lỗi:', e);
+    }
   }
 
-  function bind(){
-    const btn = document.getElementById('view-summary-btn');
-    if(!btn) return;
+  function bindButton(){
+    const btn=document.getElementById('view-summary-btn');
+    if(!btn){ console.warn('[Gallery] Không thấy nút view-summary-btn'); return; }
     if(btn.dataset._galleryBound) return;
     btn.dataset._galleryBound='1';
     btn.addEventListener('click', ()=>{
-      // generateSummaryTable chạy đồng bộ; chờ DOM render xong
-      setTimeout(()=>rebuildGalleries(), 40);
+      // gọi muộn hơn chút để bảng tóm tắt chắc chắn render
+      setTimeout(()=>rebuildGalleries(), 120);
     });
+    console.log('[Gallery] Đã bind nút (click).');
+  }
+
+  // Cho phép gọi thủ công bất cứ lúc nào (sau khi modal mở)
+  window.__rebuildGallery = rebuildGalleries;
+  window.__forceGallery = () => {
+    const modal=document.getElementById('summary-modal');
+    if(modal && modal.classList.contains('hidden')){
+      modal.classList.remove('hidden');
+    }
+    rebuildGalleries();
+  };
+
+  // Hook vào generateSummaryTable nếu có
+  const origGen = window.generateSummaryTable;
+  if(typeof origGen === 'function' && !origGen._galleryHooked){
+    window.generateSummaryTable = function(){
+      const r = origGen.apply(this, arguments);
+      // Dù trả về false (validation fail) vẫn thử nếu modal đã mở
+      setTimeout(()=> {
+        if (document.getElementById('summary-modal') && !document.getElementById('summary-modal').classList.contains('hidden')) {
+          rebuildGalleries();
+        } else {
+          console.log('[Gallery] Modal chưa mở – bỏ qua rebuild.');
+        }
+      }, 80);
+      return r;
+    };
+    window.generateSummaryTable._galleryHooked = true;
+    console.log('[Gallery] Hook generateSummaryTable thành công.');
+  } else {
+    console.log('[Gallery] Không hook generateSummaryTable (có thể chưa khai báo).');
   }
 
   document.addEventListener('DOMContentLoaded', ()=>{
     initLightbox();
-    bind();
+    bindButton();
+    console.log('[Gallery] V2.1 init DOMContentLoaded');
   });
-
-  // Expose để test thủ công trong console: __rebuildGallery()
-  window.__rebuildGallery = rebuildGalleries;
-
-  console.info('[Gallery V2] Loaded: company + main + unique riders.');
 })();
