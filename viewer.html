@@ -146,6 +146,71 @@
       body { background:#fff; }
       .viewer-image-block figure { page-break-inside:avoid; }
     }
+    #summary-wrapper {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #222;
+  line-height: 1.5;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 20px;
+}
+
+#summary-wrapper h3 {
+  font-weight: 700;
+  margin-top: 40px;
+  margin-bottom: 12px;
+  font-size: 1.2rem;
+  color: #b91c1c; /* đỏ đậm */
+}
+
+#summary-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #ddd;
+  margin-bottom: 24px;
+  font-size: 14px;
+  background: #fff;
+}
+
+#summary-wrapper th, 
+#summary-wrapper td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  vertical-align: top;
+  text-align: left;
+}
+
+#summary-wrapper th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  color: #444;
+}
+
+#summary-wrapper tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+#summary-wrapper strong {
+  font-weight: 600;
+}
+
+#summary-wrapper .text-red-600 {
+  color: #b91c1c;
+}
+
+/* Căn chỉnh số liệu sang phải */
+#summary-wrapper td:nth-child(n+4),
+#summary-wrapper th:nth-child(n+4) {
+  text-align: right;
+}
+
+#summary-wrapper p {
+  font-size: 13px;
+  color: #666;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
   </style>
 </head>
 <body>
