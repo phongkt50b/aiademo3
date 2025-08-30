@@ -4221,4 +4221,111 @@ console.info('[BenefitMatrixPatch] v3.2 applied.');
     bindButton();
     console.log('[Gallery] V2.1 init DOMContentLoaded');
   });
+    /* ====== SHARE VIEWER PAYLOAD (Phương án C2) ====== */
+(function(){
+  // Mapping sản phẩm chính -> slug thư mục ảnh sản phẩm
+  const PRODUCT_SLUG_MAP = {
+    PUL_TRON_DOI: 'khoe-tron-ven',
+    PUL_15NAM: 'khoe-tron-ven',
+    PUL_5NAM: 'khoe-tron-ven',
+    KHOE_BINH_AN: 'khoe-binh-an',
+    VUNG_TUONG_LAI: 'vung-tuong-lai',
+    TRON_TAM_AN: 'tron-tam-an',
+    AN_BINH_UU_VIET: 'an-binh-uu-viet'
+  };
+  // Mapping rider -> slug thư mục ảnh
+  const RIDER_SLUG_MAP = {
+    health_scl: 'bung-gia-luc',
+    bhn: 'benh-hiem-ngheo-20',
+    accident: 'tai-nan',
+    hospital_support: 'ho-tro-vien-phi'
+  };
+
+  function buildViewerPayload() {
+    // Cập nhật state nội bộ
+    if (typeof updateStateFromUI === 'function') updateStateFromUI();
+    if (typeof performCalculations === 'function') {
+      appState.fees = performCalculations(appState);
+    }
+    const mainKey = appState.mainProduct.key;
+    const mainPerson = appState.mainPerson || {};
+    const paymentTerm = appState.mainProduct.paymentTerm || (
+      mainKey === 'TRON_TAM_AN' ? 10 :
+      mainKey === 'AN_BINH_UU_VIET' ? parseInt(document.getElementById('abuv-term')?.value || '0',10) :
+      0
+    );
+
+    // Riders chính của người chính (đủ cho viewer)
+    const riderList = [];
+    const suppObj = mainPerson.supplements || {};
+    Object.keys(suppObj).forEach(rid => {
+      riderList.push({
+        slug: rid,
+        selected: true,
+        stbh: suppObj[rid].stbh || (rid === 'health_scl'
+              ? getHealthSclStbhByProgram(suppObj[rid].program)
+              : 0),
+        program: suppObj[rid].program,
+        scope: suppObj[rid].scope,
+        outpatient: !!suppObj[rid].outpatient,
+        dental: !!suppObj[rid].dental
+      });
+    });
+
+    // Dữ liệu phí đã tính (annual)
+    const baseMain = appState.fees.baseMain || 0;
+    const extra = appState.fees.extra || 0;
+    const totalSupp = appState.fees.totalSupp || 0;
+
+    return {
+      v: 1,
+      companySlug: 'aia-vn',
+      productKey: mainKey,
+      productSlug: PRODUCT_SLUG_MAP[mainKey] || (mainKey||'').toLowerCase(),
+      age: mainPerson.age || 0,
+      gender: mainPerson.gender === 'Nữ' ? 'F' : 'M',
+      sumAssured: (mainKey === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0),
+      paymentFrequency: appState.paymentFrequency,
+      paymentTerm,
+      targetAge: parseInt(document.getElementById('target-age-input')?.value || '0',10) || (mainPerson.age + paymentTerm - 1),
+      premiums: {
+        baseMain,
+        extra,
+        totalSupp,
+        riders: riderList
+      }
+      // Không đưa tên, ngày sinh, nghề nghiệp → ẩn thông tin nhạy cảm
+    };
+  }
+
+  function openFullViewer() {
+    try {
+      const payload = buildViewerPayload();
+      // Chuẩn hóa tối thiểu
+      if (!payload.productKey) {
+        alert('Chưa chọn sản phẩm chính.');
+        return;
+      }
+      const json = JSON.stringify(payload);
+      const b64 = btoa(unescape(encodeURIComponent(json)));
+      const url = `${location.origin}/viewer.html#v=${b64}`;
+      window.open(url, '_blank', 'noopener');
+    } catch(e) {
+      console.error('[FullViewer] Lỗi tạo payload:', e);
+      alert('Không tạo được dữ liệu chia sẻ.');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('btnFullViewer');
+    if (btn && !btn.dataset._bindFullViewer) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openFullViewer();
+      });
+      btn.dataset._bindFullViewer = '1';
+    }
+  });
+})();
+
 })();
