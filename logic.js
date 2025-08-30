@@ -4247,126 +4247,135 @@ window.__DISABLE_SUMMARY_GALLERY = true;
     accident: 'tai-nan',
     hospital_support: 'ho-tro-vien-phi'
   };
-
-   function buildViewerPayload() {
-    if (typeof updateStateFromUI === 'function') updateStateFromUI();
-    if (typeof performCalculations === 'function') {
-      appState.fees = performCalculations(appState);
-    }
-
-    const mainKey = appState.mainProduct.key;
-    const mainPerson = appState.mainPerson || {};
-
-    // Xác định paymentTerm cuối
-    let paymentTermFinal = appState.mainProduct.paymentTerm || 0;
-    if (mainKey === 'TRON_TAM_AN') paymentTermFinal = 10;
-    if (mainKey === 'AN_BINH_UU_VIET') {
-      paymentTermFinal = parseInt(document.getElementById('abuv-term')?.value || '0', 10) || paymentTermFinal;
-    }
-
-    // Riders người chính
-    const riderList = [];
-    const suppObj = mainPerson.supplements || {};
-    Object.keys(suppObj).forEach(rid => {
-      const suppConfig = suppObj[rid];
-      const premiumDetail = (appState.fees.byPerson?.[mainPerson.id]?.suppDetails?.[rid]) || 0;
-      riderList.push({
-        slug: rid,
-        selected: true,
-        stbh: suppConfig.stbh || (rid === 'health_scl'
-              ? getHealthSclStbhByProgram(suppConfig.program)
-              : 0),
-        program: suppConfig.program,
-        scope: suppConfig.scope,
-        outpatient: !!suppConfig.outpatient,
-        dental: !!suppConfig.dental,
-        premium: premiumDetail
-      });
-    });
-
-    // MDP3 (nếu có)
-    let mdp3Obj = null;
-    if (window.MDP3 && MDP3.isEnabled && MDP3.isEnabled()) {
-      const premium = MDP3.getPremium ? MDP3.getPremium() : 0;
-      const selId = MDP3.getSelectedId ? MDP3.getSelectedId() : null;
-      if (premium > 0 && selId) {
-        let selectedName = '';
-        let selectedAge = '';
-        if (selId === 'other') {
-          const form = document.getElementById('person-container-mdp3-other');
-          if (form) {
-            const info = collectPersonData(form, false);
-            selectedName = info?.name || 'Người khác';
-            selectedAge = info?.age || '';
-          }
-        } else {
-          const container = document.getElementById(selId);
-            if (container) {
-            const info = collectPersonData(container, false);
-            selectedName = info?.name || 'NĐBH bổ sung';
-            selectedAge = info?.age || '';
-          }
+    function __exportExactSummaryHtml() {
+      try {
+        if (typeof runWorkflow === 'function') runWorkflow();
+        if (typeof buildSummaryData !== 'function') return '';
+        const data = buildSummaryData();
+        const introHtml  = (typeof buildIntroSection === 'function') ? buildIntroSection(data) : '';
+        const part1Html  = (typeof buildPart1Section === 'function') ? buildPart1Section(data) : '';
+        const part2Html  = (typeof buildPart2BenefitsSection === 'function') ? buildPart2BenefitsSection(data) : '';
+        // Phần 3 có thể là buildPart3ScheduleSection hoặc buildPart2Section tuỳ patch
+        let part3Html = '';
+        if (typeof buildPart3ScheduleSection === 'function') {
+          part3Html = buildPart3ScheduleSection(data);
+        } else if (typeof buildPart2Section === 'function') {
+          part3Html = buildPart2Section(data).replace(/Phần\s*2\s*·\s*Bảng phí/i,'Phần 3 · Bảng phí');
         }
-        mdp3Obj = {
-          selectedId: selId,
-          premium,
-          selectedName,
-          selectedAge
-        };
-        // Thêm vào riderList để hiển thị đồng bộ
-        riderList.push({
-          slug: 'mdp3',
-          selected: true,
-          stbh: 0,
-          premium
-        });
+        const footerHtml = (typeof buildFooterSection === 'function') ? buildFooterSection(data) : '';
+        return introHtml + part1Html + part2Html + part3Html + footerHtml;
+      } catch(e){
+        console.error('[__exportExactSummaryHtml] lỗi:', e);
+        return '<div style="color:red">Lỗi dựng summaryHtml</div>';
       }
     }
-
-    // Dữ liệu phí (annual)
-    const baseMain = appState.fees.baseMain || 0;
-    const extra = appState.fees.extra || 0;
-    const totalSupp = appState.fees.totalSupp || 0;
-
-    const targetAgeInputVal = parseInt(document.getElementById('target-age-input')?.value || '0',10);
-    const targetAge = targetAgeInputVal || ( (mainPerson.age||0) + paymentTermFinal - 1 );
-
-    return {
-      v: 2,
-      companySlug: 'aia-vn',
-      productKey: mainKey,
-      productSlug: (function(){
-        const PRODUCT_SLUG = {
-          PUL_TRON_DOI:'khoe-tron-ven',
-          PUL_15NAM:'khoe-tron-ven',
-          PUL_5NAM:'khoe-tron-ven',
-          KHOE_BINH_AN:'khoe-binh-an',
-          VUNG_TUONG_LAI:'vung-tuong-lai',
-          TRON_TAM_AN:'tron-tam-an',
-          AN_BINH_UU_VIET:'an-binh-uu-viet'
-        };
-        return PRODUCT_SLUG[mainKey] || (mainKey||'').toLowerCase();
-      })(),
-      // Thông tin cá nhân đầy đủ
-      mainPersonName: mainPerson.name || '',
-      mainPersonDob: mainPerson.dob || '',
-      mainPersonAge: mainPerson.age || 0,
-      mainPersonGender: mainPerson.gender === 'Nữ' ? 'F' : 'M',
-      mainPersonRiskGroup: mainPerson.riskGroup,
-      sumAssured: (mainKey === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0),
-      paymentFrequency: appState.paymentFrequency,
-      paymentTerm: appState.mainProduct.paymentTerm,
-      paymentTermFinal,
-      targetAge,
-      premiums: {
-        baseMain,
-        extra,
-        totalSupp,
-        riders: riderList
-      },
-      mdp3: mdp3Obj
-    };
+function buildViewerPayload() {
+  if (typeof updateStateFromUI === 'function') updateStateFromUI();
+  if (typeof performCalculations === 'function') {
+    appState.fees = performCalculations(appState);
   }
+
+  const mainKey = appState.mainProduct.key;
+  const mainPerson = appState.mainPerson || {};
+
+  // Xác định paymentTerm sau cùng
+  let paymentTermFinal = appState.mainProduct.paymentTerm || 0;
+  if (mainKey === 'TRON_TAM_AN') paymentTermFinal = 10;
+  if (mainKey === 'AN_BINH_UU_VIET') {
+    paymentTermFinal = parseInt(document.getElementById('abuv-term')?.value || '0', 10) || paymentTermFinal;
+  }
+
+  // Riders người chính
+  const riderList = [];
+  const suppObj = mainPerson.supplements || {};
+  Object.keys(suppObj).forEach(rid => {
+    const data = suppObj[rid];
+    const premiumDetail = (appState.fees.byPerson?.[mainPerson.id]?.suppDetails?.[rid]) || 0;
+    riderList.push({
+      slug: rid,
+      selected: true,
+      stbh: data.stbh || (rid === 'health_scl' ? getHealthSclStbhByProgram(data.program) : 0),
+      program: data.program,
+      scope: data.scope,
+      outpatient: !!data.outpatient,
+      dental: !!data.dental,
+      premium: premiumDetail
+    });
+  });
+
+  // MDP3
+  let mdp3Obj = null;
+  if (window.MDP3 && MDP3.isEnabled && MDP3.isEnabled()) {
+    const premium = MDP3.getPremium ? MDP3.getPremium() : 0;
+    const selId = MDP3.getSelectedId ? MDP3.getSelectedId() : null;
+    if (premium > 0 && selId) {
+      let selectedName = '', selectedAge = '';
+      if (selId === 'other') {
+        const form = document.getElementById('person-container-mdp3-other');
+        if (form) {
+          const info = collectPersonData(form, false);
+          selectedName = info?.name || 'Người khác';
+          selectedAge  = info?.age || '';
+        }
+      } else {
+        const cont = document.getElementById(selId);
+        if (cont) {
+          const info = collectPersonData(cont, false);
+          selectedName = info?.name || 'NĐBH bổ sung';
+          selectedAge  = info?.age || '';
+        }
+      }
+      mdp3Obj = { selectedId: selId, premium, selectedName, selectedAge };
+      riderList.push({ slug:'mdp3', selected:true, stbh:0, premium });
+    }
+  }
+
+  // Phí
+  const baseMain = appState.fees.baseMain || 0;
+  const extra    = appState.fees.extra || 0;
+  const totalSupp= appState.fees.totalSupp || 0;
+  const targetAgeInputVal = parseInt(document.getElementById('target-age-input')?.value || '0', 10);
+  const targetAge = targetAgeInputVal || ((mainPerson.age||0) + paymentTermFinal - 1);
+
+  // Tạo summaryHtml nguyên văn
+  const summaryHtml = __exportExactSummaryHtml();
+
+  const PRODUCT_SLUG = {
+    PUL_TRON_DOI:'khoe-tron-ven',
+    PUL_15NAM:'khoe-tron-ven',
+    PUL_5NAM:'khoe-tron-ven',
+    KHOE_BINH_AN:'khoe-binh-an',
+    VUNG_TUONG_LAI:'vung-tuong-lai',
+    TRON_TAM_AN:'tron-tam-an',
+    AN_BINH_UU_VIET:'an-binh-uu-viet'
+  };
+
+  return {
+    v:3,
+    productKey: mainKey,
+    productSlug: PRODUCT_SLUG[mainKey] || (mainKey||'').toLowerCase(),
+    mainPersonName: mainPerson.name || '',
+    mainPersonDob: mainPerson.dob || '',
+    mainPersonAge: mainPerson.age || 0,
+    mainPersonGender: mainPerson.gender === 'Nữ' ? 'F':'M',
+    mainPersonRiskGroup: mainPerson.riskGroup,
+    sumAssured: (mainKey === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0),
+    paymentFrequency: appState.paymentFrequency,
+    paymentTerm: appState.mainProduct.paymentTerm,
+    paymentTermFinal,
+    targetAge,
+    premiums: {
+      baseMain,
+      extra,
+      totalSupp,
+      riders: riderList
+    },
+    mdp3: mdp3Obj,
+    summaryHtml
+  };
+}
+
+   
  
  function openFullViewer() {
   try {
