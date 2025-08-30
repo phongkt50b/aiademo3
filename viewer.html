@@ -93,44 +93,51 @@
     }
     .note {
       font-size:12px;
-      color:#666;
+      color:#444;
       margin-top:4px;
       margin-bottom:20px;
+      background:#fff;
+      padding:8px 10px;
+      border:1px solid #eee;
+      border-radius:4px;
+      line-height:1.4;
     }
-    /* GALLERY */
+
+    /* GALLERY (KHÔNG tiêu đề & KHÔNG caption) */
     .gallery-block {
-      margin:56px 0;
+      margin:40px 0;
     }
-    .gallery-block h2 {
-      font-size:18px;
-      margin:0 0 24px;
-      font-weight:600;
-      color:#222;
-      border-bottom:2px solid #eee;
-      padding-bottom:8px;
+    .gallery-list {
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
     }
     .gallery-list figure {
-      margin:0 0 32px;
+      margin:0;
+      padding:8px;
+      background:#fff;
+      border:1px solid #e5e5e5;
+      border-radius:8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:140px;
+      cursor:zoom-in;
+      transition:box-shadow .2s, transform .2s;
+    }
+    .gallery-list figure:hover {
+      box-shadow:0 4px 14px rgba(0,0,0,.12);
+      transform:translateY(-2px);
     }
     .gallery-list img {
       width:100%;
       height:auto;
       display:block;
-      background:#f0f0f0;
-      border:1px solid #e5e5e5;
-      border-radius:4px;
-      cursor:zoom-in;
-      transition:box-shadow .2s;
+      object-fit:contain;
+      max-height:220px;
     }
-    .gallery-list img:hover {
-      box-shadow:0 4px 16px rgba(0,0,0,.15);
-    }
-    .gallery-list figcaption {
-      font-size:12px;
-      text-align:center;
-      margin-top:6px;
-      color:#444;
-    }
+    .gallery-list figcaption { display:none !important; }
+
     /* LIGHTBOX */
     #lightboxOverlay {
       position:fixed;
@@ -169,7 +176,31 @@
       user-select:none;
       line-height:1;
     }
-    /* STATUS / LOADING */
+    .lb-nav {
+      position:fixed;
+      top:50%;
+      transform:translateY(-50%);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .lb-prev, .lb-next {
+      background:rgba(255,255,255,.15);
+      border:none;
+      color:#fff;
+      font-size:32px;
+      width:52px;
+      height:52px;
+      border-radius:50%;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:background .2s;
+    }
+    .lb-prev:hover, .lb-next:hover { background:rgba(255,255,255,.3); }
+
+    /* STATUS */
     .status {
       font-size:14px;
       color:#555;
@@ -188,24 +219,14 @@
     }
     @keyframes spin { to { transform:rotate(360deg); } }
     .hidden { display:none !important; }
+
     /* PRINT */
     @media print {
       header, #lightboxOverlay { display:none !important; }
-      body {
-        background:#fff;
-      }
-      .gallery-block h2 {
-        page-break-after:avoid;
-      }
-      .gallery-block {
-        page-break-after:always;
-      }
-      table {
-        font-size:11px;
-      }
-      .note {
-        font-size:10px;
-      }
+      body { background:#fff; }
+      .gallery-block { page-break-after:always; }
+      table { font-size:11px; }
+      .note { font-size:10px; }
     }
   </style>
 </head>
@@ -222,20 +243,25 @@
   <main id="mainContent">
     <div id="status" class="status">Đang đọc dữ liệu...</div>
     <div id="feeSection"></div>
+    <!-- GALLERY (ảnh công ty + ảnh sản phẩm + ảnh riders) -->
     <div id="galleryAnchor"></div>
   </main>
 
   <!-- LIGHTBOX -->
   <div id="lightboxOverlay">
     <span class="close-btn" aria-label="Đóng">×</span>
+    <button class="lb-prev lb-nav" style="left:30px;">‹</button>
     <img src="" alt="Preview">
+    <button class="lb-next lb-nav" style="right:30px;">›</button>
   </div>
 
   <script>
     (function(){
       const state = {
         payload:null,
-        galleryBuilt:false
+        galleryBuilt:false,
+        lightboxItems:[],
+        lbIndex:0
       };
 
       const PRODUCT_NAME_MAP = {
@@ -251,7 +277,8 @@
         health_scl:'Sức khỏe Bùng Gia Lực',
         bhn:'Bệnh hiểm nghèo 2.0',
         accident:'Bảo hiểm Tai nạn',
-        hospital_support:'Hỗ trợ chi phí nằm viện'
+        hospital_support:'Hỗ trợ chi phí nằm viện',
+        mdp3:'Miễn đóng phí 3.0'
       };
 
       function decodePayload() {
@@ -271,22 +298,27 @@
         c.innerHTML = '';
         const wrap = document.createElement('div');
 
-        // Heading phần 3
-          const h2 = document.createElement('h2');
-          h2.className = 'section-title';
-          h2.textContent = 'Phần 3 · Bảng phí bảo hiểm (dạng chia sẻ)';
-          wrap.appendChild(h2);
+        const h2 = document.createElement('h2');
+        h2.className = 'section-title';
+        h2.textContent = 'Phần 3 · Bảng phí bảo hiểm (dạng chia sẻ)';
+        wrap.appendChild(h2);
 
         const note = document.createElement('div');
         note.className = 'note';
         note.innerHTML = `
-          Sản phẩm chính: <strong>${PRODUCT_NAME_MAP[p.productKey] || p.productKey}</strong>
-          | Tuổi NĐBH chính: ${p.age}
-          | Giới tính: ${p.gender === 'F' ? 'Nữ' : 'Nam'}
-          | STBH: ${formatNumber(p.sumAssured)} đ
-          | Kỳ đóng: ${p.paymentFrequency}
-          | Minh họa đến tuổi: ${p.targetAge}
-          <br>Thông tin cá nhân đã được ẩn để bảo mật.`;
+          <strong>THÔNG TIN CHÍNH</strong><br>
+          Họ tên NĐBH chính: <b>${p.mainPersonName || '—'}</b>
+          &nbsp;|&nbsp; Ngày sinh: ${p.mainPersonDob || '—'}
+          &nbsp;|&nbsp; Tuổi: ${p.mainPersonAge}
+          &nbsp;|&nbsp; Giới tính: ${p.mainPersonGender === 'F' ? 'Nữ' : 'Nam'}
+          &nbsp;|&nbsp; Nghề (nhóm rủi ro): ${p.mainPersonRiskGroup ?? '—'}<br>
+          Sản phẩm chính: <b>${PRODUCT_NAME_MAP[p.productKey] || p.productKey}</b>
+          &nbsp;|&nbsp; STBH: ${formatNumber(p.sumAssured)} đ
+          &nbsp;|&nbsp; Kỳ đóng: ${p.paymentFrequency}
+          &nbsp;|&nbsp; Thời hạn đóng phí: ${p.paymentTermFinal || p.paymentTerm || '—'} năm
+          &nbsp;|&nbsp; Minh họa đến tuổi: ${p.targetAge}
+          ${p.mdp3 && p.mdp3.premium ? `<br><i>Đang có quyền lợi miễn đóng phí 3.0: ${formatNumber(p.mdp3.premium)} đ/năm (Người được miễn: ${p.mdp3.selectedName || '—'} - tuổi ${p.mdp3.selectedAge||'?'})</i>`:''}
+        `;
         wrap.appendChild(note);
 
         const tbl = document.createElement('table');
@@ -304,56 +336,59 @@
           <tbody></tbody>`;
         const tbody = tbl.querySelector('tbody');
 
-        // Ta giả định phí năm không thay đổi (đã tính tại thời điểm chia sẻ)
         const base = p.premiums.baseMain || 0;
         const extra = p.premiums.extra || 0;
-        const ridersAnnual = (p.premiums.totalSupp || 0);
-        const maxYears = Math.max(1, Math.min( (p.targetAge - p.age + 1), 30) ); // giới hạn 30 dòng cho gọn
+        const ridersAnnual = p.premiums.totalSupp || 0;
+        const maxYears = Math.max(1, Math.min((p.targetAge - p.mainPersonAge + 1), 30));
         for (let y=1; y<=maxYears; y++){
           const tr = document.createElement('tr');
-          const curAge = p.age + y - 1;
-          tr.innerHTML = `
-            <td>${y}</td>
-            <td>${curAge}</td>
-            <td>${formatNumber(base)}</td>
-            <td>${formatNumber(extra)}</td>
-            <td>${formatNumber(ridersAnnual)}</td>
-            <td>${formatNumber(base + extra + ridersAnnual)}</td>
-          `;
-          tbody.appendChild(tr);
+            const curAge = p.mainPersonAge + y - 1;
+            tr.innerHTML = `
+              <td>${y}</td>
+              <td>${curAge}</td>
+              <td>${formatNumber(base)}</td>
+              <td>${formatNumber(extra)}</td>
+              <td>${formatNumber(ridersAnnual)}</td>
+              <td>${formatNumber(base + extra + ridersAnnual)}</td>
+            `;
+            tbody.appendChild(tr);
         }
         wrap.appendChild(tbl);
 
-        // Breakdown riders (nếu có)
+        // Chi tiết Riders
         if (Array.isArray(p.premiums.riders) && p.premiums.riders.length){
           const h3 = document.createElement('h3');
           h3.style.margin = '0 0 12px';
           h3.style.fontSize = '16px';
           h3.style.fontWeight = '600';
-          h3.textContent = 'Chi tiết sản phẩm bổ sung (năm):';
+          h3.textContent = 'Chi tiết sản phẩm bổ sung (phí năm):';
           wrap.appendChild(h3);
 
           const tbl2 = document.createElement('table');
           tbl2.innerHTML = `
             <thead>
               <tr>
-                <th>Sản phẩm bổ sung</th>
+                <th>Sản phẩm</th>
                 <th>STBH / Thông số</th>
                 <th>Phí năm</th>
+                <th>Thông tin thêm</th>
               </tr>
             </thead>
             <tbody></tbody>`;
           const tb2 = tbl2.querySelector('tbody');
           p.premiums.riders.forEach(r => {
             if (!r.selected) return;
-            // Ở payload r không có premium riêng; nếu muốn chi tiết phải bổ sung lúc build payload
-            // Tạm để trống hoặc chỉ ước tính theo tổng (không chia). Để chính xác: bạn có thể mở rộng buildViewerPayload ghi phí từng rider.
-            const tr = document.createElement('tr');
             const stbhStr = r.stbh ? formatNumber(r.stbh) : (r.program ? r.program : '—');
+            const tr = document.createElement('tr');
             tr.innerHTML = `
               <td style="text-align:left">${RIDER_NAME_MAP[r.slug] || r.slug}</td>
-              <td>${stbhStr}</td>
-              <td>—</td>
+              <td>${stbhStr}${r.slug==='hospital_support' ? '/ngày':''}</td>
+              <td style="text-align:right">${r.premium?formatNumber(r.premium):'—'}</td>
+              <td style="text-align:left">
+                ${r.slug==='health_scl'
+                  ? `Chương trình: ${r.program || ''}<br>Phạm vi: ${r.scope==='main_global'?'Nước ngoài':'Việt Nam'}${r.outpatient?'<br>Ngoại trú: Có':''}${r.dental?'<br>Nha khoa: Có':''}`
+                  : (r.slug==='bhn' ? (r.stbh?`STBH: ${formatNumber(r.stbh)}`:'') : '')}
+              </td>
             `;
             tb2.appendChild(tr);
           });
@@ -363,56 +398,45 @@
         c.appendChild(wrap);
       }
 
-      /* ---------------- IMAGE LOADING (only .jpg – stop-first-gap – max 10) --------------- */
+      /* ---------- IMAGE HELPERS ---------- */
       async function imageExists(url) {
         try {
           const res = await fetch(url, { method:'HEAD', cache:'no-store' });
           return res.ok;
-        } catch(e){
-          return false;
-        }
+        } catch(e){ return false; }
       }
-
-      async function findImages(basePath, slug, max=10) {
+      async function findImages(basePath, slug, max=30) {
         const list = [];
         for (let i=1;i<=max;i++){
           const num = String(i).padStart(2,'0');
           const url = `${basePath}/${slug}-${num}.jpg`;
-          const ok = await imageExists(url);
-          if (!ok) {
-            if (i === 1) {
-              // Không có ảnh nào
-              break;
-            } else {
-              // Stop-first-gap
-              break;
-            }
+          if (await imageExists(url)) {
+            list.push(url);
+          } else {
+            if (i===1) break;
+            else break;
           }
-          list.push(url);
         }
         return list;
       }
 
-      function buildGallerySection(title, images) {
+      // Bỏ tiêu đề & caption
+      function buildGallerySection(images) {
         if (!images.length) return null;
         const section = document.createElement('section');
         section.className = 'gallery-block';
-        const h2 = document.createElement('h2');
-        h2.textContent = title;
-        section.appendChild(h2);
         const list = document.createElement('div');
         list.className = 'gallery-list';
-        images.forEach((src, idx)=>{
+        images.forEach((src)=>{
           const fig = document.createElement('figure');
           const img = document.createElement('img');
           img.loading = 'lazy';
           img.src = src;
-          img.alt = `${title} - ${String(idx+1).padStart(2,'0')}`;
-          const cap = document.createElement('figcaption');
-          cap.textContent = img.alt;
+          img.alt = '';
           fig.appendChild(img);
-          fig.appendChild(cap);
           list.appendChild(fig);
+          fig.addEventListener('click', ()=>openLightbox(src));
+          state.lightboxItems.push(src);
         });
         section.appendChild(list);
         return section;
@@ -421,24 +445,20 @@
       async function buildGalleries(p) {
         if (state.galleryBuilt) return;
         state.galleryBuilt = true;
-
         const anchor = document.getElementById('galleryAnchor');
         if (!anchor) return;
 
-        // Company gallery (ở đầu trang)
-        const companyImages = await findImages('images/company', 'company', 10);
-        if (companyImages.length) {
-          const sec = buildGallerySection('Hình ảnh Công ty', companyImages);
-          if (sec) {
-            const main = document.getElementById('mainContent');
-            main.insertBefore(sec, main.firstChild.nextSibling); // sau header section-title đầu
-          }
+        // Ảnh công ty (luôn trước)
+        const company = await findImages('images/company', 'company', 30);
+        if (company.length) {
+          const sec = buildGallerySection(company);
+          if (sec) anchor.parentNode.insertBefore(sec, anchor);
         }
 
-        // Product gallery (sau bảng phí)
-        const productImages = await findImages(`images/products/${p.productSlug}`, p.productSlug, 10);
+        // Ảnh sản phẩm chính
+        const productImages = await findImages(`images/products/${p.productSlug}`, p.productSlug, 50);
         if (productImages.length) {
-          const sec = buildGallerySection('Hình ảnh Sản phẩm chính', productImages);
+          const sec = buildGallerySection(productImages);
           if (sec) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
         }
 
@@ -446,17 +466,17 @@
         if (Array.isArray(p.premiums.riders)) {
           for (const r of p.premiums.riders) {
             if (!r.selected) continue;
-            const riderSlug = riderSlugMap(r.slug);
+            const riderSlug = mapRiderSlug(r.slug);
             if (!riderSlug) continue;
-            const imgs = await findImages(`images/products/${riderSlug}`, riderSlug, 10);
+            const imgs = await findImages(`images/products/${riderSlug}`, riderSlug, 50);
             if (!imgs.length) continue;
-            const sec = buildGallerySection(`Hình ảnh Rider: ${RIDER_NAME_MAP[r.slug] || r.slug}`, imgs);
+            const sec = buildGallerySection(imgs);
             if (sec) anchor.parentNode.appendChild(sec);
           }
         }
       }
 
-      function riderSlugMap(slug) {
+      function mapRiderSlug(slug) {
         const map = {
           health_scl:'bung-gia-luc',
           bhn:'benh-hiem-ngheo-20',
@@ -466,32 +486,59 @@
         return map[slug];
       }
 
-      /* ---------------- LIGHTBOX ---------------- */
+      /* ---------- LIGHTBOX ---------- */
       function setupLightbox() {
         const overlay = document.getElementById('lightboxOverlay');
-        const overlayImg = overlay.querySelector('img');
-        function close(){ overlay.classList.remove('active'); overlayImg.src=''; }
-        document.body.addEventListener('click', e=>{
-          if (e.target.matches('.gallery-list img')) {
-            overlayImg.src = e.target.src;
-            overlay.classList.add('active');
-          } else if (e.target === overlay || e.target.classList.contains('close-btn')) {
-            close();
-          }
+        const img = overlay.querySelector('img');
+        const btnPrev = overlay.querySelector('.lb-prev');
+        const btnNext = overlay.querySelector('.lb-next');
+        const closeBtn = overlay.querySelector('.close-btn');
+
+        function show(idx) {
+          if (idx < 0 || idx >= state.lightboxItems.length) return;
+          state.lbIndex = idx;
+          img.src = state.lightboxItems[idx];
+          overlay.classList.add('active');
+          updateNav();
+        }
+        function hide() {
+          overlay.classList.remove('active');
+          img.src = '';
+        }
+        function updateNav() {
+          btnPrev.disabled = (state.lbIndex <= 0);
+          btnNext.disabled = (state.lbIndex >= state.lightboxItems.length - 1);
+        }
+        function shift(d) {
+          const ni = state.lbIndex + d;
+          if (ni >=0 && ni < state.lightboxItems.length) show(ni);
+        }
+
+        btnPrev.addEventListener('click', ()=>shift(-1));
+        btnNext.addEventListener('click', ()=>shift(1));
+        closeBtn.addEventListener('click', hide);
+        overlay.addEventListener('click', e=>{
+          if (e.target === overlay) hide();
         });
         document.addEventListener('keydown', e=>{
-          if (e.key === 'Escape') close();
+          if (!overlay.classList.contains('active')) return;
+          if (e.key === 'Escape') hide();
+          if (e.key === 'ArrowLeft') shift(-1);
+          if (e.key === 'ArrowRight') shift(1);
         });
+
+        window.openLightbox = (src)=>{
+          const idx = state.lightboxItems.indexOf(src);
+          if (idx !== -1) show(idx);
+        };
       }
 
       function setupButtons() {
-        document.getElementById('btnExportPdf').addEventListener('click', ()=>{
-          window.print();
-        });
-        document.getElementById('btnReload').addEventListener('click', ()=>{
-          location.reload();
-        });
+        document.getElementById('btnExportPdf').addEventListener('click', ()=> window.print());
+        document.getElementById('btnReload').addEventListener('click', ()=> location.reload());
       }
+
+      function openLightbox(src){ if (window.openLightbox) window.openLightbox(src); }
 
       async function init() {
         setupButtons();
@@ -502,7 +549,6 @@
           statusEl.textContent = 'Đang dựng bảng phí...';
           buildFeeTable(state.payload);
           statusEl.classList.add('hidden');
-          // Sau khi bảng phí sẵn sàng -> gallery
           await buildGalleries(state.payload);
         } catch(e) {
           console.error(e);
