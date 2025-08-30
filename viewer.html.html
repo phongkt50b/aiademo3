@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Viewer Bảng Phí</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root {
+      --max-width: 1000px;
+      --gap: 24px;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      color-scheme: light;
+    }
+    body {
+      margin:0;
+      background:#fafafa;
+      color:#222;
+      line-height:1.5;
+    }
+    header {
+      background:#fff;
+      border-bottom:1px solid #e5e5e5;
+      position:sticky;
+      top:0;
+      z-index:50;
+    }
+    #toolbar {
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:12px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    #toolbar h1 {
+      margin:0;
+      font-size:18px;
+      font-weight:600;
+    }
+    #toolbar .actions {
+      display:flex;
+      gap:8px;
+    }
+    button {
+      cursor:pointer;
+      background:#d4002a;
+      border:1px solid #d4002a;
+      color:#fff;
+      padding:8px 14px;
+      font-size:14px;
+      border-radius:4px;
+    }
+    button.secondary {
+      background:#f5f5f5;
+      color:#333;
+      border:1px solid #ccc;
+    }
+    main {
+      max-width:var(--max-width);
+      margin:30px auto 80px;
+      padding:0 18px;
+    }
+    h2.section-title {
+      font-size:20px;
+      margin:60px 0 20px;
+      font-weight:600;
+      border-left:5px solid #d4002a;
+      padding-left:12px;
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin:8px 0 32px;
+      font-size:13px;
+      background:#fff;
+    }
+    th, td {
+      border:1px solid #ddd;
+      padding:6px 8px;
+    }
+    th {
+      background:#f2f2f2;
+      text-align:center;
+      font-weight:600;
+    }
+    td {
+      text-align:right;
+    }
+    td:first-child, td:nth-child(2) {
+      text-align:center;
+    }
+    .note {
+      font-size:12px;
+      color:#666;
+      margin-top:4px;
+      margin-bottom:20px;
+    }
+    /* GALLERY */
+    .gallery-block {
+      margin:56px 0;
+    }
+    .gallery-block h2 {
+      font-size:18px;
+      margin:0 0 24px;
+      font-weight:600;
+      color:#222;
+      border-bottom:2px solid #eee;
+      padding-bottom:8px;
+    }
+    .gallery-list figure {
+      margin:0 0 32px;
+    }
+    .gallery-list img {
+      width:100%;
+      height:auto;
+      display:block;
+      background:#f0f0f0;
+      border:1px solid #e5e5e5;
+      border-radius:4px;
+      cursor:zoom-in;
+      transition:box-shadow .2s;
+    }
+    .gallery-list img:hover {
+      box-shadow:0 4px 16px rgba(0,0,0,.15);
+    }
+    .gallery-list figcaption {
+      font-size:12px;
+      text-align:center;
+      margin-top:6px;
+      color:#444;
+    }
+    /* LIGHTBOX */
+    #lightboxOverlay {
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.85);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:40px 30px;
+      z-index:999;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .25s;
+    }
+    #lightboxOverlay.active {
+      opacity:1;
+      pointer-events:auto;
+    }
+    #lightboxOverlay img {
+      max-width:95vw;
+      max-height:95vh;
+      object-fit:contain;
+      border:1px solid #444;
+      background:#111;
+      box-shadow:0 10px 30px rgba(0,0,0,.6);
+      border-radius:4px;
+      cursor:zoom-out;
+    }
+    #lightboxOverlay .close-btn {
+      position:fixed;
+      top:14px;
+      right:22px;
+      font-size:32px;
+      color:#fff;
+      cursor:pointer;
+      user-select:none;
+      line-height:1;
+    }
+    /* STATUS / LOADING */
+    .status {
+      font-size:14px;
+      color:#555;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .status::before {
+      content:"";
+      width:14px;
+      height:14px;
+      border:2px solid #d4002a;
+      border-right-color:transparent;
+      border-radius:50%;
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .hidden { display:none !important; }
+    /* PRINT */
+    @media print {
+      header, #lightboxOverlay { display:none !important; }
+      body {
+        background:#fff;
+      }
+      .gallery-block h2 {
+        page-break-after:avoid;
+      }
+      .gallery-block {
+        page-break-after:always;
+      }
+      table {
+        font-size:11px;
+      }
+      .note {
+        font-size:10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="toolbar">
+      <h1>Bảng minh họa (Viewer)</h1>
+      <div class="actions">
+        <button id="btnExportPdf" title="Xuất PDF">Xuất PDF</button>
+        <button class="secondary" id="btnReload" title="Tải lại">Tải lại</button>
+      </div>
+    </div>
+  </header>
+  <main id="mainContent">
+    <div id="status" class="status">Đang đọc dữ liệu...</div>
+    <div id="feeSection"></div>
+    <div id="galleryAnchor"></div>
+  </main>
+
+  <!-- LIGHTBOX -->
+  <div id="lightboxOverlay">
+    <span class="close-btn" aria-label="Đóng">×</span>
+    <img src="" alt="Preview">
+  </div>
+
+  <script>
+    (function(){
+      const state = {
+        payload:null,
+        galleryBuilt:false
+      };
+
+      const PRODUCT_NAME_MAP = {
+        PUL_TRON_DOI:'Khoẻ trọn vẹn - Trọn đời',
+        PUL_15NAM:'Khoẻ trọn vẹn - 15 năm',
+        PUL_5NAM:'Khoẻ trọn vẹn - 5 năm',
+        KHOE_BINH_AN:'MUL - Khoẻ Bình An',
+        VUNG_TUONG_LAI:'MUL - Vững Tương Lai',
+        TRON_TAM_AN:'Trọn Tâm An',
+        AN_BINH_UU_VIET:'An Bình Ưu Việt'
+      };
+      const RIDER_NAME_MAP = {
+        health_scl:'Sức khỏe Bùng Gia Lực',
+        bhn:'Bệnh hiểm nghèo 2.0',
+        accident:'Bảo hiểm Tai nạn',
+        hospital_support:'Hỗ trợ chi phí nằm viện'
+      };
+
+      function decodePayload() {
+        const h = location.hash;
+        if (!h.startsWith('#v=')) throw new Error('Không có payload (#v=...)');
+        const b64 = h.slice(3);
+        const json = decodeURIComponent(escape(atob(b64)));
+        return JSON.parse(json);
+      }
+
+      function formatNumber(n){
+        return (Number(n)||0).toLocaleString('vi-VN');
+      }
+
+      function buildFeeTable(p) {
+        const c = document.getElementById('feeSection');
+        c.innerHTML = '';
+        const wrap = document.createElement('div');
+
+        // Heading phần 3
+          const h2 = document.createElement('h2');
+          h2.className = 'section-title';
+          h2.textContent = 'Phần 3 · Bảng phí bảo hiểm (dạng chia sẻ)';
+          wrap.appendChild(h2);
+
+        const note = document.createElement('div');
+        note.className = 'note';
+        note.innerHTML = `
+          Sản phẩm chính: <strong>${PRODUCT_NAME_MAP[p.productKey] || p.productKey}</strong>
+          | Tuổi NĐBH chính: ${p.age}
+          | Giới tính: ${p.gender === 'F' ? 'Nữ' : 'Nam'}
+          | STBH: ${formatNumber(p.sumAssured)} đ
+          | Kỳ đóng: ${p.paymentFrequency}
+          | Minh họa đến tuổi: ${p.targetAge}
+          <br>Thông tin cá nhân đã được ẩn để bảo mật.`;
+        wrap.appendChild(note);
+
+        const tbl = document.createElement('table');
+        tbl.innerHTML = `
+          <thead>
+            <tr>
+              <th>Năm HĐ</th>
+              <th>Tuổi</th>
+              <th>Phí SP chính</th>
+              <th>Phí đóng thêm</th>
+              <th>Phí SP bổ sung</th>
+              <th>Tổng phí (năm)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>`;
+        const tbody = tbl.querySelector('tbody');
+
+        // Ta giả định phí năm không thay đổi (đã tính tại thời điểm chia sẻ)
+        const base = p.premiums.baseMain || 0;
+        const extra = p.premiums.extra || 0;
+        const ridersAnnual = (p.premiums.totalSupp || 0);
+        const maxYears = Math.max(1, Math.min( (p.targetAge - p.age + 1), 30) ); // giới hạn 30 dòng cho gọn
+        for (let y=1; y<=maxYears; y++){
+          const tr = document.createElement('tr');
+          const curAge = p.age + y - 1;
+          tr.innerHTML = `
+            <td>${y}</td>
+            <td>${curAge}</td>
+            <td>${formatNumber(base)}</td>
+            <td>${formatNumber(extra)}</td>
+            <td>${formatNumber(ridersAnnual)}</td>
+            <td>${formatNumber(base + extra + ridersAnnual)}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+        wrap.appendChild(tbl);
+
+        // Breakdown riders (nếu có)
+        if (Array.isArray(p.premiums.riders) && p.premiums.riders.length){
+          const h3 = document.createElement('h3');
+          h3.style.margin = '0 0 12px';
+          h3.style.fontSize = '16px';
+          h3.style.fontWeight = '600';
+          h3.textContent = 'Chi tiết sản phẩm bổ sung (năm):';
+          wrap.appendChild(h3);
+
+          const tbl2 = document.createElement('table');
+          tbl2.innerHTML = `
+            <thead>
+              <tr>
+                <th>Sản phẩm bổ sung</th>
+                <th>STBH / Thông số</th>
+                <th>Phí năm</th>
+              </tr>
+            </thead>
+            <tbody></tbody>`;
+          const tb2 = tbl2.querySelector('tbody');
+          p.premiums.riders.forEach(r => {
+            if (!r.selected) return;
+            // Ở payload r không có premium riêng; nếu muốn chi tiết phải bổ sung lúc build payload
+            // Tạm để trống hoặc chỉ ước tính theo tổng (không chia). Để chính xác: bạn có thể mở rộng buildViewerPayload ghi phí từng rider.
+            const tr = document.createElement('tr');
+            const stbhStr = r.stbh ? formatNumber(r.stbh) : (r.program ? r.program : '—');
+            tr.innerHTML = `
+              <td style="text-align:left">${RIDER_NAME_MAP[r.slug] || r.slug}</td>
+              <td>${stbhStr}</td>
+              <td>—</td>
+            `;
+            tb2.appendChild(tr);
+          });
+          wrap.appendChild(tbl2);
+        }
+
+        c.appendChild(wrap);
+      }
+
+      /* ---------------- IMAGE LOADING (only .jpg – stop-first-gap – max 10) --------------- */
+      async function imageExists(url) {
+        try {
+          const res = await fetch(url, { method:'HEAD', cache:'no-store' });
+          return res.ok;
+        } catch(e){
+          return false;
+        }
+      }
+
+      async function findImages(basePath, slug, max=10) {
+        const list = [];
+        for (let i=1;i<=max;i++){
+          const num = String(i).padStart(2,'0');
+          const url = `${basePath}/${slug}-${num}.jpg`;
+          const ok = await imageExists(url);
+          if (!ok) {
+            if (i === 1) {
+              // Không có ảnh nào
+              break;
+            } else {
+              // Stop-first-gap
+              break;
+            }
+          }
+          list.push(url);
+        }
+        return list;
+      }
+
+      function buildGallerySection(title, images) {
+        if (!images.length) return null;
+        const section = document.createElement('section');
+        section.className = 'gallery-block';
+        const h2 = document.createElement('h2');
+        h2.textContent = title;
+        section.appendChild(h2);
+        const list = document.createElement('div');
+        list.className = 'gallery-list';
+        images.forEach((src, idx)=>{
+          const fig = document.createElement('figure');
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.src = src;
+          img.alt = `${title} - ${String(idx+1).padStart(2,'0')}`;
+          const cap = document.createElement('figcaption');
+          cap.textContent = img.alt;
+          fig.appendChild(img);
+          fig.appendChild(cap);
+          list.appendChild(fig);
+        });
+        section.appendChild(list);
+        return section;
+      }
+
+      async function buildGalleries(p) {
+        if (state.galleryBuilt) return;
+        state.galleryBuilt = true;
+
+        const anchor = document.getElementById('galleryAnchor');
+        if (!anchor) return;
+
+        // Company gallery (ở đầu trang)
+        const companyImages = await findImages('/images/company', 'company', 10);
+        if (companyImages.length) {
+          const sec = buildGallerySection('Hình ảnh Công ty', companyImages);
+          if (sec) {
+            const main = document.getElementById('mainContent');
+            main.insertBefore(sec, main.firstChild.nextSibling); // sau header section-title đầu
+          }
+        }
+
+        // Product gallery (sau bảng phí)
+        const productImages = await findImages(`/images/product/${p.productSlug}`, p.productSlug, 10);
+        if (productImages.length) {
+          const sec = buildGallerySection('Hình ảnh Sản phẩm chính', productImages);
+          if (sec) anchor.parentNode.insertBefore(sec, anchor.nextSibling);
+        }
+
+        // Riders
+        if (Array.isArray(p.premiums.riders)) {
+          for (const r of p.premiums.riders) {
+            if (!r.selected) continue;
+            const riderSlug = riderSlugMap(r.slug);
+            if (!riderSlug) continue;
+            const imgs = await findImages(`/images/rider/${riderSlug}`, riderSlug, 10);
+            if (!imgs.length) continue;
+            const sec = buildGallerySection(`Hình ảnh Rider: ${RIDER_NAME_MAP[r.slug] || r.slug}`, imgs);
+            if (sec) anchor.parentNode.appendChild(sec);
+          }
+        }
+      }
+
+      function riderSlugMap(slug) {
+        const map = {
+          health_scl:'bung-gia-luc',
+          bhn:'benh-hiem-ngheo-20',
+          accident:'tai-nan',
+          hospital_support:'ho-tro-vien-phi'
+        };
+        return map[slug];
+      }
+
+      /* ---------------- LIGHTBOX ---------------- */
+      function setupLightbox() {
+        const overlay = document.getElementById('lightboxOverlay');
+        const overlayImg = overlay.querySelector('img');
+        function close(){ overlay.classList.remove('active'); overlayImg.src=''; }
+        document.body.addEventListener('click', e=>{
+          if (e.target.matches('.gallery-list img')) {
+            overlayImg.src = e.target.src;
+            overlay.classList.add('active');
+          } else if (e.target === overlay || e.target.classList.contains('close-btn')) {
+            close();
+          }
+        });
+        document.addEventListener('keydown', e=>{
+          if (e.key === 'Escape') close();
+        });
+      }
+
+      function setupButtons() {
+        document.getElementById('btnExportPdf').addEventListener('click', ()=>{
+          window.print();
+        });
+        document.getElementById('btnReload').addEventListener('click', ()=>{
+          location.reload();
+        });
+      }
+
+      async function init() {
+        setupButtons();
+        setupLightbox();
+        const statusEl = document.getElementById('status');
+        try {
+          state.payload = decodePayload();
+          statusEl.textContent = 'Đang dựng bảng phí...';
+          buildFeeTable(state.payload);
+          statusEl.classList.add('hidden');
+          // Sau khi bảng phí sẵn sàng -> gallery
+          await buildGalleries(state.payload);
+        } catch(e) {
+          console.error(e);
+          statusEl.textContent = 'Không đọc được dữ liệu hoặc link hỏng.';
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', init);
+    })();
+  </script>
+</body>
+</html>
