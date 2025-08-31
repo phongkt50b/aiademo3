@@ -4065,16 +4065,30 @@ function buildViewerPayload() {
     alert('Không tạo được dữ liệu chia sẻ.');
   }
 }
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('btnFullViewer');
+  if (btn && !btn.dataset._bindFullViewer) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
 
+      const errors = (typeof collectSimpleErrors === 'function') ? collectSimpleErrors() : [];
+      if (errors.length) {
+        if (typeof showGlobalErrors === 'function') {
+          showGlobalErrors(errors);
+        }
+        const box = document.getElementById('global-error-box');
+        if (box) {
+          const y = box.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({ top: y < 0 ? 0 : y, behavior: 'smooth' });
+        }
+        return;
+      } else if (typeof showGlobalErrors === 'function') {
+        showGlobalErrors([]);
+      }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('btnFullViewer');
-    if (btn && !btn.dataset._bindFullViewer) {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        openFullViewer();
-      });
-      btn.dataset._bindFullViewer = '1';
-    }
-  });
+      openFullViewer();
+    });
+    btn.dataset._bindFullViewer = '1';
+  }
+});
 })();
