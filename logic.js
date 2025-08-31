@@ -3423,6 +3423,7 @@ const BM_SCHEMAS = [
     benefits:[
       { id:'kba_life', labelBase:'Quyền lợi sinh mệnh', formulaLabel:'100% STBH', valueType:'number', compute:(sa)=>sa },
       { id:'kba_thyroid', labelBase:'TTTBVV do ung thư tuyến giáp - giai đoạn sớm (Tối đa 200 triệu)', formulaLabel:'10% STBH', valueType:'number', compute:(sa)=>sa*0.10, cap:200000000 },
+      { id:'kba_tangcuong', labelBase:'Gia tăng bảo vệ mỗi năm 5% từ năm thứ 2 đến năm thứ 11', formulaLabel:'tối đa 50% STBH', valueType:'number', compute:(sa)=>sa*0.50},      
       { id:'kba_vitality', labelBase:'Thưởng gia tăng bảo vệ AIA Vitality', formulaLabel:'tối đa 30% STBH', valueType:'number', minAge:18, compute:(sa)=>sa*0.30 },
       { id:'kba_no_underw', labelBase:'Tăng số tiền bảo hiểm không cần thẩm định (Tối đa 500 triệu)', formulaLabel:'tối đa 50% STBH', valueType:'number', compute:(sa)=>sa*0.50, cap:500000000 }
     ]
