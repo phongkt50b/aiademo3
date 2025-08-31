@@ -361,6 +361,15 @@
       container.id = 'summary-wrapper';
       container.innerHTML = summaryHtml;
       main.appendChild(container);
+      
+      // --- Thêm đoạn này ---
+      const rows = container.querySelectorAll('tr');
+      rows.forEach(row => {
+        if (/tổng/i.test(row.textContent)) {
+          row.style.fontWeight = '700';
+        }
+      });
+
 
       // 2. Chèn ảnh công ty trước phần 1 (giới hạn 10 ảnh)
       const part1Heading = qa('h3', container).find(h => /Phần\s*1/i.test(h.textContent));
