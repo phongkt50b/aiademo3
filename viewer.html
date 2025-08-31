@@ -202,8 +202,7 @@ main {
 
 /* --- Phần 1: Bảng tóm tắt sản phẩm --- */
 /* Căn phải từ cột 3 (STBH) trở đi */
-#summary-wrapper table:nth-of-type(1) td:nth-child(n+3),
-#summary-wrapper table:nth-of-type(1) th:nth-child(n+3) {
+#summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
   text-align: right;
 }
 
@@ -226,28 +225,19 @@ main {
 }
 
 /* Các cột còn lại căn phải */
-#summary-wrapper table:nth-of-type(2) td:not(:first-child),
-#summary-wrapper table:nth-of-type(2) th:not(:first-child) {
+#summary-wrapper table:nth-of-type(2) td:not(:first-child) {
   text-align: right;
 }
-
-/* Dòng tổng quyền lợi bôi đậm */
-#summary-wrapper table:nth-of-type(2) tr:last-child td {
-  font-weight: 700;
-}
-
 /* --- Phần 3: Bảng phí --- */
 /* Hai cột đầu căn giữa */
 #summary-wrapper table:nth-of-type(3) td:nth-child(1),
-#summary-wrapper table:nth-of-type(3) td:nth-child(2),
-#summary-wrapper table:nth-of-type(3) th:nth-child(1),
-#summary-wrapper table:nth-of-type(3) th:nth-child(2) {
+#summary-wrapper table:nth-of-type(3) td:nth-child(2)
+{
   text-align: center;
 }
 
 /* Các cột còn lại căn phải */
-#summary-wrapper table:nth-of-type(3) td:nth-child(n+3),
-#summary-wrapper table:nth-of-type(3) th:nth-child(n+3) {
+#summary-wrapper table:nth-of-type(3) td:nth-child(n+3) {
   text-align: right;
 }
 
