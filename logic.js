@@ -905,17 +905,30 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
 
     // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
     if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
-        if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-            setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH, '')}`);
-            ok = false;
-        } else { clearFieldError(stbhEl); }
+        // Bổ sung kiểm tra stbh >= 2 tỷ cho PUL_TRON_DOI, PUL_5NAM, PUL_15NAM
+        if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
+            const MIN_STBH = 2000000000; // 2 tỷ
+            if (stbh < MIN_STBH) {
+                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(MIN_STBH, '')}`);
+                ok = false;
+            } else {
+                clearFieldError(stbhEl);
+            }
+        } else {
+            // Kiểm tra stbh tối thiểu theo config cũ
+            if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
+                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH, '')}`);
+                ok = false;
+            } else {
+                clearFieldError(stbhEl);
+            }
+        }
 
         if (basePremium > 0 && basePremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
             setFieldError(document.getElementById('main-stbh') || document.getElementById('main-premium-input'), `Phí chính tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM, '')}`);
             ok = false;
         }
     }
-
     // 2) Kiểm tra thời hạn đóng phí theo từng sản phẩm
     const age = customer?.age || 0;
     const bounds = getPaymentTermBounds(age);
