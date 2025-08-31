@@ -211,20 +211,16 @@ main {
 #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
   text-align: right;
 }
-/* Phần 2: căn trái cột đầu tiên, căn phải các cột còn lại */
-#summary-wrapper table:nth-of-type(2) tr > td:first-child {
-  text-align: left !important;
+/* Dòng tổng cuối cùng của bảng 1 */
+/* Ô đầu tiên căn trái và bôi đậm */
+#summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
+  text-align: left;
+  font-weight: 700;
 }
-#summary-wrapper table:nth-of-type(2) tr > td:not(:first-child) {
-  text-align: right !important;
-}
-/* Phần 3: 2 cột đầu căn giữa, các cột còn lại căn phải */
-#summary-wrapper table:nth-of-type(3) tr > td:nth-child(1),
-#summary-wrapper table:nth-of-type(3) tr > td:nth-child(2) {
-  text-align: center !important;
-}
-#summary-wrapper table:nth-of-type(3) tr > td:nth-child(n+3) {
-  text-align: right !important;
+/* Các ô còn lại căn phải và bôi đậm */
+#summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
+  text-align: right;
+  font-weight: 700;
 }
   </style>
 </head>
