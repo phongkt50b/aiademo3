@@ -205,29 +205,21 @@ main {
 #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
   text-align: right;
 }
-/* --- Phần 2: Tóm tắt quyền lợi sản phẩm --- */
-/* Cột đầu tiên căn trái */
-#summary-wrapper table:nth-of-type(2) td:first-child {
-  text-align: left;
+/* Phần 2: căn trái cột đầu tiên, căn phải các cột còn lại */
+#summary-wrapper table:nth-of-type(2) tr > td:first-child {
+  text-align: left !important;
 }
-
-/* Các cột còn lại căn phải */
-#summary-wrapper table:nth-of-type(2) td:not(:first-child) {
-  text-align: right;
+#summary-wrapper table:nth-of-type(2) tr > td:not(:first-child) {
+  text-align: right !important;
 }
-/* --- Phần 3: Bảng phí --- */
-/* Hai cột đầu căn giữa */
-#summary-wrapper table:nth-of-type(3) td:nth-child(1),
-#summary-wrapper table:nth-of-type(3) td:nth-child(2)
-{
-  text-align: center;
+/* Phần 3: 2 cột đầu căn giữa, các cột còn lại căn phải */
+#summary-wrapper table:nth-of-type(3) tr > td:nth-child(1),
+#summary-wrapper table:nth-of-type(3) tr > td:nth-child(2) {
+  text-align: center !important;
 }
-
-/* Các cột còn lại căn phải */
-#summary-wrapper table:nth-of-type(3) td:nth-child(n+3) {
-  text-align: right;
+#summary-wrapper table:nth-of-type(3) tr > td:nth-child(n+3) {
+  text-align: right !important;
 }
-
   </style>
 </head>
 <body>
