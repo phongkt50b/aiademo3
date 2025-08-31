@@ -371,15 +371,15 @@
       });
 
 
-      // 2. Chèn ảnh công ty trước phần 1 (giới hạn 10 ảnh)
-      const part1Heading = qa('h3', container).find(h => /Phần\s*1/i.test(h.textContent));
+      // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
       const companyImgs = await collectSequentialLimited('images/company','company',10);
       console.log('Company images:', companyImgs);
       const companyBlock = renderImageBlock(companyImgs);
       if(companyBlock){
-        if(part1Heading){
-          container.insertBefore(companyBlock, part1Heading);
+        if(container.parentNode){
+          container.parentNode.insertBefore(companyBlock, container);
         } else {
+          // fallback nếu container chưa có parent
           container.prepend(companyBlock);
         }
       }
