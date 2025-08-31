@@ -2500,9 +2500,9 @@ function buildIntroSection(data) {
   }
 
   return `
-    <div class="mb-4">
+    <div class="mb-4" style="font-size: 14px;">
       <h2 class="text-xl font-bold">BẢNG MINH HỌA PHÍ & QUYỀN LỢI</h2>
-      <div class="text-sm text-gray-700">
+      <div class="text-sm text-gray-700 style="font-size: 14px;"">
         Sản phẩm chính: <strong>${sanitizeHtml(getProductLabel(data.productKey) || data.productKey || '—')}</strong>
         &nbsp;|&nbsp; Kỳ đóng: <strong>${sanitizeHtml(freqLabel)}</strong>
         &nbsp;|&nbsp; Minh họa đến tuổi: <strong>${sanitizeHtml(data.targetAge)}</strong>
@@ -2982,7 +2982,7 @@ function buildPart2Section(data) {
  ********************************************************************/
 function buildFooterSection() {
   return `
-    <div class="mt-6 text-xs text-gray-600 italic">
+    <div class="mt-6 text-xs text-gray-600 italic" style="font-size: 14px;">
       (*) Công cụ này chỉ mang tính chất tham khảo cá nhân, không phải là bảng minh họa chính thức của AIA. Quyền lợi và mức phí cụ thể sẽ được xác nhận trong hợp đồng do AIA phát hành. 
           Vui lòng liên hệ tư vấn viên AIA để được tư vấn chi tiết và nhận bảng minh họa chính thức <!-- Bạn có thể viết lại nội dung này -->
     </div>
