@@ -373,26 +373,40 @@ main {
 
       // <-- Thêm đoạn fix căn chỉnh bảng ở đây -->
       function fixTableAlignments() {
-        const table2 = container.querySelector('table:nth-of-type(2)');
-        if (table2) {
-          table2.querySelectorAll('tbody tr').forEach(tr => {
-            tr.querySelectorAll('td').forEach((td, i) => {
-              if (i === 0) td.style.textAlign = 'left';
+        const tables = container.querySelectorAll('table');
+        if (tables.length === 0) return;
+      
+        // Bảng phần 2 là tất cả bảng từ vị trí bảng thứ 2 đến trước bảng thứ 3
+        // Vì phần 1 là bảng 1, phần 3 là bảng 3, phần 2 là các bảng ở giữa (có thể nhiều bảng)
+        // Nên phần 2 sẽ là bảng thứ 2 (index 1) nếu có 1 bảng, hoặc nhiều bảng từ 1 đến 2 (nếu có 3 bảng)
+        
+        // Cách an toàn: phần 1 = bảng 1 (index 0), phần 3 = bảng cuối cùng (index tables.length - 1),
+        // phần 2 là tất cả bảng nằm giữa (index từ 1 đến tables.length-2)
+        
+        // Căn chỉnh phần 2: cột đầu trái, các cột còn lại phải
+        for(let i=1; i < tables.length - 1; i++) {
+          const table = tables[i];
+          table.querySelectorAll('tbody tr').forEach(tr => {
+            tr.querySelectorAll('td').forEach((td, idx) => {
+              if (idx === 0) td.style.textAlign = 'left';
               else td.style.textAlign = 'right';
             });
           });
         }
-        const table3 = container.querySelector('table:nth-of-type(3)');
-        if (table3) {
-          table3.querySelectorAll('tbody tr').forEach(tr => {
-            tr.querySelectorAll('td').forEach((td, i) => {
-              if (i === 0 || i === 1) td.style.textAlign = 'center';
+      
+        // Căn chỉnh phần 3 (bảng cuối cùng): 2 cột đầu căn giữa, các cột còn lại phải
+        const lastTable = tables[tables.length - 1];
+        if (lastTable) {
+          lastTable.querySelectorAll('tbody tr').forEach(tr => {
+            tr.querySelectorAll('td').forEach((td, idx) => {
+              if (idx === 0 || idx === 1) td.style.textAlign = 'center';
               else td.style.textAlign = 'right';
             });
           });
         }
       }
       fixTableAlignments();
+
       // --- Thêm đoạn này ---
       const rows = container.querySelectorAll('tr');
       rows.forEach(row => {
