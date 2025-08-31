@@ -370,7 +370,29 @@ main {
       container.id = 'summary-wrapper';
       container.innerHTML = summaryHtml;
       main.appendChild(container);
-      
+
+      // <-- Thêm đoạn fix căn chỉnh bảng ở đây -->
+      function fixTableAlignments() {
+        const table2 = container.querySelector('table:nth-of-type(2)');
+        if (table2) {
+          table2.querySelectorAll('tbody tr').forEach(tr => {
+            tr.querySelectorAll('td').forEach((td, i) => {
+              if (i === 0) td.style.textAlign = 'left';
+              else td.style.textAlign = 'right';
+            });
+          });
+        }
+        const table3 = container.querySelector('table:nth-of-type(3)');
+        if (table3) {
+          table3.querySelectorAll('tbody tr').forEach(tr => {
+            tr.querySelectorAll('td').forEach((td, i) => {
+              if (i === 0 || i === 1) td.style.textAlign = 'center';
+              else td.style.textAlign = 'right';
+            });
+          });
+        }
+      }
+      fixTableAlignments();
       // --- Thêm đoạn này ---
       const rows = container.querySelectorAll('tr');
       rows.forEach(row => {
