@@ -365,11 +365,11 @@
       // --- Thêm đoạn này ---
       const rows = container.querySelectorAll('tr');
       rows.forEach(row => {
-        if (/tổng/i.test(row.textContent)) {
+        const text = row.textContent.toLowerCase();
+        if (text.includes('tổng') || text.includes('thai sản') || text.includes('ngoại trú') || text.includes('nha khoa')) {
           row.style.fontWeight = '700';
         }
       });
-
 
       // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
       const companyImgs = await collectSequentialLimited('images/company','company',10);
