@@ -295,27 +295,27 @@
 
     // Lấy danh sách ảnh tuần tự, dừng khi gặp ảnh không tồn tại
     async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
-      const urls = [];
-      for(let i=1; i<=max; i++) {
-        const num = String(i).padStart(2,'0');
-        urls.push(`${baseDir}/${baseName}-${num}.jpg`);
-      }
-      // Kiểm tra tồn tại song song
-      const checks = await Promise.all(urls.map(async url => {
-        try {
-          const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-          return res.ok ? url : null;
-        } catch {
-          return null;
+    const urls = [];
+    for(let i=1; i<=max; i++) {
+      const num = String(i).padStart(2,'0');
+      urls.push(`${baseDir}/${baseName}-${num}.jpg`);
+    }
+    // Thử tải ảnh GET để kiểm tra tồn tại, dừng khi gặp ảnh không tồn tại liên tiếp
+    const out = [];
+    for(const url of urls){
+      try {
+        // Dùng fetch GET, mode cors để kiểm tra tồn tại ảnh
+        const res = await fetch(url, { method: 'GET', cache: 'no-store', mode: 'cors' });
+        if(res.ok){
+          out.push(url);
+        } else {
+          break;
         }
-      }));
-      // Lọc ảnh tồn tại, dừng khi gặp ảnh không tồn tại liên tiếp
-      const out = [];
-      for(const url of checks){
-        if(url) out.push(url);
-        else break;
+      } catch {
+        break;
       }
-      return out;
+    }
+    return out;
     }
 
     // Tạo khối ảnh
