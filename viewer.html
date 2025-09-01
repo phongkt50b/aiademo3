@@ -285,32 +285,30 @@
     return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
   }
 
-  async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
+  // Tối ưu: tải ảnh song song, lọc url tồn tại
+  async function collectParallelLimited(baseDir, baseName, max=10) {
     const urls = [];
     for(let i=1; i<=max; i++) {
       const num = String(i).padStart(2,'0');
       urls.push(`${baseDir}/${baseName}-${num}.jpg`);
     }
-    const out = [];
-    for(const url of urls){
-      try {
-        const res = await fetch(url, { method: 'GET', cache: 'no-store', mode: 'cors' });
-        if(res.ok){
-          out.push(url);
-        } else {
-          break;
-        }
-      } catch {
-        break;
-      }
-    }
-    return out;
+
+    const fetchPromises = urls.map(url =>
+      fetch(url, { method: 'GET', cache: 'no-store', mode: 'cors' })
+        .then(res => res.ok ? url : null)
+        .catch(() => null)
+    );
+
+    const results = await Promise.all(fetchPromises);
+    return results.filter(x => x !== null);
   }
 
   function renderImageBlock(urls){
     if(!urls.length) return null;
     const wrap=document.createElement('div');
     wrap.className='viewer-image-block';
+
+    const fragment = document.createDocumentFragment();
     urls.forEach(u=>{
       const fig=document.createElement('figure');
       const img=document.createElement('img');
@@ -320,10 +318,17 @@
       img.addEventListener('load', () => {
         img.classList.add('loaded');
       });
+      img.addEventListener('error', () => {
+        img.classList.remove('loaded');
+        // Có thể gán ảnh dự phòng nếu muốn
+        // img.src = 'images/placeholder.png';
+      });
       fig.appendChild(img);
       fig.addEventListener('click',()=>openLightbox(u));
-      wrap.appendChild(fig);
+      fragment.appendChild(fig);
     });
+    wrap.appendChild(fragment);
+
     state.images = state.images.concat(urls);
     return wrap;
   }
@@ -428,7 +433,7 @@
     });
 
     // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
-    const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
+    const companyImgs = await collectParallelLimited('images/company','company',10);
     const companyBlock = renderImageBlock(companyImgs);
     if(companyBlock){
       if(container.parentNode){
@@ -445,7 +450,7 @@
 
     // 3.1 Ảnh sản phẩm chính
     const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-    const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
+    const productImgs = await collectParallelLimited(`images/products/${prodSlug}`, prodSlug, 10);
     if(productImgs.length){
       const prodBlock = renderImageBlock(productImgs);
       if(insertAfterNode && insertAfterNode.parentNode){
@@ -457,30 +462,35 @@
       }
     }
 
-    // 3.2 Ảnh riders
+    // 3.2 Ảnh riders - tải song song
     if(Array.isArray(payload.premiums?.riders)){
-      for(const r of payload.premiums.riders){
-        if(!r.selected) continue;
-        const riderSlugMap = {
-          health_scl:'bung-gia-luc',
-          bhn:'benh-hiem-ngheo-20',
-          accident:'tai-nan',
-          hospital_support:'ho-tro-vien-phi',
-        };
+      const riderSlugMap = {
+        health_scl:'bung-gia-luc',
+        bhn:'benh-hiem-ngheo-20',
+        accident:'tai-nan',
+        hospital_support:'ho-tro-vien-phi',
+      };
+
+      const selectedRiders = payload.premiums.riders.filter(r => r.selected);
+      const riderPromises = selectedRiders.map(async r => {
         const rSlug = riderSlugMap[r.slug];
-        if(!rSlug) continue;
-        const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
-        if(riderImgs.length){
-          const riderBlock = renderImageBlock(riderImgs);
-          if(insertAfterNode && insertAfterNode.parentNode){
-            insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
-            insertAfterNode = riderBlock;
-          } else {
-            container.appendChild(riderBlock);
-            insertAfterNode = riderBlock;
-          }
+        if(!rSlug) return null;
+        const imgs = await collectParallelLimited(`images/products/${rSlug}`, rSlug, 10);
+        return imgs.length ? { imgs, rSlug } : null;
+      });
+
+      const riderResults = (await Promise.all(riderPromises)).filter(x => x !== null);
+
+      riderResults.forEach(({imgs}) => {
+        const riderBlock = renderImageBlock(imgs);
+        if(insertAfterNode && insertAfterNode.parentNode){
+          insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
+          insertAfterNode = riderBlock;
+        } else {
+          container.appendChild(riderBlock);
+          insertAfterNode = riderBlock;
         }
-      }
+      });
     }
   }
 
@@ -630,8 +640,7 @@
     }
   }
   document.addEventListener('DOMContentLoaded', init);
-})();
-
+  })();
   </script>
 </body>
 </html>
