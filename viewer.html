@@ -1,225 +1,241 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Viewer Bảng Minh Họa</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root {
-  --max-width: 1000px;
-  font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-}
-body {
-  margin:0;
-  background:#fafafa;
-  color:#222;
-  line-height:1.5;
-}
-header {
-  background:#fff;
-  border-bottom:1px solid #e5e5e5;
-  position:sticky; top:0; z-index:20;
-}
-#toolbar {
-  max-width:var(--max-width);
-  margin:0 auto;
-  padding:12px 18px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:12px;
-}
-#toolbar h1 { margin:0; font-size:18px; font-weight:600; }
-button {
-  cursor:pointer;
-  background:#d4002a;
-  border:1px solid #d4002a;
-  color:#fff;
-  padding:8px 14px;
-  font-size:14px;
-  border-radius:4px;
-}
-button.secondary {
-  background:#f5f5f5;
-  color:#222;
-  border:1px solid #ccc;
-}
-main {
-  max-width:var(--max-width);
-  margin:28px auto 80px;
-  padding:0 18px;
-}
-.status {
-  font-size:14px;
-  color:#555;
-  display:flex;
-  align-items:center;
-  gap:6px;
-}
-.status::before {
-  content:"";
-  width:14px; height:14px;
-  border:2px solid #d4002a;
-  border-right-color:transparent;
-  border-radius:50%;
-  animation:spin .9s linear infinite;
-}
-@keyframes spin { to { transform:rotate(360deg);} }
-.hidden { display:none !important; }
+      --max-width: 1000px;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    }
+    body {
+      margin:0;
+      background:#fafafa;
+      color:#222;
+      line-height:1.5;
+    }
+    header {
+      background:#fff;
+      border-bottom:1px solid #e5e5e5;
+      position:sticky; top:0; z-index:20;
+    }
+    #toolbar {
+      max-width:var(--max-width);
+      margin:0 auto;
+      padding:12px 18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:12px;
+    }
+    #toolbar h1 { margin:0; font-size:18px; font-weight:600; }
+    button {
+      cursor:pointer;
+      background:#d4002a;
+      border:1px solid #d4002a;
+      color:#fff;
+      padding:8px 14px;
+      font-size:14px;
+      border-radius:4px;
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    button:hover,
+    button:focus {
+      background-color: #a30021;
+      box-shadow: 0 4px 8px rgba(163, 0, 33, 0.4);
+      outline: none;
+    }
+    button:disabled {
+      background-color: #ccc;
+      border-color: #ccc;
+      cursor: not-allowed;
+      box-shadow: none;
+      color: #666;
+    }
+    button.secondary {
+      background:#f5f5f5;
+      color:#222;
+      border:1px solid #ccc;
+    }
+    main {
+      max-width:var(--max-width);
+      margin:28px auto 80px;
+      padding:0 18px;
+    }
+    .status {
+      font-size:14px;
+      color:#555;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .status::before {
+      content:"";
+      width:14px; height:14px;
+      border:2px solid #d4002a;
+      border-right-color:transparent;
+      border-radius:50%;
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg);} }
+    .hidden { display:none !important; }
 
-/* Khối ảnh full-width */
-.viewer-image-block {
-  margin:40px 0 48px;
-}
-.viewer-image-block figure {
-  margin:0 0 32px;
-  background:#fff;
-  border:1px solid #e5e5e5;
-  border-radius:8px;
-  padding:10px;
-  box-shadow:0 2px 4px rgba(0,0,0,.05);
-  cursor:zoom-in;
-  transition:box-shadow .25s;
-}
-.viewer-image-block figure:hover {
-  box-shadow:0 5px 20px rgba(0,0,0,.15);
-}
-.viewer-image-block img {
-  width:100%;
-  height:auto;
-  display:block;
-  border-radius:4px;
-  object-fit:contain;
-}
-.viewer-image-block figcaption { display:none !important; }
+    /* Khối ảnh full-width */
+    .viewer-image-block {
+      margin:40px 0 48px;
+    }
+    .viewer-image-block figure {
+      margin:0 0 32px;
+      background:#fff;
+      border:1px solid #e5e5e5;
+      border-radius:8px;
+      padding:10px;
+      box-shadow:0 2px 4px rgba(0,0,0,.05);
+      cursor:zoom-in;
+      transition:box-shadow .25s;
+    }
+    .viewer-image-block figure:hover {
+      box-shadow:0 5px 20px rgba(0,0,0,.15);
+    }
+    .viewer-image-block img {
+      width:100%;
+      height:auto;
+      display:block;
+      border-radius:4px;
+      object-fit:contain;
+      background: #eee; /* placeholder màu xám nhạt */
+      transition: background 0.3s ease;
+    }
+    .viewer-image-block img.loaded {
+      background: transparent;
+    }
+    .viewer-image-block figcaption { display:none !important; }
 
-/* Lightbox */
-#lightboxOverlay {
-  position:fixed; inset:0;
-  background:rgba(0,0,0,.85);
-  display:flex; align-items:center; justify-content:center;
-  padding:40px 30px;
-  z-index:999;
-  opacity:0; pointer-events:none;
-  transition:opacity .25s;
-}
-#lightboxOverlay.active {
-  opacity:1; pointer-events:auto;
-}
-#lightboxOverlay img {
-  max-width:95vw;
-  max-height:95vh;
-  object-fit:contain;
-  background:#111;
-  border:1px solid #444;
-  border-radius:4px;
-  box-shadow:0 10px 30px rgba(0,0,0,.6);
-  cursor:zoom-out;
-}
-#lightboxOverlay .close-btn {
-  position:fixed;
-  top:14px; right:22px;
-  font-size:32px; color:#fff;
-  cursor:pointer;
-  user-select:none;
-  line-height:1;
-}
-.lb-nav-btn {
-  position:fixed;
-  top:50%; transform:translateY(-50%);
-  width:58px; height:58px;
-  display:flex; align-items:center; justify-content:center;
-  border-radius:50%;
-  font-size:40px;
-  background:rgba(255,255,255,.18);
-  color:#fff; border:none; cursor:pointer;
-  transition:background .25s;
-}
-.lb-nav-btn:hover { background:rgba(255,255,255,.35); }
-.lb-prev { left:30px; }
-.lb-next { right:30px; }
+    /* Lightbox */
+    #lightboxOverlay {
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.85);
+      display:flex; align-items:center; justify-content:center;
+      padding:40px 30px;
+      z-index:999;
+      opacity:0; pointer-events:none;
+      transition:opacity .25s;
+    }
+    #lightboxOverlay.active {
+      opacity:1; pointer-events:auto;
+    }
+    #lightboxOverlay img {
+      max-width:95vw;
+      max-height:95vh;
+      object-fit:contain;
+      background:#111;
+      border:1px solid #444;
+      border-radius:4px;
+      box-shadow:0 10px 30px rgba(0,0,0,.6);
+      cursor:zoom-out;
+    }
+    #lightboxOverlay .close-btn {
+      position:fixed;
+      top:14px; right:22px;
+      font-size:32px; color:#fff;
+      cursor:pointer;
+      user-select:none;
+      line-height:1;
+    }
+    .lb-nav-btn {
+      position:fixed;
+      top:50%; transform:translateY(-50%);
+      width:58px; height:58px;
+      display:flex; align-items:center; justify-content:center;
+      border-radius:50%;
+      font-size:40px;
+      background:rgba(255,255,255,.18);
+      color:#fff; border:none; cursor:pointer;
+      transition:background .25s;
+    }
+    .lb-nav-btn:hover { background:rgba(255,255,255,.35); }
+    .lb-prev { left:30px; }
+    .lb-next { right:30px; }
 
-/* Print */
-@media print {
-  header, #lightboxOverlay { display:none !important; }
-  body { background:#fff; }
-  .viewer-image-block figure { page-break-inside:avoid; }
-}
+    /* Print */
+    @media print {
+      header, #lightboxOverlay { display:none !important; }
+      body { background:#fff; }
+      .viewer-image-block figure { page-break-inside:avoid; }
+    }
 
-#summary-wrapper {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  color: #222;
-  line-height: 1.5;
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 14px;
-}
-#summary-wrapper {
-  font-size: 14px; /* cỡ chữ chuẩn bạn muốn (dựa theo bảng phần 1, 2, 3 hiện tại) */
-  line-height: 1.5;
-}
-#summary-wrapper * {
-  font-size: inherit !important; /* kế thừa cỡ chữ từ #summary-wrapper, ưu tiên override các cỡ chữ khác */
-}
+    #summary-wrapper {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #222;
+      line-height: 1.5;
+      max-width: 100%;
+      overflow-x: auto;
+      padding-bottom: 14px;
+      font-size: 14px; /* cỡ chữ chuẩn */
+    }
+    #summary-wrapper * {
+      font-size: inherit !important;
+    }
 
-#summary-wrapper h3 {
-  font-weight: 600;
-  margin-top: 14px;
-  margin-bottom: 14px;
-  color: #b91c1c; /* đỏ đậm */
-}
+    #summary-wrapper h3 {
+      font-weight: 600;
+      margin-top: 14px;
+      margin-bottom: 14px;
+      color: #b91c1c;
+    }
 
-#summary-wrapper table {
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid #ddd;
-  margin-bottom: 14px;
-  font-size: 14px;
-  background: #fff;
-}
+    #summary-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #ddd;
+      margin-bottom: 14px;
+      font-size: 14px;
+      background: #fff;
+    }
 
-#summary-wrapper th, 
-#summary-wrapper td {
-  border: 1px solid #ddd;
-  padding: 8px 12px;
-  vertical-align: top;
-  text-align: left;
-}
+    #summary-wrapper th, 
+    #summary-wrapper td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
 
-#summary-wrapper th {
-  background-color: #f3f4f6;
-  font-weight: 600;
-  color: #444;
-  text-align: center; /* Tiêu đề căn giữa tất cả bảng */
-}
+    #summary-wrapper th {
+      background-color: #f3f4f6;
+      font-weight: 600;
+      color: #444;
+      text-align: center;
+    }
 
-#summary-wrapper tr:nth-child(even) {
-  background-color: #fafafa;
-}
+    #summary-wrapper tr:nth-child(even) {
+      background-color: #fafafa;
+    }
 
-#summary-wrapper strong {
-  font-weight: 600;
-}
+    #summary-wrapper strong {
+      font-weight: 600;
+    }
 
-#summary-wrapper .text-red-600 {
-  color: #b91c1c;
-}
+    #summary-wrapper .text-red-600 {
+      color: #b91c1c;
+    }
 
-/* --- Phần 1: Bảng tóm tắt sản phẩm --- */
-/* Căn phải từ cột 3 (STBH) trở đi */
-#summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
-  text-align: right;
-}
-/* Dòng tổng cuối cùng của bảng 1 */
-/* Ô đầu tiên căn trái và bôi đậm */
-#summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
-  text-align: left;
-}
-/* Các ô còn lại căn phải và bôi đậm */
-#summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
-  text-align: right;
-}
+    /* --- Phần 1: Bảng tóm tắt sản phẩm --- */
+    /* Căn phải từ cột 3 (STBH) trở đi */
+    #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
+      text-align: right;
+    }
+    /* Dòng tổng cuối cùng của bảng 1 */
+    /* Ô đầu tiên căn trái và bôi đậm */
+    #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
+      text-align: left;
+    }
+    /* Các ô còn lại căn phải và bôi đậm */
+    #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -241,7 +257,7 @@ main {
   <div id="lightboxOverlay">
     <span class="close-btn" aria-label="Đóng">×</span>
     <button class="lb-nav-btn lb-prev" title="Trước">‹</button>
-    <img src="" alt="">
+    <img src="" alt="" />
     <button class="lb-nav-btn lb-next" title="Sau">›</button>
   </div>
 
@@ -269,6 +285,7 @@ main {
     }
 
     /* ---------- IMAGE LOADING ---------- */
+    // Hàm kiểm tra tồn tại ảnh bằng HEAD request
     async function headExists(url){
       try {
         const res = await fetch(url,{method:'HEAD',cache:'no-store'});
@@ -276,17 +293,27 @@ main {
       } catch(_e){ return false; }
     }
 
-    // Hàm mới: tải tuần tự tối đa max ảnh, dừng khi gặp ảnh không tồn tại
-    async function collectSequentialLimited(baseDir, baseName, max=10){
-      const out = [];
-      for(let i=1; i<=max; i++){
+    // Hàm mới: kiểm tra tồn tại ảnh song song, dừng khi gặp ảnh không tồn tại liên tiếp
+    async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
+      const urls = [];
+      for(let i=1; i<=max; i++) {
         const num = String(i).padStart(2,'0');
-        const url = `${baseDir}/${baseName}-${num}.jpg`;
-        if(await headExists(url)){
-          out.push(url);
-        } else {
-          break; // dừng khi ảnh kế tiếp không tồn tại
+        urls.push(`${baseDir}/${baseName}-${num}.jpg`);
+      }
+      // Kiểm tra tồn tại song song
+      const checks = await Promise.all(urls.map(async url => {
+        try {
+          const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+          return res.ok ? url : null;
+        } catch {
+          return null;
         }
+      }));
+      // Lọc ảnh tồn tại, dừng khi gặp ảnh không tồn tại liên tiếp
+      const out = [];
+      for(const url of checks){
+        if(url) out.push(url);
+        else break;
       }
       return out;
     }
@@ -300,7 +327,10 @@ main {
         const img=document.createElement('img');
         img.src=u;
         img.alt='';
-        img.loading = 'lazy'; // Thêm lazy load ảnh
+        img.loading = 'lazy'; // lazy load ảnh
+        img.addEventListener('load', () => {
+          img.classList.add('loaded');
+        });
         fig.appendChild(img);
         fig.addEventListener('click',()=>openLightbox(u));
         wrap.appendChild(fig);
@@ -372,19 +402,11 @@ main {
       container.innerHTML = summaryHtml;
       main.appendChild(container);
 
-      // <-- Thêm đoạn fix căn chỉnh bảng ở đây -->
+      // Fix căn chỉnh bảng
       function fixTableAlignments() {
         const tables = container.querySelectorAll('table');
         if (tables.length === 0) return;
-      
-        // Bảng phần 2 là tất cả bảng từ vị trí bảng thứ 2 đến trước bảng thứ 3
-        // Vì phần 1 là bảng 1, phần 3 là bảng 3, phần 2 là các bảng ở giữa (có thể nhiều bảng)
-        // Nên phần 2 sẽ là bảng thứ 2 (index 1) nếu có 1 bảng, hoặc nhiều bảng từ 1 đến 2 (nếu có 3 bảng)
-        
-        // Cách an toàn: phần 1 = bảng 1 (index 0), phần 3 = bảng cuối cùng (index tables.length - 1),
-        // phần 2 là tất cả bảng nằm giữa (index từ 1 đến tables.length-2)
-        
-        // Căn chỉnh phần 2: cột đầu trái, các cột còn lại phải
+
         for(let i=1; i < tables.length - 1; i++) {
           const table = tables[i];
           table.querySelectorAll('tbody tr').forEach(tr => {
@@ -394,8 +416,7 @@ main {
             });
           });
         }
-      
-        // Căn chỉnh phần 3 (bảng cuối cùng): 2 cột đầu căn giữa, các cột còn lại phải
+
         const lastTable = tables[tables.length - 1];
         if (lastTable) {
           lastTable.querySelectorAll('tbody tr').forEach(tr => {
@@ -408,7 +429,7 @@ main {
       }
       fixTableAlignments();
 
-      // --- Thêm đoạn này ---
+      // Bôi đậm dòng tổng, quyền lợi đặc biệt
       const rows = container.querySelectorAll('tr');
       rows.forEach(row => {
         const text = row.textContent.toLowerCase();
@@ -418,14 +439,12 @@ main {
       });
 
       // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
-      const companyImgs = await collectSequentialLimited('images/company','company',10);
-      console.log('Company images:', companyImgs);
+      const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
       const companyBlock = renderImageBlock(companyImgs);
       if(companyBlock){
         if(container.parentNode){
           container.parentNode.insertBefore(companyBlock, container);
         } else {
-          // fallback nếu container chưa có parent
           container.prepend(companyBlock);
         }
       }
@@ -437,8 +456,7 @@ main {
 
       // 3.1 Ảnh sản phẩm chính
       const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-      const productImgs = await collectSequentialLimited(`images/products/${prodSlug}`, prodSlug, 10);
-      console.log('Product images:', productImgs);
+      const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
       if(productImgs.length){
         const prodBlock = renderImageBlock(productImgs);
         if(insertAfterNode && insertAfterNode.parentNode){
@@ -462,8 +480,7 @@ main {
           };
           const rSlug = riderSlugMap[r.slug];
           if(!rSlug) continue;
-          const riderImgs = await collectSequentialLimited(`images/products/${rSlug}`, rSlug, 10);
-          console.log(`Rider images (${r.slug}):`, riderImgs);
+          const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
           if(riderImgs.length){
             const riderBlock = renderImageBlock(riderImgs);
             if(insertAfterNode && insertAfterNode.parentNode){
