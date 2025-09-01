@@ -273,8 +273,9 @@
       const h = location.hash || '';
       if(!h.startsWith('#v=')) throw new Error('Thiếu payload (#v=...)');
       const b64 = h.slice(3);
-      const json = decodeURIComponent(escape(atob(b64)));
-      return JSON.parse(json);
+      // Sửa decode base64 đúng UTF-8
+      const jsonStr = decodeURIComponent(escape(atob(b64)));
+      return JSON.parse(jsonStr);
     }
 
     function qs(sel,root=document){ return root.querySelector(sel); }
@@ -284,7 +285,6 @@
       return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
     }
 
-    /* ---------- IMAGE LOADING ---------- */
     // Hàm kiểm tra tồn tại ảnh bằng HEAD request
     async function headExists(url){
       try {
@@ -293,7 +293,7 @@
       } catch(_e){ return false; }
     }
 
-    // Hàm mới: kiểm tra tồn tại ảnh song song, dừng khi gặp ảnh không tồn tại liên tiếp
+    // Kiểm tra tồn tại ảnh tuần tự, dừng khi gặp ảnh không tồn tại liên tiếp
     async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
       const urls = [];
       for(let i=1; i<=max; i++) {
@@ -318,6 +318,25 @@
       return out;
     }
 
+    // Chuyển ảnh từ URL sang base64
+    async function toBase64(url) {
+      try {
+        const response = await fetch(url);
+        if(!response.ok) throw new Error('Không tải được ảnh');
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn('Không thể tải ảnh:', url, e);
+        return url; // fallback trả lại url gốc nếu lỗi
+      }
+    }
+
+    // Hàm tạo khối ảnh từ mảng URL hoặc base64
     function renderImageBlock(urls){
       if(!urls.length) return null;
       const wrap=document.createElement('div');
@@ -326,8 +345,8 @@
         const fig=document.createElement('figure');
         const img=document.createElement('img');
         img.src=u;
-        img.alt='';
-        img.loading = 'lazy'; // lazy load ảnh
+        img.alt='Ảnh minh họa';
+        img.loading = 'lazy';
         img.addEventListener('load', () => {
           img.classList.add('loaded');
         });
@@ -438,9 +457,14 @@
         }
       });
 
-      // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
-      const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
-      const companyBlock = renderImageBlock(companyImgs);
+      // 2. Chèn ảnh công ty dưới dạng base64 TRƯỚC TOÀN BỘ bảng minh họa (trước container)
+      const companyUrls = await collectSequentialLimitedParallel('images/company','company',10);
+      const companyBase64Imgs = [];
+      for(const url of companyUrls){
+        const base64 = await toBase64(url);
+        companyBase64Imgs.push(base64);
+      }
+      const companyBlock = renderImageBlock(companyBase64Imgs);
       if(companyBlock){
         if(container.parentNode){
           container.parentNode.insertBefore(companyBlock, container);
@@ -456,9 +480,14 @@
 
       // 3.1 Ảnh sản phẩm chính
       const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-      const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
-      if(productImgs.length){
-        const prodBlock = renderImageBlock(productImgs);
+      const productUrls = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
+      const productBase64Imgs = [];
+      for(const url of productUrls){
+        const base64 = await toBase64(url);
+        productBase64Imgs.push(base64);
+      }
+      if(productBase64Imgs.length){
+        const prodBlock = renderImageBlock(productBase64Imgs);
         if(insertAfterNode && insertAfterNode.parentNode){
           insertAfterNode.parentNode.insertBefore(prodBlock, insertAfterNode.nextSibling);
           insertAfterNode = prodBlock;
@@ -480,9 +509,14 @@
           };
           const rSlug = riderSlugMap[r.slug];
           if(!rSlug) continue;
-          const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
-          if(riderImgs.length){
-            const riderBlock = renderImageBlock(riderImgs);
+          const riderUrls = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
+          const riderBase64Imgs = [];
+          for(const url of riderUrls){
+            const base64 = await toBase64(url);
+            riderBase64Imgs.push(base64);
+          }
+          if(riderBase64Imgs.length){
+            const riderBlock = renderImageBlock(riderBase64Imgs);
             if(insertAfterNode && insertAfterNode.parentNode){
               insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
               insertAfterNode = riderBlock;
@@ -495,114 +529,137 @@
       }
     }
 
-    // Hàm tải HTML giữ nguyên style gốc
-    function exportHtmlWithStyle() {
-    const container = document.querySelector('#summary-wrapper');
-    if (!container) {
-      alert('Không có nội dung để tải.');
-      return;
+    // Hàm tải HTML với ảnh đã được nhúng base64
+    async function exportHtmlWithEmbeddedImages() {
+      const container = document.querySelector('#summary-wrapper');
+      if (!container) {
+        alert('Không có nội dung để tải.');
+        return;
+      }
+      // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
+      const clone = container.cloneNode(true);
+
+      // Lấy tất cả thẻ img trong clone
+      const imgs = clone.querySelectorAll('img');
+
+      // Chuyển từng ảnh src URL thành base64 (nếu chưa phải base64)
+      async function toBase64(url) {
+        try {
+          const response = await fetch(url);
+          if(!response.ok) throw new Error('Không tải được ảnh');
+          const blob = await response.blob();
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          console.warn('Không thể tải ảnh:', url, e);
+          return url; // fallback trả lại url gốc nếu lỗi
+        }
+      }
+
+      for(const img of imgs){
+        const src = img.getAttribute('src');
+        if(src && !src.startsWith('data:')){
+          const absUrl = new URL(src, location.href).href;
+          const base64 = await toBase64(absUrl);
+          img.setAttribute('src', base64);
+        }
+      }
+
+      const innerHtml = clone.innerHTML;
+
+      const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
+        .map(node => node.outerHTML).join('\n');
+
+      const extraStyle = `
+      <style>
+        body {
+          margin: 20px;
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+          background: #fafafa;
+          color: #222;
+        }
+        #summary-wrapper {
+          max-width: 1000px;
+          margin: 0 auto;
+          background: #fff;
+          padding: 18px;
+          box-sizing: border-box;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          overflow-x: auto;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        #summary-wrapper table {
+          width: 100%;
+          border-collapse: collapse;
+          border: 1px solid #ddd;
+          margin-bottom: 14px;
+          background: #fff;
+        }
+        #summary-wrapper th, #summary-wrapper td {
+          border: 1px solid #ddd;
+          padding: 8px 12px;
+          vertical-align: top;
+          text-align: left;
+        }
+        #summary-wrapper th {
+          background-color: #f3f4f6;
+          font-weight: 600;
+          color: #444;
+          text-align: center;
+        }
+        /* Căn phải từ cột 3 trở đi trong bảng 1 */
+        #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
+          text-align: right;
+        }
+        /* Dòng tổng cuối cùng của bảng 1 */
+        #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
+          text-align: left;
+          font-weight: 700;
+        }
+        #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
+          text-align: right;
+          font-weight: 700;
+        }
+      </style>`;
+
+      const fullHtml = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bảng Minh Họa - Xuất HTML</title>
+  ${styles}
+  ${extraStyle}
+</head>
+<body>
+  <div id="summary-wrapper">
+    ${innerHtml}
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bang-minh-hoa.html';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 0);
     }
-    let innerHtml = container.innerHTML;
-  
-    // Lấy gốc URL hiện tại
-    const origin = location.origin;
-  
-    // Chuyển src="images/..." thành src="https://domain/images/..."
-    innerHtml = innerHtml.replace(/src="images\/([^"]+)"/g, (match, p1) => {
-      return `src="${origin}/images/${p1}"`;
-    });
-  
-    // Giữ nguyên style hiện tại trong <head>
-    const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
-      .map(node => node.outerHTML).join('\n');
-  
-    // Thêm style căn lề và style #summary-wrapper như trong bản gốc
-    const extraStyle = `
-    <style>
-      body {
-        margin: 20px;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        background: #fafafa;
-        color: #222;
-      }
-      #summary-wrapper {
-        max-width: 1000px;
-        margin: 0 auto;
-        background: #fff;
-        padding: 18px;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        overflow-x: auto;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      #summary-wrapper table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #ddd;
-        margin-bottom: 14px;
-        background: #fff;
-      }
-      #summary-wrapper th, #summary-wrapper td {
-        border: 1px solid #ddd;
-        padding: 8px 12px;
-        vertical-align: top;
-        text-align: left;
-      }
-      #summary-wrapper th {
-        background-color: #f3f4f6;
-        font-weight: 600;
-        color: #444;
-        text-align: center;
-      }
-      /* Căn phải từ cột 3 trở đi trong bảng 1 */
-      #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
-        text-align: right;
-      }
-      /* Dòng tổng cuối cùng của bảng 1 */
-      #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
-        text-align: left;
-        font-weight: 700;
-      }
-      #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
-        text-align: right;
-        font-weight: 700;
-      }
-    </style>`;
-  
-    const fullHtml = `
-  <!DOCTYPE html>
-  <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Bảng Minh Họa - Xuất HTML</title>
-    ${styles}
-    ${extraStyle}
-  </head>
-  <body>
-    <div id="summary-wrapper">
-      ${innerHtml}
-    </div>
-  </body>
-  </html>`;
-  
-    const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'bang-minh-hoa.html';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 0);
-  }
 
     function setupButtons(){
       qs('#btnExportPdf').addEventListener('click', ()=>window.print());
-      qs('#btnExportHtml').addEventListener('click', exportHtmlWithStyle);
+      qs('#btnExportHtml').addEventListener('click', exportHtmlWithEmbeddedImages);
       qs('#btnReload').addEventListener('click', ()=>location.reload());
     }
     function init(){
