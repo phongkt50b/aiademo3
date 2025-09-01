@@ -504,7 +504,7 @@
 
       async function toBase64(url) {
         try {
-          const response = await fetch(url,{mode: 'cors'});
+          const response = await fetch(url);
           if(!response.ok) throw new Error('Không tải được ảnh');
           const blob = await response.blob();
           return await new Promise((resolve, reject) => {
