@@ -273,7 +273,7 @@
       const h = location.hash || '';
       if(!h.startsWith('#v=')) throw new Error('Thiếu payload (#v=...)');
       const b64 = h.slice(3);
-      // Sửa decode base64 đúng UTF-8
+      // Giải mã base64 thành chuỗi JSON đúng UTF-8
       const jsonStr = decodeURIComponent(escape(atob(b64)));
       return JSON.parse(jsonStr);
     }
@@ -285,7 +285,7 @@
       return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
     }
 
-    // Hàm kiểm tra tồn tại ảnh bằng HEAD request
+    // Kiểm tra tồn tại ảnh bằng HEAD request
     async function headExists(url){
       try {
         const res = await fetch(url,{method:'HEAD',cache:'no-store'});
@@ -293,7 +293,7 @@
       } catch(_e){ return false; }
     }
 
-    // Kiểm tra tồn tại ảnh tuần tự, dừng khi gặp ảnh không tồn tại liên tiếp
+    // Lấy danh sách ảnh tuần tự, dừng khi gặp ảnh không tồn tại
     async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
       const urls = [];
       for(let i=1; i<=max; i++) {
@@ -318,25 +318,7 @@
       return out;
     }
 
-    // Chuyển ảnh từ URL sang base64
-    async function toBase64(url) {
-      try {
-        const response = await fetch(url);
-        if(!response.ok) throw new Error('Không tải được ảnh');
-        const blob = await response.blob();
-        return await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        console.warn('Không thể tải ảnh:', url, e);
-        return url; // fallback trả lại url gốc nếu lỗi
-      }
-    }
-
-    // Hàm tạo khối ảnh từ mảng URL hoặc base64
+    // Tạo khối ảnh
     function renderImageBlock(urls){
       if(!urls.length) return null;
       const wrap=document.createElement('div');
@@ -457,20 +439,11 @@
         }
       });
 
-      // 2. Chèn ảnh công ty dưới dạng base64 TRƯỚC TOÀN BỘ bảng minh họa (trước container)
-      const companyUrls = await collectSequentialLimitedParallel('images/company','company',10);
-      const companyBase64Imgs = [];
-      for(const url of companyUrls){
-        const base64 = await toBase64(url);
-        companyBase64Imgs.push(base64);
-      }
-      const companyBlock = renderImageBlock(companyBase64Imgs);
+      // 2. Chèn ảnh công ty VÀO TRONG #summary-wrapper (đầu container)
+      const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
+      const companyBlock = renderImageBlock(companyImgs);
       if(companyBlock){
-        if(container.parentNode){
-          container.parentNode.insertBefore(companyBlock, container);
-        } else {
-          container.prepend(companyBlock);
-        }
+        container.prepend(companyBlock);
       }
 
       // 3. Chèn ảnh sản phẩm chính và riders sau phần 3 (giới hạn 10 ảnh mỗi loại)
@@ -480,14 +453,9 @@
 
       // 3.1 Ảnh sản phẩm chính
       const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-      const productUrls = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
-      const productBase64Imgs = [];
-      for(const url of productUrls){
-        const base64 = await toBase64(url);
-        productBase64Imgs.push(base64);
-      }
-      if(productBase64Imgs.length){
-        const prodBlock = renderImageBlock(productBase64Imgs);
+      const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
+      if(productImgs.length){
+        const prodBlock = renderImageBlock(productImgs);
         if(insertAfterNode && insertAfterNode.parentNode){
           insertAfterNode.parentNode.insertBefore(prodBlock, insertAfterNode.nextSibling);
           insertAfterNode = prodBlock;
@@ -509,14 +477,9 @@
           };
           const rSlug = riderSlugMap[r.slug];
           if(!rSlug) continue;
-          const riderUrls = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
-          const riderBase64Imgs = [];
-          for(const url of riderUrls){
-            const base64 = await toBase64(url);
-            riderBase64Imgs.push(base64);
-          }
-          if(riderBase64Imgs.length){
-            const riderBlock = renderImageBlock(riderBase64Imgs);
+          const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
+          if(riderImgs.length){
+            const riderBlock = renderImageBlock(riderImgs);
             if(insertAfterNode && insertAfterNode.parentNode){
               insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
               insertAfterNode = riderBlock;
@@ -529,20 +492,16 @@
       }
     }
 
-    // Hàm tải HTML với ảnh đã được nhúng base64
+    // Hàm chuyển ảnh sang base64 và tải HTML
     async function exportHtmlWithEmbeddedImages() {
       const container = document.querySelector('#summary-wrapper');
       if (!container) {
         alert('Không có nội dung để tải.');
         return;
       }
-      // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
       const clone = container.cloneNode(true);
-
-      // Lấy tất cả thẻ img trong clone
       const imgs = clone.querySelectorAll('img');
 
-      // Chuyển từng ảnh src URL thành base64 (nếu chưa phải base64)
       async function toBase64(url) {
         try {
           const response = await fetch(url);
@@ -556,7 +515,7 @@
           });
         } catch (e) {
           console.warn('Không thể tải ảnh:', url, e);
-          return url; // fallback trả lại url gốc nếu lỗi
+          return url;
         }
       }
 
