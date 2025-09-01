@@ -478,11 +478,56 @@ main {
       }
     }
 
+    function exportHtmlSimple() {
+    const container = document.querySelector('#summary-wrapper');
+        if (!container) {
+          alert('Không có nội dung để tải.');
+          return;
+        }
+    const innerHtml = container.innerHTML;
+      
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+      <meta charset="UTF-8">
+      <title>Bảng Minh Họa - Xuất HTML</title>
+      <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 20px; background: #fafafa; color: #222; }
+        #summary-wrapper { max-width: 1000px; margin: auto; }
+        table { width: 100%; border-collapse: collapse; border: 1px solid #ddd; margin-bottom: 14px; background: #fff; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; vertical-align: top; }
+        th { background-color: #f3f4f6; font-weight: 600; color: #444; text-align: center; }
+        tr:nth-child(even) { background-color: #fafafa; }
+        strong { font-weight: 600; }
+        .text-red-600 { color: #b91c1c; }
+      </style>
+      </head>
+      <body>
+        <div id="summary-wrapper">
+          ${innerHtml}
+        </div>
+      </body>
+      </html>`;
+      
+        const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'bang-minh-hoa.html';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 0);
+      }
+
     function setupButtons(){
       qs('#btnExportPdf').addEventListener('click', ()=>window.print());
+      qs('#btnExportHtml').addEventListener('click', exportHtmlSimple);
       qs('#btnReload').addEventListener('click', ()=>location.reload());
     }
-
     function init(){
       setupButtons();
       setupLightbox();
