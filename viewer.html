@@ -493,109 +493,108 @@
       });
     }
   }
+async function exportHtmlWithEmbeddedImages() {
+  // Lấy toàn bộ nội dung trong #content để bao gồm cả ảnh công ty
+  const mainContent = document.querySelector('#content');
+  if (!mainContent) {
+    alert('Không có nội dung để tải.');
+    return;
+  }
+  // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
+  const clone = mainContent.cloneNode(true);
 
-  async function exportHtmlWithEmbeddedImages() {
-    // Lấy toàn bộ nội dung trong #content để bao gồm cả ảnh công ty
-    const mainContent = document.querySelector('#content');
-    if (!mainContent) {
-      alert('Không có nội dung để tải.');
-      return;
+  // Lấy tất cả thẻ img trong clone
+  const imgs = clone.querySelectorAll('img');
+
+  // Hàm lấy Base64 từ URL ảnh
+  async function toBase64(url) {
+    try {
+      const response = await fetch(url);
+      if(!response.ok) throw new Error('Không tải được ảnh');
+      const blob = await response.blob();
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('Không thể tải ảnh:', url, e);
+      return url; // fallback trả lại url gốc nếu lỗi
     }
-    // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
-    const clone = mainContent.cloneNode(true);
+  }
 
-    // Lấy tất cả thẻ img trong clone
-    const imgs = clone.querySelectorAll('img');
-
-    // Hàm lấy Base64 từ URL ảnh
-    async function toBase64(url) {
-      try {
-        const response = await fetch(url);
-        if(!response.ok) throw new Error('Không tải được ảnh');
-        const blob = await response.blob();
-        return await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        console.warn('Không thể tải ảnh:', url, e);
-        return url; // fallback trả lại url gốc nếu lỗi
-      }
+  // Duyệt từng ảnh, thay src thành base64
+  for (const img of imgs) {
+    const src = img.getAttribute('src');
+    if (src && !src.startsWith('data:')) {
+      // Chuyển src thành URL tuyệt đối
+      const absUrl = new URL(src, location.href).href;
+      const base64 = await toBase64(absUrl);
+      img.setAttribute('src', base64);
     }
+  }
 
-    // Duyệt từng ảnh, thay src thành base64
-    for (const img of imgs) {
-      const src = img.getAttribute('src');
-      if (src && !src.startsWith('data:')) {
-        // Chuyển src thành URL tuyệt đối
-        const absUrl = new URL(src, location.href).href;
-        const base64 = await toBase64(absUrl);
-        img.setAttribute('src', base64);
-      }
+  const innerHtml = clone.innerHTML;
+
+  const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
+    .map(node => node.outerHTML).join('\n');
+
+  const extraStyle = `
+  <style>
+    body {
+      margin: 20px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: #fafafa;
+      color: #222;
     }
+    #summary-wrapper {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 18px;
+      box-sizing: border-box;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    #summary-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #ddd;
+      margin-bottom: 14px;
+      background: #fff;
+    }
+    #summary-wrapper th, #summary-wrapper td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      vertical-align: top;
+      text-align: left;
+    }
+    #summary-wrapper th {
+      background-color: #f3f4f6;
+      font-weight: 600;
+      color: #444;
+      text-align: center;
+    }
+    /* Căn phải từ cột 3 trở đi trong bảng 1 */
+    #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
+      text-align: right;
+    }
+    /* Dòng tổng cuối cùng của bảng 1 */
+    #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
+      text-align: left;
+      font-weight: 700;
+    }
+    #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
+      text-align: right;
+      font-weight: 700;
+    }
+  </style>`;
 
-    const innerHtml = clone.innerHTML;
-
-    const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
-      .map(node => node.outerHTML).join('\n');
-
-    const extraStyle = `
-    <style>
-      body {
-        margin: 20px;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        background: #fafafa;
-        color: #222;
-      }
-      #summary-wrapper {
-        max-width: 1000px;
-        margin: 0 auto;
-        background: #fff;
-        padding: 18px;
-        box-sizing: border-box;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        overflow-x: auto;
-        font-size: 14px;
-        line-height: 1.5;
-      }
-      #summary-wrapper table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 1px solid #ddd;
-        margin-bottom: 14px;
-        background: #fff;
-      }
-      #summary-wrapper th, #summary-wrapper td {
-        border: 1px solid #ddd;
-        padding: 8px 12px;
-        vertical-align: top;
-        text-align: left;
-      }
-      #summary-wrapper th {
-        background-color: #f3f4f6;
-        font-weight: 600;
-        color: #444;
-        text-align: center;
-      }
-      /* Căn phải từ cột 3 trở đi trong bảng 1 */
-      #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
-        text-align: right;
-      }
-      /* Dòng tổng cuối cùng của bảng 1 */
-      #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
-        text-align: left;
-        font-weight: 700;
-      }
-      #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
-        text-align: right;
-        font-weight: 700;
-      }
-    </style>`;
-
-    const fullHtml = `
+  const fullHtml = `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -609,19 +608,46 @@
 </body>
 </html>`;
 
-    const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'bang-minh-hoa.html';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 0);
+  // Hàm tạo chuỗi ngày giờ theo format dd-mm-yy - hh-mm
+  function getFormattedDateTime() {
+    const now = new Date();
+    const pad2 = n => n.toString().padStart(2, '0');
+    const day = pad2(now.getDate());
+    const month = pad2(now.getMonth() + 1);
+    const year = now.getFullYear().toString().slice(-2);
+    const hour = pad2(now.getHours());
+    const minute = pad2(now.getMinutes());
+    return `${day}-${month}-${year} - ${hour}-${minute}`;
   }
 
+  // Hàm thay thế ký tự không hợp lệ trong tên file
+  function sanitizeFileName(name) {
+    return name.replace(/[\/\\?%*:|"<>]/g, '-').trim();
+  }
+
+  // Lấy tên người được bảo hiểm chính từ payload
+  let rawName = 'NguoiDuocBaoHiem';
+  if (state.payload && state.payload.mainPersonName) {
+    rawName = state.payload.mainPersonName;
+  }
+  const safeName = sanitizeFileName(rawName);
+  const dateTimeStr = getFormattedDateTime();
+  const fileName = `${safeName} - ${dateTimeStr}.html`;
+
+  const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+  
   function setupButtons(){
     qs('#btnExportPdf').addEventListener('click', ()=>window.print());
     qs('#btnExportHtml').addEventListener('click', exportHtmlWithEmbeddedImages);
