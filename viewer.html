@@ -501,14 +501,13 @@
       return;
     }
     let innerHtml = container.innerHTML;
-    const origin = location.origin;
-    const path = location.pathname;
-    const basePath = path.substring(0, path.lastIndexOf('/') + 1);
-    const baseUrl = origin + basePath;
+
+    // Gốc URL ảnh chuẩn bạn cung cấp
+    const baseImgUrl = 'https://phongkt50b.github.io/aiademo3/';
   
-    // Regex thay thế src="images/..." hoặc src='./images/...'
-    innerHtml = innerHtml.replace(/src=(["'])(\.{0,2}\/)?images\/([^"']+)\1/g, (match, quote, dotSlash, filename) => {
-      return `src=${quote}${baseUrl}images/${filename}${quote}`;
+    // Thay src="images/..." thành src="https://phongkt50b.github.io/aiademo3/images/..."
+    innerHtml = innerHtml.replace(/src="images\/([^"]+)"/g, (match, p1) => {
+      return `src="${baseImgUrl}images/${p1}"`;
     });
   
     // Giữ nguyên style hiện tại trong <head>
