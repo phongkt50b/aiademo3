@@ -494,27 +494,51 @@
         }
       }
     }
-    function exportHtmlWithStyle() {
+     async function exportHtmlWithEmbeddedImages() {
     const container = document.querySelector('#summary-wrapper');
     if (!container) {
       alert('Không có nội dung để tải.');
       return;
     }
-    let innerHtml = container.innerHTML;
-
-    // Gốc URL ảnh chuẩn bạn cung cấp
-    const baseImgUrl = 'https://phongkt50b.github.io/aiademo3/';
+    // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
+    const clone = container.cloneNode(true);
   
-    // Thay src="images/..." thành src="https://phongkt50b.github.io/aiademo3/images/..."
-    innerHtml = innerHtml.replace(/src="images\/([^"]+)"/g, (match, p1) => {
-      return `src="${baseImgUrl}images/${p1}"`;
-    });
+    // Lấy tất cả thẻ img trong clone
+    const imgs = clone.querySelectorAll('img');
   
-    // Giữ nguyên style hiện tại trong <head>
+    // Hàm lấy Base64 từ URL ảnh
+    async function toBase64(url) {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn('Không thể tải ảnh:', url, e);
+        return url; // fallback trả lại url gốc nếu lỗi
+      }
+    }
+  
+    // Duyệt từng ảnh, thay src thành base64
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (src && !src.startsWith('data:')) {
+        // Chuyển src thành URL tuyệt đối
+        const absUrl = new URL(src, location.href).href;
+        const base64 = await toBase64(absUrl);
+        img.setAttribute('src', base64);
+      }
+    }
+  
+    const innerHtml = clone.innerHTML;
+  
     const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
       .map(node => node.outerHTML).join('\n');
   
-    // Thêm style căn lề và style #summary-wrapper như trong bản gốc
     const extraStyle = `
     <style>
       body {
@@ -596,7 +620,8 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 0);
-    }
+}
+
 
     
     function setupButtons(){
