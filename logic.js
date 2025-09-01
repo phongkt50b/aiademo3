@@ -907,7 +907,7 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
         // Bổ sung kiểm tra stbh >= 2 tỷ cho PUL_TRON_DOI, PUL_5NAM, PUL_15NAM
         if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-            const MIN_STBH = 2000000000; // 2 tỷ
+            const MIN_STBH = 0; // 2 tỷ khi nào áp dụng thì thay 2 tỷ vào là ok ngày :))
             if (stbh < MIN_STBH) {
                 setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(MIN_STBH, '')}`);
                 ok = false;
