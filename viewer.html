@@ -501,19 +501,14 @@
       return;
     }
     let innerHtml = container.innerHTML;
-  
-    // Lấy gốc URL hiện tại (cả origin + path đến thư mục chứa file)
-    // Ví dụ: https://phongkt50b.github.io/aiademo3/viewer.html
-    // -> baseUrl = https://phongkt50b.github.io/aiademo3/
-    const currentUrl = location.href;
     const origin = location.origin;
     const path = location.pathname;
     const basePath = path.substring(0, path.lastIndexOf('/') + 1);
     const baseUrl = origin + basePath;
   
-    // Thay src="images/..." thành src="https://domain/.../images/..."
-    innerHtml = innerHtml.replace(/src="images\/([^"]+)"/g, (match, p1) => {
-      return `src="${baseUrl}images/${p1}"`;
+    // Regex thay thế src="images/..." hoặc src='./images/...'
+    innerHtml = innerHtml.replace(/src=(["'])(\.{0,2}\/)?images\/([^"']+)\1/g, (match, quote, dotSlash, filename) => {
+      return `src=${quote}${baseUrl}images/${filename}${quote}`;
     });
   
     // Giữ nguyên style hiện tại trong <head>
