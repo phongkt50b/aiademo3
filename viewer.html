@@ -263,48 +263,37 @@
 
   <script>
   (function(){
-    const state = {
-      payload:null,
-      images:[],
-      currentIndex:0
-    };
+  const state = {
+    payload:null,
+    images:[],
+    currentIndex:0
+  };
 
-    function decodePayload(){
-      const h = location.hash || '';
-      if(!h.startsWith('#v=')) throw new Error('Thiếu payload (#v=...)');
-      const b64 = h.slice(3);
-      // Giải mã base64 thành chuỗi JSON đúng UTF-8
-      const jsonStr = decodeURIComponent(escape(atob(b64)));
-      return JSON.parse(jsonStr);
-    }
+  function decodePayload(){
+    const h = location.hash || '';
+    if(!h.startsWith('#v=')) throw new Error('Thiếu payload (#v=...)');
+    const b64 = h.slice(3);
+    // Giải mã base64 thành chuỗi JSON đúng UTF-8
+    const jsonStr = decodeURIComponent(escape(atob(b64)));
+    return JSON.parse(jsonStr);
+  }
 
-    function qs(sel,root=document){ return root.querySelector(sel); }
-    function qa(sel,root=document){ return Array.from(root.querySelectorAll(sel)); }
+  function qs(sel,root=document){ return root.querySelector(sel); }
+  function qa(sel,root=document){ return Array.from(root.querySelectorAll(sel)); }
 
-    function buildSummaryHtmlFromPayload(p){
-      return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
-    }
+  function buildSummaryHtmlFromPayload(p){
+    return p.summaryHtml || '<div class="text-red-600">Không có summaryHtml trong payload.</div>';
+  }
 
-    // Kiểm tra tồn tại ảnh bằng HEAD request
-    async function headExists(url){
-      try {
-        const res = await fetch(url,{method:'HEAD',cache:'no-store'});
-        return res.ok;
-      } catch(_e){ return false; }
-    }
-
-    // Lấy danh sách ảnh tuần tự, dừng khi gặp ảnh không tồn tại
-    async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
+  async function collectSequentialLimitedParallel(baseDir, baseName, max=10) {
     const urls = [];
     for(let i=1; i<=max; i++) {
       const num = String(i).padStart(2,'0');
       urls.push(`${baseDir}/${baseName}-${num}.jpg`);
     }
-    // Thử tải ảnh GET để kiểm tra tồn tại, dừng khi gặp ảnh không tồn tại liên tiếp
     const out = [];
     for(const url of urls){
       try {
-        // Dùng fetch GET, mode cors để kiểm tra tồn tại ảnh
         const res = await fetch(url, { method: 'GET', cache: 'no-store', mode: 'cors' });
         if(res.ok){
           out.push(url);
@@ -316,278 +305,287 @@
       }
     }
     return out;
+  }
+
+  function renderImageBlock(urls){
+    if(!urls.length) return null;
+    const wrap=document.createElement('div');
+    wrap.className='viewer-image-block';
+    urls.forEach(u=>{
+      const fig=document.createElement('figure');
+      const img=document.createElement('img');
+      img.src=u;
+      img.alt='Ảnh minh họa';
+      img.loading = 'lazy';
+      img.addEventListener('load', () => {
+        img.classList.add('loaded');
+      });
+      fig.appendChild(img);
+      fig.addEventListener('click',()=>openLightbox(u));
+      wrap.appendChild(fig);
+    });
+    state.images = state.images.concat(urls);
+    return wrap;
+  }
+
+  /* ---------- LIGHTBOX ---------- */
+  function setupLightbox(){
+    const overlay=qs('#lightboxOverlay');
+    const img=overlay.querySelector('img');
+    const closeBtn=overlay.querySelector('.close-btn');
+    const prevBtn=overlay.querySelector('.lb-prev');
+    const nextBtn=overlay.querySelector('.lb-next');
+
+    function show(idx){
+      if(idx<0||idx>=state.images.length) return;
+      state.currentIndex=idx;
+      img.src=state.images[idx];
+      overlay.classList.add('active');
+      updateNav();
+    }
+    function hide(){
+      overlay.classList.remove('active');
+      img.src='';
+    }
+    function updateNav(){
+      prevBtn.disabled=(state.currentIndex===0);
+      nextBtn.disabled=(state.currentIndex===state.images.length-1);
+    }
+    function shift(d){
+      const ni=state.currentIndex+d;
+      if(ni>=0 && ni<state.images.length) show(ni);
     }
 
-    // Tạo khối ảnh
-    function renderImageBlock(urls){
-      if(!urls.length) return null;
-      const wrap=document.createElement('div');
-      wrap.className='viewer-image-block';
-      urls.forEach(u=>{
-        const fig=document.createElement('figure');
-        const img=document.createElement('img');
-        img.src=u;
-        img.alt='Ảnh minh họa';
-        img.loading = 'lazy';
-        img.addEventListener('load', () => {
-          img.classList.add('loaded');
+    prevBtn.addEventListener('click',()=>shift(-1));
+    nextBtn.addEventListener('click',()=>shift(1));
+    closeBtn.addEventListener('click',hide);
+    overlay.addEventListener('click',e=>{ if(e.target===overlay) hide(); });
+    document.addEventListener('keydown',e=>{
+      if(!overlay.classList.contains('active')) return;
+      if(e.key==='Escape') hide();
+      if(e.key==='ArrowLeft') shift(-1);
+      if(e.key==='ArrowRight') shift(1);
+    });
+    window._lbOpenSrc = (src)=>{
+      const idx=state.images.indexOf(src);
+      if(idx!==-1) show(idx);
+    };
+  }
+  function openLightbox(src){
+    if(window._lbOpenSrc) window._lbOpenSrc(src);
+  }
+
+  /* ---------- MAIN RENDER ---------- */
+  async function render(){
+    const payload = state.payload;
+    const main = qs('#content');
+    const statusEl = qs('#status');
+    statusEl.classList.add('hidden');
+    main.innerHTML = '';
+    state.images = [];
+
+    // 1. Gắn summaryHtml
+    const summaryHtml = buildSummaryHtmlFromPayload(payload);
+    const container = document.createElement('div');
+    container.id = 'summary-wrapper';
+    container.innerHTML = summaryHtml;
+    main.appendChild(container);
+
+    // Fix căn chỉnh bảng
+    function fixTableAlignments() {
+      const tables = container.querySelectorAll('table');
+      if (tables.length === 0) return;
+
+      for(let i=1; i < tables.length - 1; i++) {
+        const table = tables[i];
+        table.querySelectorAll('tbody tr').forEach(tr => {
+          tr.querySelectorAll('td').forEach((td, idx) => {
+            if (idx === 0) td.style.textAlign = 'left';
+            else td.style.textAlign = 'right';
+          });
         });
-        fig.appendChild(img);
-        fig.addEventListener('click',()=>openLightbox(u));
-        wrap.appendChild(fig);
-      });
-      state.images = state.images.concat(urls);
-      return wrap;
-    }
-
-    /* ---------- LIGHTBOX ---------- */
-    function setupLightbox(){
-      const overlay=qs('#lightboxOverlay');
-      const img=overlay.querySelector('img');
-      const closeBtn=overlay.querySelector('.close-btn');
-      const prevBtn=overlay.querySelector('.lb-prev');
-      const nextBtn=overlay.querySelector('.lb-next');
-
-      function show(idx){
-        if(idx<0||idx>=state.images.length) return;
-        state.currentIndex=idx;
-        img.src=state.images[idx];
-        overlay.classList.add('active');
-        updateNav();
-      }
-      function hide(){
-        overlay.classList.remove('active');
-        img.src='';
-      }
-      function updateNav(){
-        prevBtn.disabled=(state.currentIndex===0);
-        nextBtn.disabled=(state.currentIndex===state.images.length-1);
-      }
-      function shift(d){
-        const ni=state.currentIndex+d;
-        if(ni>=0 && ni<state.images.length) show(ni);
       }
 
-      prevBtn.addEventListener('click',()=>shift(-1));
-      nextBtn.addEventListener('click',()=>shift(1));
-      closeBtn.addEventListener('click',hide);
-      overlay.addEventListener('click',e=>{ if(e.target===overlay) hide(); });
-      document.addEventListener('keydown',e=>{
-        if(!overlay.classList.contains('active')) return;
-        if(e.key==='Escape') hide();
-        if(e.key==='ArrowLeft') shift(-1);
-        if(e.key==='ArrowRight') shift(1);
-      });
-      window._lbOpenSrc = (src)=>{
-        const idx=state.images.indexOf(src);
-        if(idx!==-1) show(idx);
-      };
-    }
-    function openLightbox(src){
-      if(window._lbOpenSrc) window._lbOpenSrc(src);
-    }
-
-    /* ---------- MAIN RENDER ---------- */
-    async function render(){
-      const payload = state.payload;
-      const main = qs('#content');
-      const statusEl = qs('#status');
-      statusEl.classList.add('hidden');
-      main.innerHTML = '';
-      state.images = [];
-
-      // 1. Gắn summaryHtml
-      const summaryHtml = buildSummaryHtmlFromPayload(payload);
-      const container = document.createElement('div');
-      container.id = 'summary-wrapper';
-      container.innerHTML = summaryHtml;
-      main.appendChild(container);
-
-      // Fix căn chỉnh bảng
-      function fixTableAlignments() {
-        const tables = container.querySelectorAll('table');
-        if (tables.length === 0) return;
-
-        for(let i=1; i < tables.length - 1; i++) {
-          const table = tables[i];
-          table.querySelectorAll('tbody tr').forEach(tr => {
-            tr.querySelectorAll('td').forEach((td, idx) => {
-              if (idx === 0) td.style.textAlign = 'left';
-              else td.style.textAlign = 'right';
-            });
+      const lastTable = tables[tables.length - 1];
+      if (lastTable) {
+        lastTable.querySelectorAll('tbody tr').forEach(tr => {
+          tr.querySelectorAll('td').forEach((td, idx) => {
+            if (idx === 0 || idx === 1) td.style.textAlign = 'center';
+            else td.style.textAlign = 'right';
           });
-        }
-
-        const lastTable = tables[tables.length - 1];
-        if (lastTable) {
-          lastTable.querySelectorAll('tbody tr').forEach(tr => {
-            tr.querySelectorAll('td').forEach((td, idx) => {
-              if (idx === 0 || idx === 1) td.style.textAlign = 'center';
-              else td.style.textAlign = 'right';
-            });
-          });
-        }
+        });
       }
-      fixTableAlignments();
+    }
+    fixTableAlignments();
 
-      // Bôi đậm dòng tổng, quyền lợi đặc biệt
-      const rows = container.querySelectorAll('tr');
-      rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        if (text.includes('tổng') || text.includes('quyền lợi thai sản') || text.includes('quyền lợi ngoại trú') || text.includes('quyền lợi nha khoa')|| text.includes('điều trị ung thư')) {
-          row.style.fontWeight = '700';
-        }
-      });
+    // Bôi đậm dòng tổng, quyền lợi đặc biệt
+    const rows = container.querySelectorAll('tr');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      if (text.includes('tổng') || text.includes('quyền lợi thai sản') || text.includes('quyền lợi ngoại trú') || text.includes('quyền lợi nha khoa')|| text.includes('điều trị ung thư')) {
+        row.style.fontWeight = '700';
+      }
+    });
 
-      // 2. Chèn ảnh công ty VÀO TRONG #summary-wrapper (đầu container)
-      const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
-      const companyBlock = renderImageBlock(companyImgs);
-      if(companyBlock){
+    // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
+    const companyImgs = await collectSequentialLimitedParallel('images/company','company',10);
+    const companyBlock = renderImageBlock(companyImgs);
+    if(companyBlock){
+      if(container.parentNode){
+        container.parentNode.insertBefore(companyBlock, container);
+      } else {
         container.prepend(companyBlock);
       }
+    }
 
-      // 3. Chèn ảnh sản phẩm chính và riders sau phần 3 (giới hạn 10 ảnh mỗi loại)
-      const part3Headings = qa('h3', container).filter(h => /Phần\s*3/i.test(h.textContent));
-      const lastPart3 = part3Headings.length ? part3Headings[part3Headings.length - 1] : null;
-      let insertAfterNode = lastPart3 ? lastPart3.parentElement : container.lastElementChild;
+    // 3. Chèn ảnh sản phẩm chính và riders sau phần 3 (giới hạn 10 ảnh mỗi loại)
+    const part3Headings = qa('h3', container).filter(h => /Phần\s*3/i.test(h.textContent));
+    const lastPart3 = part3Headings.length ? part3Headings[part3Headings.length - 1] : null;
+    let insertAfterNode = lastPart3 ? lastPart3.parentElement : container.lastElementChild;
 
-      // 3.1 Ảnh sản phẩm chính
-      const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
-      const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
-      if(productImgs.length){
-        const prodBlock = renderImageBlock(productImgs);
-        if(insertAfterNode && insertAfterNode.parentNode){
-          insertAfterNode.parentNode.insertBefore(prodBlock, insertAfterNode.nextSibling);
-          insertAfterNode = prodBlock;
-        } else {
-          container.appendChild(prodBlock);
-          insertAfterNode = prodBlock;
-        }
+    // 3.1 Ảnh sản phẩm chính
+    const prodSlug = payload.productSlug || (payload.productKey || '').toLowerCase();
+    const productImgs = await collectSequentialLimitedParallel(`images/products/${prodSlug}`, prodSlug, 10);
+    if(productImgs.length){
+      const prodBlock = renderImageBlock(productImgs);
+      if(insertAfterNode && insertAfterNode.parentNode){
+        insertAfterNode.parentNode.insertBefore(prodBlock, insertAfterNode.nextSibling);
+        insertAfterNode = prodBlock;
+      } else {
+        container.appendChild(prodBlock);
+        insertAfterNode = prodBlock;
       }
+    }
 
-      // 3.2 Ảnh riders
-      if(Array.isArray(payload.premiums?.riders)){
-        for(const r of payload.premiums.riders){
-          if(!r.selected) continue;
-          const riderSlugMap = {
-            health_scl:'bung-gia-luc',
-            bhn:'benh-hiem-ngheo-20',
-            accident:'tai-nan',
-            hospital_support:'ho-tro-vien-phi',
-          };
-          const rSlug = riderSlugMap[r.slug];
-          if(!rSlug) continue;
-          const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
-          if(riderImgs.length){
-            const riderBlock = renderImageBlock(riderImgs);
-            if(insertAfterNode && insertAfterNode.parentNode){
-              insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
-              insertAfterNode = riderBlock;
-            } else {
-              container.appendChild(riderBlock);
-              insertAfterNode = riderBlock;
-            }
+    // 3.2 Ảnh riders
+    if(Array.isArray(payload.premiums?.riders)){
+      for(const r of payload.premiums.riders){
+        if(!r.selected) continue;
+        const riderSlugMap = {
+          health_scl:'bung-gia-luc',
+          bhn:'benh-hiem-ngheo-20',
+          accident:'tai-nan',
+          hospital_support:'ho-tro-vien-phi',
+        };
+        const rSlug = riderSlugMap[r.slug];
+        if(!rSlug) continue;
+        const riderImgs = await collectSequentialLimitedParallel(`images/products/${rSlug}`, rSlug, 10);
+        if(riderImgs.length){
+          const riderBlock = renderImageBlock(riderImgs);
+          if(insertAfterNode && insertAfterNode.parentNode){
+            insertAfterNode.parentNode.insertBefore(riderBlock, insertAfterNode.nextSibling);
+            insertAfterNode = riderBlock;
+          } else {
+            container.appendChild(riderBlock);
+            insertAfterNode = riderBlock;
           }
         }
       }
     }
+  }
 
-    // Hàm chuyển ảnh sang base64 và tải HTML
-    async function exportHtmlWithEmbeddedImages() {
-      const container = document.querySelector('#summary-wrapper');
-      if (!container) {
-        alert('Không có nội dung để tải.');
-        return;
+  async function exportHtmlWithEmbeddedImages() {
+    // Lấy toàn bộ nội dung trong #content để bao gồm cả ảnh công ty
+    const mainContent = document.querySelector('#content');
+    if (!mainContent) {
+      alert('Không có nội dung để tải.');
+      return;
+    }
+    // Clone nội dung để xử lý mà không ảnh hưởng tới DOM gốc
+    const clone = mainContent.cloneNode(true);
+
+    // Lấy tất cả thẻ img trong clone
+    const imgs = clone.querySelectorAll('img');
+
+    // Hàm lấy Base64 từ URL ảnh
+    async function toBase64(url) {
+      try {
+        const response = await fetch(url);
+        if(!response.ok) throw new Error('Không tải được ảnh');
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn('Không thể tải ảnh:', url, e);
+        return url; // fallback trả lại url gốc nếu lỗi
       }
-      const clone = container.cloneNode(true);
-      const imgs = clone.querySelectorAll('img');
+    }
 
-      async function toBase64(url) {
-        try {
-          const response = await fetch(url);
-          if(!response.ok) throw new Error('Không tải được ảnh');
-          const blob = await response.blob();
-          return await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        } catch (e) {
-          console.warn('Không thể tải ảnh:', url, e);
-          return url;
-        }
+    // Duyệt từng ảnh, thay src thành base64
+    for (const img of imgs) {
+      const src = img.getAttribute('src');
+      if (src && !src.startsWith('data:')) {
+        // Chuyển src thành URL tuyệt đối
+        const absUrl = new URL(src, location.href).href;
+        const base64 = await toBase64(absUrl);
+        img.setAttribute('src', base64);
       }
+    }
 
-      for(const img of imgs){
-        const src = img.getAttribute('src');
-        if(src && !src.startsWith('data:')){
-          const absUrl = new URL(src, location.href).href;
-          const base64 = await toBase64(absUrl);
-          img.setAttribute('src', base64);
-        }
+    const innerHtml = clone.innerHTML;
+
+    const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
+      .map(node => node.outerHTML).join('\n');
+
+    const extraStyle = `
+    <style>
+      body {
+        margin: 20px;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: #fafafa;
+        color: #222;
       }
+      #summary-wrapper {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 18px;
+        box-sizing: border-box;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      #summary-wrapper table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #ddd;
+        margin-bottom: 14px;
+        background: #fff;
+      }
+      #summary-wrapper th, #summary-wrapper td {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        vertical-align: top;
+        text-align: left;
+      }
+      #summary-wrapper th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+        color: #444;
+        text-align: center;
+      }
+      /* Căn phải từ cột 3 trở đi trong bảng 1 */
+      #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
+        text-align: right;
+      }
+      /* Dòng tổng cuối cùng của bảng 1 */
+      #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
+        text-align: left;
+        font-weight: 700;
+      }
+      #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
+        text-align: right;
+        font-weight: 700;
+      }
+    </style>`;
 
-      const innerHtml = clone.innerHTML;
-
-      const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
-        .map(node => node.outerHTML).join('\n');
-
-      const extraStyle = `
-      <style>
-        body {
-          margin: 20px;
-          font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-          background: #fafafa;
-          color: #222;
-        }
-        #summary-wrapper {
-          max-width: 1000px;
-          margin: 0 auto;
-          background: #fff;
-          padding: 18px;
-          box-sizing: border-box;
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          overflow-x: auto;
-          font-size: 14px;
-          line-height: 1.5;
-        }
-        #summary-wrapper table {
-          width: 100%;
-          border-collapse: collapse;
-          border: 1px solid #ddd;
-          margin-bottom: 14px;
-          background: #fff;
-        }
-        #summary-wrapper th, #summary-wrapper td {
-          border: 1px solid #ddd;
-          padding: 8px 12px;
-          vertical-align: top;
-          text-align: left;
-        }
-        #summary-wrapper th {
-          background-color: #f3f4f6;
-          font-weight: 600;
-          color: #444;
-          text-align: center;
-        }
-        /* Căn phải từ cột 3 trở đi trong bảng 1 */
-        #summary-wrapper table:nth-of-type(1) td:nth-child(n+3) {
-          text-align: right;
-        }
-        /* Dòng tổng cuối cùng của bảng 1 */
-        #summary-wrapper table:nth-of-type(1) tr:last-child td:first-child {
-          text-align: left;
-          font-weight: 700;
-        }
-        #summary-wrapper table:nth-of-type(1) tr:last-child td:not(:first-child) {
-          text-align: right;
-          font-weight: 700;
-        }
-      </style>`;
-
-      const fullHtml = `
+    const fullHtml = `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -597,44 +595,43 @@
   ${extraStyle}
 </head>
 <body>
-  <div id="summary-wrapper">
-    ${innerHtml}
-  </div>
+  ${innerHtml}
 </body>
 </html>`;
 
-      const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'bang-minh-hoa.html';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 0);
-    }
+    const blob = new Blob([fullHtml], {type: 'text/html;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bang-minh-hoa.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 0);
+  }
 
-    function setupButtons(){
-      qs('#btnExportPdf').addEventListener('click', ()=>window.print());
-      qs('#btnExportHtml').addEventListener('click', exportHtmlWithEmbeddedImages);
-      qs('#btnReload').addEventListener('click', ()=>location.reload());
+  function setupButtons(){
+    qs('#btnExportPdf').addEventListener('click', ()=>window.print());
+    qs('#btnExportHtml').addEventListener('click', exportHtmlWithEmbeddedImages);
+    qs('#btnReload').addEventListener('click', ()=>location.reload());
+  }
+  function init(){
+    setupButtons();
+    setupLightbox();
+    try {
+      state.payload = decodePayload();
+      render();
+    } catch(e){
+      console.error(e);
+      const st=qs('#status');
+      st.textContent='Không đọc được dữ liệu.';
     }
-    function init(){
-      setupButtons();
-      setupLightbox();
-      try {
-        state.payload = decodePayload();
-        render();
-      } catch(e){
-        console.error(e);
-        const st=qs('#status');
-        st.textContent='Không đọc được dữ liệu.';
-      }
-    }
-    document.addEventListener('DOMContentLoaded', init);
-  })();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+
   </script>
 </body>
 </html>
