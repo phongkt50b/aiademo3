@@ -906,12 +906,29 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     const abuvTermEl = document.getElementById('abuv-term');
 
     // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
-    if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
-        // Bổ sung kiểm tra stbh >= 2 tỷ cho PUL_TRON_DOI, PUL_5NAM, PUL_15NAM
-        if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-            const MIN_STBH = 0; // 2 tỷ khi nào áp dụng thì thay 2 tỷ vào là ok ngày :))
-            if (stbh < MIN_STBH) {
-                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(MIN_STBH, '')}`);
+   if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
+    const pulMinFee  = CONFIG.PUL_MIN_PREMIUM_OR || 30000000;
+    const pulMinStbh = CONFIG.PUL_MIN_STBH_OR || 2000000000;
+
+    const meetsFee  = basePremium >= pulMinFee;
+    const meetsStbh = stbh >= pulMinStbh;
+
+    if (!(meetsFee || meetsStbh)) {
+        // Ưu tiên báo lỗi vào cả STBH và (nếu có) ô premium (trong MUL thì premium nhập, PUL thì premium tính theo STBH)
+        setFieldError(stbhEl, `Yêu cầu: Phí sản phẩm chính ≥ ${formatCurrency(pulMinFee, '')} hoặc STBH ≥ ${formatCurrency(pulMinStbh, '')}`);
+        const mainPremiumInput = document.getElementById('main-premium-input');
+        if (mainPremiumInput) {
+            setFieldError(mainPremiumInput, `Phí/SP chính chưa đạt ≥ ${formatCurrency(pulMinFee,'')} (trừ khi STBH ≥ ${formatCurrency(pulMinStbh,'')})`);
+        }
+        ok = false;
+        } else {
+            clearFieldError(stbhEl);
+            const mainPremiumInput = document.getElementById('main-premium-input');
+            if (mainPremiumInput) clearFieldError(mainPremiumInput);
+            }
+        } else {
+            if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
+                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH, '')}`);
                 ok = false;
             } else {
                 clearFieldError(stbhEl);
