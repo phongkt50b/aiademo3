@@ -912,35 +912,43 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
 
     // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
     if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-        const pulMinFee  = CONFIG.PUL_MIN_PREMIUM_OR || 30000000;
-        const pulMinStbh = CONFIG.PUL_MIN_STBH_OR    || 2000000000;
+            // Ngưỡng cấu hình gốc
+            const pulMinFeeRaw  = CONFIG.PUL_MIN_PREMIUM_OR || 0;
+            const pulMinStbhRaw = CONFIG.PUL_MIN_STBH_OR    || 0;
     
-        const meetsFee  = basePremium >= pulMinFee;
-        const meetsStbh = stbh >= pulMinStbh;
-        const meets = meetsFee || meetsStbh;
+            // Ngưỡng hiệu dụng theo yêu cầu: STBH dùng MIN, Phí dùng MAX
+            const effectiveStbhMin    = Math.min(pulMinStbhRaw, CONFIG.MAIN_PRODUCT_MIN_STBH);
+            const effectivePremiumMin = Math.max(pulMinFeeRaw, CONFIG.MAIN_PRODUCT_MIN_PREMIUM);
     
-        // (Tùy chọn) cập nhật hint nếu bạn đã tạo hàm:
-        // updatePulHint({ fee: basePremium, stbh, pulMinFee, pulMinStbh, meets });
-    
-        if (!meets) {
-            setFieldError(
-                stbhEl,
-                `Yêu cầu: Phí sản phẩm chính ≥ ${formatCurrency(pulMinFee,'')} hoặc STBH ≥ ${formatCurrency(pulMinStbh,'')}`
-            );
-            const mainPremiumInput = document.getElementById('main-premium-input');
-            if (mainPremiumInput) {
+            // 1) Gate STBH trước
+            if (stbh > 0 && stbh < effectiveStbhMin) {
                 setFieldError(
-                    mainPremiumInput,
-                    `Phí/SP chính chưa đạt ≥ ${formatCurrency(pulMinFee,'')} (trừ khi STBH ≥ ${formatCurrency(pulMinStbh,'')})`
+                  stbhEl,
+                  `STBH tối thiểu: ${effectiveStbhMin.toLocaleString('vi-VN')}`
                 );
+                // Không kiểm tra phí khi STBH chưa đạt
+                ok = false;
+            } else {
+                clearFieldError(stbhEl);
+    
+                // 2) Chỉ kiểm tra phí khi STBH đạt ngưỡng & đã có premium tính ra (>0)
+                // (Vì PUL không có input nhập phí chính thủ công)
+                if (basePremium > 0 && basePremium < effectivePremiumMin) {
+                    // Gắn lỗi vào STBH (do không có input phí chính riêng cho PUL)
+                    setFieldError(
+                      stbhEl,
+                      `Phí tối thiểu: ${effectivePremiumMin.toLocaleString('vi-VN')}`
+                    );
+                    ok = false;
+                } else if (basePremium >= effectivePremiumMin) {
+                    // Đạt phí
+                    if (stbhEl) clearFieldError(stbhEl);
+                } else {
+                    // basePremium == 0: chưa tính ra => không set lỗi phí
+                }
             }
-            ok = false;
+    
         } else {
-            clearFieldError(stbhEl);
-            const mainPremiumInput = document.getElementById('main-premium-input');
-            if (mainPremiumInput) clearFieldError(mainPremiumInput);
-        }
-    } else {
         // (Tùy chọn) ẩn hint nếu không phải PUL:
         // updatePulHint({ hide: true });
     
