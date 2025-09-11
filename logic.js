@@ -627,7 +627,6 @@ function renderMainProductSection(customer, mainProductKey) {
     }
     attachTermListenersForTargetAge();
 }
-
 function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container) {
     const { age, riskGroup, daysFromBirth } = customer;
     
@@ -641,14 +640,38 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         'TRON_TAM_AN'
     ].includes(mainProductKey);
     const isTTA = mainProductKey === 'TRON_TAM_AN';
-
-    // Dưới ngưỡng: khóa riders. (Nếu muốn chỉ khóa khi >0 mà vẫn < ngưỡng, đổi dòng dưới thành: const belowMin = mainPremium > 0 && mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM;)
     const isPul = ['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProductKey);
-    const belowMin = !isTTA && (
-      isPul
-        ? ( mainPremium < CONFIG.PUL_MIN_PREMIUM_OR && appState.mainProduct.stbh < CONFIG.PUL_MIN_STBH_OR )
-        : ( mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM )
-    );
+
+    // ================= PATCH START (thay cho biến belowMin cũ) =================
+    let ridersDisabled = false;
+    let ridersReason = '';
+
+    if (!isTTA && isPul) {
+        const effStbhMin = Math.min(CONFIG.PUL_MIN_STBH_OR, CONFIG.MAIN_PRODUCT_MIN_STBH);
+        const effPremiumMin = Math.max(CONFIG.PUL_MIN_PREMIUM_OR, CONFIG.MAIN_PRODUCT_MIN_PREMIUM);
+
+        const curStbh = appState.mainProduct.stbh || 0;
+        // Gate 1: STBH
+        if (curStbh > 0 && curStbh < effStbhMin) {
+            ridersDisabled = true;
+            ridersReason = `Cần STBH ≥ ${effStbhMin.toLocaleString('vi-VN')} đ (hiện tại: ${curStbh.toLocaleString('vi-VN')} đ)`;
+        } else if (curStbh >= effStbhMin) {
+            // Gate 2: Premium (chỉ check khi đã có phí > 0)
+            if (mainPremium > 0 && mainPremium < effPremiumMin) {
+                ridersDisabled = true;
+                ridersReason = `Cần phí sản phẩm chính ≥ ${effPremiumMin.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+            }
+            // Nếu mainPremium = 0 (chưa tính) thì chưa khóa – chờ tính xong
+        }
+    } else if (!isTTA && !isPul) {
+        // Sản phẩm chính thường: chỉ cần đạt ngưỡng phí
+        if (mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
+            ridersDisabled = true;
+            ridersReason = `Cần phí sản phẩm chính ≥ ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+        }
+    }
+    // ================= PATCH END =================
+
     let anyUncheckedByThreshold = false;
 
     CONFIG.supplementaryProducts.forEach(prod => {
@@ -670,17 +693,18 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             if (checkbox.checked) checkbox.checked = false;
         }
 
-        if (isEligible && belowMin) {
-            // Khóa do chưa đạt ngưỡng phí chính
+        if (isEligible && ridersDisabled) {
+            // Khóa do chưa đạt ngưỡng
             if (checkbox.checked) {
                 checkbox.checked = false;
                 anyUncheckedByThreshold = true;
             }
             checkbox.disabled = true;
             section.classList.add('opacity-50');
+
             const msgEl = section.querySelector('.main-premium-threshold-msg');
             if (msgEl) {
-                msgEl.textContent = `Cần phí sản phẩm chính ≥ ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+                msgEl.textContent = ridersReason;
                 msgEl.classList.remove('hidden');
             }
         } else {
@@ -708,32 +732,28 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     });
 
-    // Nếu có rider bị bỏ chọn do bị khóa bởi ngưỡng → tính lại (debounce để tránh vòng lặp)
     if (anyUncheckedByThreshold && typeof runWorkflowDebounced === 'function') {
         runWorkflowDebounced();
     }
     
-    // Xử lý riêng Sức khỏe Bùng Gia Lực (chương trình) sau khi đã khóa nếu belowMin
+    // Khối xử lý riêng SCL (giữ nguyên, chỉ thay tham chiếu ridersDisabled thay vì belowMin)
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
         const checkbox = sclSection.querySelector('.health_scl-checkbox');
-        if (checkbox && isTTA && !checkbox.checked && !belowMin) {
-            // Với Trọn Tâm An tự bật nếu không bị khóa bởi belowMin
+        if (checkbox && isTTA && !checkbox.checked && !ridersDisabled) {
             checkbox.checked = true;
             sclSection.querySelector('.product-options')?.classList.remove('hidden');
         }
 
-        if (belowMin) {
-            // Đang bị khóa toàn cục: không cần xử lý logic lựa chọn chương trình
-            return;
+        if (ridersDisabled) {
+            return; // đang bị gate – khỏi xử lý nâng cấp chương trình
         } else if (isTTA) {
-            // TTA: mở toàn bộ option
             Array.from(programSelect.options).forEach(opt => opt.disabled = false);
         } else {
-            // Logic giới hạn chương trình theo premium
+            // Logic giới hạn chương trình theo premium (giữ nguyên)
             programSelect.querySelectorAll('option').forEach(opt => {
-                if (opt.value === 'nang_cao') return; // luôn giữ nâng_cao không disable
+                if (opt.value === 'nang_cao') return;
                 if (mainPremium >= 15000000) {
                     opt.disabled = false;
                 } else if (mainPremium >= 10000000) {
@@ -766,7 +786,6 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     }
 }
-
 function updateSummaryUI(fees) {
   const f = fees || { baseMain:0, extra:0, totalSupp:0, total:0 };
   const fmt = (n)=> formatDisplayCurrency(Math.round((Number(n)||0)/1000)*1000);
