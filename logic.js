@@ -938,6 +938,7 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
             } else {
                 clearFieldError(stbhEl);
             }
+        }
         } else {
             // Kiểm tra stbh tối thiểu theo config cũ
             if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
