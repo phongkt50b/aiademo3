@@ -643,7 +643,12 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     const isTTA = mainProductKey === 'TRON_TAM_AN';
 
     // Dưới ngưỡng: khóa riders. (Nếu muốn chỉ khóa khi >0 mà vẫn < ngưỡng, đổi dòng dưới thành: const belowMin = mainPremium > 0 && mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM;)
-    const belowMin = !isTTA && (mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM);
+    const isPul = ['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProductKey);
+    const belowMin = !isTTA && (
+      isPul
+        ? ( mainPremium < CONFIG.PUL_MIN_PREMIUM_OR && appState.mainProduct.stbh < CONFIG.PUL_MIN_STBH_OR )
+        : ( mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM )
+    );
     let anyUncheckedByThreshold = false;
 
     CONFIG.supplementaryProducts.forEach(prod => {
