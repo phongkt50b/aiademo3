@@ -911,46 +911,65 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     const abuvTermEl = document.getElementById('abuv-term');
 
     // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
-   if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-    const pulMinFee  = CONFIG.PUL_MIN_PREMIUM_OR || 30000000;
-    const pulMinStbh = CONFIG.PUL_MIN_STBH_OR || 2000000000;
-
-    const meetsFee  = basePremium >= pulMinFee;
-    const meetsStbh = stbh >= pulMinStbh;
-
-    if (!(meetsFee || meetsStbh)) {
-        // Ưu tiên báo lỗi vào cả STBH và (nếu có) ô premium (trong MUL thì premium nhập, PUL thì premium tính theo STBH)
-        setFieldError(stbhEl, `Yêu cầu: Phí sản phẩm chính ≥ ${formatCurrency(pulMinFee, '')} hoặc STBH ≥ ${formatCurrency(pulMinStbh, '')}`);
-        const mainPremiumInput = document.getElementById('main-premium-input');
-        if (mainPremiumInput) {
-            setFieldError(mainPremiumInput, `Phí/SP chính chưa đạt ≥ ${formatCurrency(pulMinFee,'')} (trừ khi STBH ≥ ${formatCurrency(pulMinStbh,'')})`);
-        }
-        ok = false;
+    if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
+        const pulMinFee  = CONFIG.PUL_MIN_PREMIUM_OR || 30000000;
+        const pulMinStbh = CONFIG.PUL_MIN_STBH_OR    || 2000000000;
+    
+        const meetsFee  = basePremium >= pulMinFee;
+        const meetsStbh = stbh >= pulMinStbh;
+        const meets = meetsFee || meetsStbh;
+    
+        // (Tùy chọn) cập nhật hint nếu bạn đã tạo hàm:
+        // updatePulHint({ fee: basePremium, stbh, pulMinFee, pulMinStbh, meets });
+    
+        if (!meets) {
+            setFieldError(
+                stbhEl,
+                `Yêu cầu: Phí sản phẩm chính ≥ ${formatCurrency(pulMinFee,'')} hoặc STBH ≥ ${formatCurrency(pulMinStbh,'')}`
+            );
+            const mainPremiumInput = document.getElementById('main-premium-input');
+            if (mainPremiumInput) {
+                setFieldError(
+                    mainPremiumInput,
+                    `Phí/SP chính chưa đạt ≥ ${formatCurrency(pulMinFee,'')} (trừ khi STBH ≥ ${formatCurrency(pulMinStbh,'')})`
+                );
+            }
+            ok = false;
         } else {
             clearFieldError(stbhEl);
             const mainPremiumInput = document.getElementById('main-premium-input');
             if (mainPremiumInput) clearFieldError(mainPremiumInput);
-            }
-        } else {
+        }
+    } else {
+        // (Tùy chọn) ẩn hint nếu không phải PUL:
+        // updatePulHint({ hide: true });
+    
+        // Các sản phẩm KHÁC PUL (trừ Trọn Tâm An có STBH cố định không cần kiểm tra)
+        if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
             if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH, '')}`);
-                ok = false;
-            } else {
-                clearFieldError(stbhEl);
-            }
-        } else {
-            // Kiểm tra stbh tối thiểu theo config cũ
-            if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH, '')}`);
+                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH,'')}`);
                 ok = false;
             } else {
                 clearFieldError(stbhEl);
             }
         }
-
-        if (basePremium > 0 && basePremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
-            setFieldError(document.getElementById('main-stbh') || document.getElementById('main-premium-input'), `Phí chính tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM, '')}`);
-            ok = false;
+    }
+    
+    // Phí chính tối thiểu (không áp dụng cho Trọn Tâm An vì phí tính cố định theo STBH)
+    if (
+        mainProduct &&
+        mainProduct !== 'TRON_TAM_AN' &&
+        basePremium > 0 &&
+        basePremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM &&
+        !['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProduct) // (PUL đã có điều kiện OR riêng ở trên)
+    ) {
+        const feeInput = document.getElementById('main-premium-input') || stbhEl;
+        setFieldError(feeInput, `Phí chính tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM,'')}`);
+        ok = false;
+    } else {
+        const feeInput = document.getElementById('main-premium-input');
+        if (feeInput && !['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProduct)) {
+            clearFieldError(feeInput);
         }
     }
     // 2) Kiểm tra thời hạn đóng phí theo từng sản phẩm
