@@ -647,29 +647,36 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     let ridersReason = '';
 
     if (!isTTA && isPul) {
-        const effStbhMin = Math.min(CONFIG.PUL_MIN_STBH_OR, CONFIG.MAIN_PRODUCT_MIN_STBH);
-        const effPremiumMin = Math.max(CONFIG.PUL_MIN_PREMIUM_OR, CONFIG.MAIN_PRODUCT_MIN_PREMIUM);
-
+        const mainStbhMin    = CONFIG.MAIN_PRODUCT_MIN_STBH || 0;
+        const pulStbhMin     = CONFIG.PUL_MIN_STBH_OR || mainStbhMin;
+        const pulPremiumMin  = CONFIG.PUL_MIN_PREMIUM_OR || 0;
+        const mainPremiumMin = CONFIG.MAIN_PRODUCT_MIN_PREMIUM || 0;
+    
         const curStbh = appState.mainProduct.stbh || 0;
-        // Gate 1: STBH
-        if (curStbh > 0 && curStbh < effStbhMin) {
+    
+        // Tầng 1: STBH chưa đạt
+        if (curStbh > 0 && curStbh < mainStbhMin) {
             ridersDisabled = true;
-            ridersReason = `Cần STBH ≥ ${effStbhMin.toLocaleString('vi-VN')} đ (hiện tại: ${curStbh.toLocaleString('vi-VN')} đ)`;
-        } else if (curStbh >= effStbhMin) {
-            // Gate 2: Premium (chỉ check khi đã có phí > 0)
-            if (mainPremium > 0 && mainPremium < effPremiumMin) {
+            ridersReason = `Cần STBH ≥ ${mainStbhMin.toLocaleString('vi-VN')} đ (hiện tại: ${curStbh.toLocaleString('vi-VN')} đ)`;
+    
+        // Tầng 2: STBH đạt main nhưng chưa tới ngưỡng PUL -> dùng phí tối thiểu pulPremiumMin
+        } else if (curStbh >= mainStbhMin && curStbh < pulStbhMin) {
+            if (mainPremium > 0 && mainPremium < pulPremiumMin) {
                 ridersDisabled = true;
-                ridersReason = `Cần phí sản phẩm chính ≥ ${effPremiumMin.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+                ridersReason = `Cần phí chính ≥ ${pulPremiumMin.toLocaleString('vi-VN')} đ (STBH < ${pulStbhMin.toLocaleString('vi-VN')} đ)`;
             }
-            // Nếu mainPremium = 0 (chưa tính) thì chưa khóa – chờ tính xong
-        }
-    } else if (!isTTA && !isPul) {
-        // Sản phẩm chính thường: chỉ cần đạt ngưỡng phí
-        if (mainPremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
-            ridersDisabled = true;
-            ridersReason = `Cần phí sản phẩm chính ≥ ${CONFIG.MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ (hiện tại: ${mainPremium.toLocaleString('vi-VN')} đ)`;
+            // mainPremium == 0 => chưa khóa (đợi tính phí)
+    
+        // Tầng 3: STBH ≥ pulStbhMin -> dùng phí tối thiểu mainPremiumMin
+        } else if (curStbh >= pulStbhMin) {
+            if (mainPremium > 0 && mainPremium < mainPremiumMin) {
+                ridersDisabled = true;
+                ridersReason = `Cần phí chính ≥ ${mainPremiumMin.toLocaleString('vi-VN')} đ`;
+            }
+            // mainPremium == 0 => chờ tính
         }
     }
+
     // ================= PATCH END =================
 
     let anyUncheckedByThreshold = false;
