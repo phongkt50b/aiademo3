@@ -930,44 +930,60 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     const abuvTermEl = document.getElementById('abuv-term');
 
     // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
+    // ============== PUL: LOGIC TẦNG MỚI ==============
     if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-            // Ngưỡng cấu hình gốc
-            const pulMinFeeRaw  = CONFIG.PUL_MIN_PREMIUM_OR || 0;
-            const pulMinStbhRaw = CONFIG.PUL_MIN_STBH_OR    || 0;
+        const mainStbhMin      = CONFIG.MAIN_PRODUCT_MIN_STBH || 0;
+        const pulStbhMin       = CONFIG.PUL_MIN_STBH_OR || mainStbhMin;
+        const pulPremiumMin    = CONFIG.PUL_MIN_PREMIUM_OR || 0;
+        const mainPremiumMin   = CONFIG.MAIN_PRODUCT_MIN_PREMIUM || 0;
     
-            // Ngưỡng hiệu dụng theo yêu cầu: STBH dùng MIN, Phí dùng MAX
-            const effectiveStbhMin    = Math.min(pulMinStbhRaw, CONFIG.MAIN_PRODUCT_MIN_STBH);
-            const effectivePremiumMin = Math.max(pulMinFeeRaw, CONFIG.MAIN_PRODUCT_MIN_PREMIUM);
+        // Reset lỗi trước
+        clearFieldError(stbhEl);
+        const feeInputForPul = stbhEl; // vì không có input phí chính riêng PUL
     
-            // 1) Gate STBH trước
-            if (stbh > 0 && stbh < effectiveStbhMin) {
+        if (stbh > 0 && stbh < mainStbhMin) {
+            // TẦNG 1: STBH chưa đạt min của sản phẩm chính
+            setFieldError(stbhEl, `STBH tối thiểu: ${mainStbhMin.toLocaleString('vi-VN')} đ`);
+            ok = false;
+    
+        } else if (stbh >= mainStbhMin && stbh < pulStbhMin) {
+            // TẦNG 2: STBH đạt min chung nhưng chưa tới min PUL → dùng ngưỡng phí PUL
+            clearFieldError(stbhEl);
+    
+            if (basePremium > 0 && basePremium < pulPremiumMin) {
                 setFieldError(
-                  stbhEl,
-                  `STBH tối thiểu: ${effectiveStbhMin.toLocaleString('vi-VN')}`
+                  feeInputForPul,
+                  `Phí tối thiểu (tầng STBH < ${pulStbhMin.toLocaleString('vi-VN')} đ): ${pulPremiumMin.toLocaleString('vi-VN')} đ`
                 );
-                // Không kiểm tra phí khi STBH chưa đạt
                 ok = false;
+            } else if (basePremium >= pulPremiumMin) {
+                clearFieldError(feeInputForPul);
             } else {
-                clearFieldError(stbhEl);
-    
-                // 2) Chỉ kiểm tra phí khi STBH đạt ngưỡng & đã có premium tính ra (>0)
-                // (Vì PUL không có input nhập phí chính thủ công)
-                if (basePremium > 0 && basePremium < effectivePremiumMin) {
-                    // Gắn lỗi vào STBH (do không có input phí chính riêng cho PUL)
-                    setFieldError(
-                      stbhEl,
-                      `Phí tối thiểu: ${effectivePremiumMin.toLocaleString('vi-VN')}`
-                    );
-                    ok = false;
-                } else if (basePremium >= effectivePremiumMin) {
-                    // Đạt phí
-                    if (stbhEl) clearFieldError(stbhEl);
-                } else {
-                    // basePremium == 0: chưa tính ra => không set lỗi phí
-                }
+                // basePremium == 0 => chưa tính phí, chưa cảnh báo
             }
     
+        } else if (stbh >= pulStbhMin) {
+            // TẦNG 3: STBH đã ≥ ngưỡng PUL → dùng ngưỡng phí chung MAIN
+            clearFieldError(stbhEl);
+    
+            if (basePremium > 0 && basePremium < mainPremiumMin) {
+                setFieldError(
+                  feeInputForPul,
+                  `Phí tối thiểu: ${mainPremiumMin.toLocaleString('vi-VN')} đ`
+                );
+                ok = false;
+            } else if (basePremium >= mainPremiumMin) {
+                clearFieldError(feeInputForPul);
+            } else {
+                // basePremium == 0 => chưa tính phí, chưa cảnh báo
+            }
         } else {
+            // stbh == 0: chưa nhập / chưa tính → không báo lỗi
+            clearFieldError(stbhEl);
+        }
+    
+    } else {
+
         // (Tùy chọn) ẩn hint nếu không phải PUL:
         // updatePulHint({ hide: true });
     
