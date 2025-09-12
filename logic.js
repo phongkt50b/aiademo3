@@ -960,7 +960,7 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
             if (basePremium > 0 && basePremium < pulPremiumMin) {
                 setFieldError(
                   feeInputForPul,
-                  `Phí tối thiểu (tầng STBH < ${pulStbhMin.toLocaleString('vi-VN')} đ): ${pulPremiumMin.toLocaleString('vi-VN')} đ`
+                  `Phí tối thiểu: ${pulPremiumMin.toLocaleString('vi-VN')} đ`
                 );
                 ok = false;
             } else if (basePremium >= pulPremiumMin) {
