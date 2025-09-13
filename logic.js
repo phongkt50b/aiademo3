@@ -1372,7 +1372,6 @@ function updateSupplementaryAddButtonState() {
     btn.classList.toggle('cursor-not-allowed', disabled);
     btn.classList.toggle('hidden', isTTA);
 }
-
 function generateSupplementaryProductsHtml() {
     return CONFIG.supplementaryProducts.map(prod => {
         let optionsHtml = '';
@@ -1390,23 +1389,44 @@ function generateSupplementaryProductsHtml() {
               </div>    
               <div>
                 <label class="font-medium text-gray-700 block mb-1">Phạm vi địa lý</label>
-                <select class="form-select health-scl-scope"><option value="main_vn">Việt Nam</option><option value="main_global">Nước ngoài</option></select>
+                <select class="form-select health-scl-scope">
+                  <option value="main_vn">Việt Nam</option>
+                  <option value="main_global">Nước ngoài</option>
+                </select>
               </div>
             </div>
             <div>
               <span class="font-medium text-gray-700 block mb-2">Quyền lợi tùy chọn:</span>
               <div class="space-y-2">
-                <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" class="form-checkbox health-scl-outpatient"> <span>Điều trị ngoại trú</span></label>
-                <label class="flex items-center space-x-3 cursor-pointer"><input type="checkbox" class="form-checkbox health-scl-dental"> <span>Chăm sóc nha khoa</span></label>
+                <label class="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" class="form-checkbox health-scl-outpatient">
+                  <span>Điều trị ngoại trú</span>
+                  <span class="scl-outpatient-fee ml-2 text-xs text-gray-600"></span>
+                </label>
+                <label class="flex items-center space-x-3 cursor-pointer">
+                  <input type="checkbox" class="form-checkbox health-scl-dental">
+                  <span>Chăm sóc nha khoa</span>
+                  <span class="scl-dental-fee ml-2 text-xs text-gray-600"></span>
+                </label>
               </div>
             </div>`;
         } else {
-            optionsHtml = `<div><label class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH)</label><input type="text" class="form-input ${prod.id}-stbh" placeholder="${prod.id==='bhn'?'VD: 200.000.000':(prod.id==='accident'?'VD: 500.000.000':(prod.id==='hospital_support'?'Bội số 100.000 (đ/ngày)':'Nhập STBH'))}"></div><p class="hospital-support-validation text-sm text-gray-500 mt-1"></p>`;
+            optionsHtml = `<div>
+              <label class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH)</label>
+              <input type="text" class="form-input ${prod.id}-stbh" placeholder="${
+                prod.id==='bhn' ? 'VD: 200.000.000' :
+                (prod.id==='accident' ? 'VD: 500.000.000' :
+                  (prod.id==='hospital_support' ? 'Bội số 100.000 (đ/ngày)' : 'Nhập STBH')
+                )
+              }">
+            </div>
+            <p class="hospital-support-validation text-sm text-gray-500 mt-1"></p>`;
         }
         return `
         <div class="product-section ${prod.id}-section hidden">
           <label class="flex items-center space-x-3 cursor-pointer">
-            <input type="checkbox" class="form-checkbox ${prod.id}-checkbox"> <span class="text-lg font-medium text-gray-800">${prod.name}</span>
+            <input type="checkbox" class="form-checkbox ${prod.id}-checkbox">
+            <span class="text-lg font-medium text-gray-800">${prod.name}</span>
           </label>
           <div class="product-options hidden mt-3 pl-8 space-y-3 border-l-2 border-gray-200">
             ${optionsHtml}
@@ -1416,6 +1436,7 @@ function generateSupplementaryProductsHtml() {
         </div>`;
     }).join('');
 }
+
 
 function initOccupationAutocomplete(input, container) {
   if (!input) return;
