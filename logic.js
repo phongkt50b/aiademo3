@@ -676,7 +676,6 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     const isTTA = mainProductKey === 'TRON_TAM_AN';
     const isPul = ['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProductKey);
 
-    // ================= PATCH START (thay cho biến belowMin cũ) =================
     let ridersDisabled = false;
     let ridersReason = '';
 
@@ -685,33 +684,23 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         const pulStbhMin     = CONFIG.PUL_MIN_STBH_OR || mainStbhMin;
         const pulPremiumMin  = CONFIG.PUL_MIN_PREMIUM_OR || 0;
         const mainPremiumMin = CONFIG.MAIN_PRODUCT_MIN_PREMIUM || 0;
-    
         const curStbh = appState.mainProduct.stbh || 0;
-    
-        // Tầng 1: STBH chưa đạt
+
         if (curStbh > 0 && curStbh < mainStbhMin) {
             ridersDisabled = true;
             ridersReason = `Cần STBH ≥ ${mainStbhMin.toLocaleString('vi-VN')} đ (hiện tại: ${curStbh.toLocaleString('vi-VN')} đ)`;
-    
-        // Tầng 2: STBH đạt main nhưng chưa tới ngưỡng PUL -> dùng phí tối thiểu pulPremiumMin
         } else if (curStbh >= mainStbhMin && curStbh < pulStbhMin) {
             if (mainPremium > 0 && mainPremium < pulPremiumMin) {
                 ridersDisabled = true;
                 ridersReason = `Cần phí chính ≥ ${pulPremiumMin.toLocaleString('vi-VN')} đ (STBH < ${pulStbhMin.toLocaleString('vi-VN')} đ)`;
             }
-            // mainPremium == 0 => chưa khóa (đợi tính phí)
-    
-        // Tầng 3: STBH ≥ pulStbhMin -> dùng phí tối thiểu mainPremiumMin
         } else if (curStbh >= pulStbhMin) {
             if (mainPremium > 0 && mainPremium < mainPremiumMin) {
                 ridersDisabled = true;
                 ridersReason = `Cần phí chính ≥ ${mainPremiumMin.toLocaleString('vi-VN')} đ`;
             }
-            // mainPremium == 0 => chờ tính
         }
     }
-
-    // ================= PATCH END =================
 
     let anyUncheckedByThreshold = false;
 
@@ -735,21 +724,18 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
 
         if (isEligible && ridersDisabled) {
-            // Khóa do chưa đạt ngưỡng
             if (checkbox.checked) {
                 checkbox.checked = false;
                 anyUncheckedByThreshold = true;
             }
             checkbox.disabled = true;
             section.classList.add('opacity-50');
-
             const msgEl = section.querySelector('.main-premium-threshold-msg');
             if (msgEl) {
                 msgEl.textContent = ridersReason;
                 msgEl.classList.remove('hidden');
             }
         } else {
-            // Trạng thái bình thường
             checkbox.disabled = !isEligible;
             section.classList.toggle('opacity-50', !isEligible);
             const msgEl = section.querySelector('.main-premium-threshold-msg');
@@ -759,25 +745,43 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             }
         }
 
-        // Hiển thị / ẩn block options
         const options = section.querySelector('.product-options');
         if (options) {
             options.classList.toggle('hidden', !checkbox.checked);
         }
 
-        // Cập nhật hiển thị phí
         const fee = appState.fees.byPerson[customer.id]?.suppDetails?.[prod.id] || 0;
         const feeDisplay = section.querySelector('.fee-display');
         if (feeDisplay) {
             feeDisplay.textContent = fee > 0 ? `Phí: ${formatCurrency(fee)}` : '';
+        }
+
+        // === CẬP NHẬT PHÍ TÙY CHỌN CHO SỨC KHỎE BÙNG GIA LỰC ===
+        if (prod.id === 'health_scl' && section.querySelector('.health-scl-checkbox')?.checked) {
+            const comps = getHealthSclFeeComponents(customer);
+            const outpatientCb = section.querySelector('.health-scl-outpatient');
+            const dentalCb = section.querySelector('.health-scl-dental');
+            const outSpan = section.querySelector('.scl-outpatient-fee');
+            const dentalSpan = section.querySelector('.scl-dental-fee');
+
+            if (outSpan) {
+                outSpan.textContent = (outpatientCb && outpatientCb.checked && comps.outpatient > 0)
+                  ? `(+${formatCurrency(comps.outpatient)})`
+                  : '';
+            }
+            if (dentalSpan) {
+                dentalSpan.textContent = (dentalCb && dentalCb.checked && comps.dental > 0)
+                  ? `(+${formatCurrency(comps.dental)})`
+                  : '';
+            }
         }
     });
 
     if (anyUncheckedByThreshold && typeof runWorkflowDebounced === 'function') {
         runWorkflowDebounced();
     }
-    
-    // Khối xử lý riêng SCL (giữ nguyên, chỉ thay tham chiếu ridersDisabled thay vì belowMin)
+
+    // Giữ nguyên phần logic SCL nâng cấp chương trình ở dưới
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
@@ -788,11 +792,10 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
 
         if (ridersDisabled) {
-            return; // đang bị gate – khỏi xử lý nâng cấp chương trình
+            return;
         } else if (isTTA) {
             Array.from(programSelect.options).forEach(opt => opt.disabled = false);
         } else {
-            // Logic giới hạn chương trình theo premium (giữ nguyên)
             programSelect.querySelectorAll('option').forEach(opt => {
                 if (opt.value === 'nang_cao') return;
                 if (mainPremium >= 15000000) {
@@ -809,7 +812,6 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
                 programSelect.value = '';
             }
 
-            // Hint STBH theo option
             const stbhHintEl = sclSection.querySelector('.health-scl-stbh-hint');
             if (stbhHintEl && programSelect) {
                 const setHint = () => {
@@ -827,6 +829,7 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     }
 }
+
 function updateSummaryUI(fees) {
   const f = fees || { baseMain:0, extra:0, totalSupp:0, total:0 };
   const fmt = (n)=> formatDisplayCurrency(Math.round((Number(n)||0)/1000)*1000);
