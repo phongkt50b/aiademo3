@@ -402,6 +402,40 @@ function calculateHealthSclPremium(customer, mainPremium, totalHospitalSupportSt
 
     return roundDownTo1000(totalPremium);
 }
+// Tách phí từng phần của Sức khỏe Bùng Gia Lực
+function getHealthSclFeeComponents(customer, ageOverride = null) {
+  try {
+    if (!customer || !customer.supplements || !customer.supplements.health_scl) {
+      return { base:0, outpatient:0, dental:0, total:0 };
+    }
+    const ageToUse = ageOverride ?? customer.age;
+    const { program, scope, outpatient, dental } = customer.supplements.health_scl;
+    if (!program || !scope) return { base:0, outpatient:0, dental:0, total:0 };
+
+    const ageBandIndex = product_data.health_scl_rates.age_bands.findIndex(
+      b => ageToUse >= b.min && ageToUse <= b.max
+    );
+    if (ageBandIndex === -1) return { base:0, outpatient:0, dental:0, total:0 };
+
+    const base = product_data.health_scl_rates[scope]?.[ageBandIndex]?.[program] || 0;
+    const outpatientFee = outpatient
+        ? (product_data.health_scl_rates.outpatient?.[ageBandIndex]?.[program] || 0)
+        : 0;
+    const dentalFee = dental
+        ? (product_data.health_scl_rates.dental?.[ageBandIndex]?.[program] || 0)
+        : 0;
+
+    const total = base + outpatientFee + dentalFee;
+    return {
+      base: roundDownTo1000(base),
+      outpatient: roundDownTo1000(outpatientFee),
+      dental: roundDownTo1000(dentalFee),
+      total: roundDownTo1000(total)
+    };
+  } catch(e){
+    return { base:0, outpatient:0, dental:0, total:0 };
+  }
+}
 
 function calculateBhnPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
     const ageToUse = ageOverride ?? customer.age;
