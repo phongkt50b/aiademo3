@@ -757,7 +757,7 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
 
         // === CẬP NHẬT PHÍ TÙY CHỌN CHO SỨC KHỎE BÙNG GIA LỰC ===
-        if (prod.id === 'health_scl' && section.querySelector('.health-scl-checkbox')?.checked) {
+        if (prod.id === 'health_scl' && section.querySelector('.health_scl-checkbox')?.checked) {
             const comps = getHealthSclFeeComponents(customer);
             const outpatientCb = section.querySelector('.health-scl-outpatient');
             const dentalCb = section.querySelector('.health-scl-dental');
