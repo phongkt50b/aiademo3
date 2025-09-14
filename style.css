@@ -19,10 +19,14 @@ html, body {
   min-height: 100vh !important;
 }
 
-/* Fix sticky sidebar trong iframe */
+/* Fix sticky sidebar trong iframe - STICKY BOTTOM */
 #results-container {
   position: sticky !important;
-  top: 2rem !important;
+  bottom: 1rem !important;  /* ⬅️ Dùng BOTTOM thay vì TOP */
+  top: auto !important;     /* ⬅️ Reset top */
+  align-self: flex-end !important;  /* ⬅️ Align to end */
+  max-height: calc(100vh - 2rem) !important;
+  overflow-y: auto !important;
   z-index: 10 !important;
 }
 
@@ -380,7 +384,8 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
-/* ================== FIX IFRAME HEIGHT & SIDEBAR ================== */
+
+/* ================== FIX IFRAME HEIGHT & SIDEBAR STICKY BOTTOM ================== */
 /* Khi được nhúng trong iframe, giảm khoảng trắng thừa */
 @media all {
   /* Giảm padding/margin cuối trang */
@@ -388,12 +393,30 @@ input[type="number"] { -moz-appearance: textfield; }
     padding-bottom: 2rem !important;
   }
   
-  /* Đảm bảo sidebar sticky đúng vị trí */
+  /* SIDEBAR STICKY TO BOTTOM - Dính cuối viewport */
   #results-container {
     position: sticky !important;
-    top: 1rem !important;
+    bottom: 1rem !important;  /* ⬅️ Dùng BOTTOM thay vì TOP */
+    top: auto !important;     /* ⬅️ Reset top */
+    align-self: flex-end !important;  /* ⬅️ Align to end */
     max-height: calc(100vh - 2rem) !important;
     overflow-y: auto !important;
+    z-index: 10 !important;
+  }
+  
+  /* Backup: Nếu #results-container không work, thử selector khác */
+  .grid > div:last-child,
+  .grid-cols-2 > div:last-child,
+  .lg\\:grid-cols-2 > div:last-child,
+  [class*="results"],
+  [class*="summary"] {
+    position: sticky !important;
+    bottom: 1rem !important;
+    top: auto !important;
+    align-self: flex-end !important;
+    max-height: calc(100vh - 2rem) !important;
+    overflow-y: auto !important;
+    z-index: 10 !important;
   }
   
   /* Giảm khoảng cách cuối form */
@@ -415,3 +438,23 @@ input[type="number"] { -moz-appearance: textfield; }
     min-height: auto !important;
   }
 }
+
+/* ================== FLOATING SIDEBAR (BACKUP OPTION) ================== */
+/* Nếu sticky không work, uncomment phần này để dùng floating sidebar */
+/*
+#results-container,
+.grid > div:last-child {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  width: 320px !important;
+  max-height: 60vh !important;
+  overflow-y: auto !important;
+  background: white !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
+  padding: 1.5rem !important;
+  z-index: 9999 !important;
+  border: 1px solid var(--gray-200) !important;
+}
+*/
