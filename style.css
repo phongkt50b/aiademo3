@@ -12,6 +12,25 @@ body {
   font-family: 'Be Vietnam Pro', sans-serif;
 }
 
+/* ================== FIX STICKY TRONG IFRAME ================== */
+/* Đảm bảo body và html có height đầy đủ trong iframe */
+html, body {
+  height: 100% !important;
+  min-height: 100vh !important;
+}
+
+/* Fix sticky sidebar trong iframe */
+#results-container {
+  position: sticky !important;
+  top: 2rem !important;
+  z-index: 10 !important;
+}
+
+/* Đảm bảo content đủ cao để scroll trong iframe */
+main.grid {
+  min-height: 100vh !important;
+}
+
 /* Brand helpers */
 .text-aia-red { color: var(--aia-red); }
 .bg-aia-red { background-color: var(--aia-red); }
@@ -361,148 +380,3 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
-/* ================== SCROLL TOÀN TRANG - SIDEBAR BÊN PHẢI ================== */
-
-/* Reset body và html để scroll tự nhiên */
-html, body {
-  margin: 0;
-  padding: 0;
-  height: auto; /* Không cố định chiều cao */
-  overflow-x: hidden; /* Chỉ ẩn scroll ngang nếu cần */
-}
-
-/* Container chính - cho phép scroll tự nhiên */
-.main-container,
-.app-container,
-.page-container {
-  min-height: 100vh; /* Tối thiểu full viewport */
-  display: flex;
-  flex-direction: column;
-}
-
-/* Header - sticky thay vì fixed */
-.header,
-.app-header,
-.page-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: #fff;
-  border-bottom: 1px solid var(--gray-200);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-/* Layout chính với content + sidebar */
-.main-layout {
-  display: flex;
-  flex: 1;
-  gap: 0;
-}
-
-/* Content area - BÊN TRÁI, BỎ overflow và height cố định */
-.content,
-.main-content,
-.page-content {
-  flex: 1;
-  padding: 2rem;
-  /* BỎ các dòng này nếu có:
-     overflow-y: auto;
-     height: calc(100vh - 80px);
-     max-height: calc(100vh - 80px);
-  */
-  min-height: calc(100vh - 80px); /* Tối thiểu để đẩy footer xuống */
-}
-
-/* Sidebar - BÊN PHẢI, sticky */
-.sidebar,
-.nav-sidebar,
-.right-sidebar {
-  width: 280px;
-  background: var(--gray-50);
-  border-left: 1px solid var(--gray-200); /* border-left thay vì border-right */
-  position: sticky;
-  top: 80px; /* Cách header (điều chỉnh theo chiều cao header thực tế) */
-  height: fit-content;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto; /* Chỉ sidebar mới có scroll riêng nếu quá dài */
-  order: 2; /* Đảm bảo sidebar ở bên phải */
-}
-
-/* Đảm bảo content ở bên trái */
-.content,
-.main-content,
-.page-content {
-  order: 1; /* Content ở bên trái */
-}
-
-/* Form sections - đảm bảo không bị cắt */
-.product-section {
-  margin-bottom: 1.5rem;
-}
-
-/* Gallery images - responsive với scroll tự nhiên */
-.img-product-gallery,
-.img-company-gallery {
-  margin-bottom: 2rem;
-}
-
-/* Footer - luôn ở cuối */
-.footer,
-.app-footer {
-  margin-top: auto;
-  padding: 1rem 2rem;
-  background: var(--gray-50);
-  border-top: 1px solid var(--gray-200);
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .main-layout {
-    flex-direction: column;
-  }
-  
-  .sidebar,
-  .nav-sidebar,
-  .right-sidebar {
-    position: static; /* Bỏ sticky trên mobile */
-    width: 100%;
-    height: auto;
-    max-height: none;
-    border-left: none;
-    border-top: 1px solid var(--gray-200);
-    order: 2; /* Sidebar xuống dưới trên mobile */
-  }
-  
-  .content,
-  .main-content,
-  .page-content {
-    padding: 1rem;
-    min-height: auto;
-    order: 1; /* Content lên trên trên mobile */
-  }
-}
-
-/* Đảm bảo modal vẫn hoạt động tốt */
-#summary-modal {
-  position: fixed;
-  z-index: 9999;
-}
-
-/* Lightbox không bị ảnh hưởng */
-.img-lightbox {
-  position: fixed;
-  z-index: 9999;
-}
-
-/* Smooth scrolling cho toàn trang */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Focus management khi scroll */
-*:focus-visible {
-  outline: 2px solid var(--aia-red);
-  outline-offset: 2px;
-}
-
-/* ================== KẾT THÚC SCROLL TOÀN TRANG ================== */
