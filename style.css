@@ -380,3 +380,38 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
+/* ================== FIX IFRAME HEIGHT & SIDEBAR ================== */
+/* Khi được nhúng trong iframe, giảm khoảng trắng thừa */
+@media all {
+  /* Giảm padding/margin cuối trang */
+  body {
+    padding-bottom: 2rem !important;
+  }
+  
+  /* Đảm bảo sidebar sticky đúng vị trí */
+  #results-container {
+    position: sticky !important;
+    top: 1rem !important;
+    max-height: calc(100vh - 2rem) !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Giảm khoảng cách cuối form */
+  main.grid {
+    min-height: auto !important;
+    padding-bottom: 1rem !important;
+  }
+  
+  /* Tối ưu cho iframe */
+  .container {
+    padding-bottom: 1rem !important;
+  }
+}
+
+/* Detect nếu đang trong iframe */
+@media all {
+  body {
+    /* Kiểm tra nếu trong iframe thì điều chỉnh */
+    min-height: auto !important;
+  }
+}
