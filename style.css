@@ -361,7 +361,7 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
-/* ================== SCROLL TOÀN TRANG - THÊM VÀO CUỐI FILE ================== */
+/* ================== SCROLL TOÀN TRANG - SIDEBAR BÊN PHẢI ================== */
 
 /* Reset body và html để scroll tự nhiên */
 html, body {
@@ -392,27 +392,14 @@ html, body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-/* Layout chính với sidebar + content */
+/* Layout chính với content + sidebar */
 .main-layout {
   display: flex;
   flex: 1;
   gap: 0;
 }
 
-/* Sidebar - sticky */
-.sidebar,
-.nav-sidebar {
-  width: 280px;
-  background: var(--gray-50);
-  border-right: 1px solid var(--gray-200);
-  position: sticky;
-  top: 80px; /* Cách header (điều chỉnh theo chiều cao header thực tế) */
-  height: fit-content;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto; /* Chỉ sidebar mới có scroll riêng nếu quá dài */
-}
-
-/* Content area - BỎ overflow và height cố định */
+/* Content area - BÊN TRÁI, BỎ overflow và height cố định */
 .content,
 .main-content,
 .page-content {
@@ -424,6 +411,28 @@ html, body {
      max-height: calc(100vh - 80px);
   */
   min-height: calc(100vh - 80px); /* Tối thiểu để đẩy footer xuống */
+}
+
+/* Sidebar - BÊN PHẢI, sticky */
+.sidebar,
+.nav-sidebar,
+.right-sidebar {
+  width: 280px;
+  background: var(--gray-50);
+  border-left: 1px solid var(--gray-200); /* border-left thay vì border-right */
+  position: sticky;
+  top: 80px; /* Cách header (điều chỉnh theo chiều cao header thực tế) */
+  height: fit-content;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto; /* Chỉ sidebar mới có scroll riêng nếu quá dài */
+  order: 2; /* Đảm bảo sidebar ở bên phải */
+}
+
+/* Đảm bảo content ở bên trái */
+.content,
+.main-content,
+.page-content {
+  order: 1; /* Content ở bên trái */
 }
 
 /* Form sections - đảm bảo không bị cắt */
@@ -453,11 +462,15 @@ html, body {
   }
   
   .sidebar,
-  .nav-sidebar {
+  .nav-sidebar,
+  .right-sidebar {
     position: static; /* Bỏ sticky trên mobile */
     width: 100%;
     height: auto;
     max-height: none;
+    border-left: none;
+    border-top: 1px solid var(--gray-200);
+    order: 2; /* Sidebar xuống dưới trên mobile */
   }
   
   .content,
@@ -465,6 +478,7 @@ html, body {
   .page-content {
     padding: 1rem;
     min-height: auto;
+    order: 1; /* Content lên trên trên mobile */
   }
 }
 
