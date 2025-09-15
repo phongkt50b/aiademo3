@@ -439,6 +439,11 @@
   </div>
 </div>
 <!-- HẾT LIGHTBOX -->
-  
+<script>
+// Detect nếu đang trong iframe và thêm class
+if (window.self !== window.top) {
+  document.body.classList.add('iframe-context');
+}
+</script>  
 </body>
 </html>
