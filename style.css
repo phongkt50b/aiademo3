@@ -361,3 +361,13 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
+/* Fix sidebar cho iframe */
+@media screen {
+  .iframe-context #results-container {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    max-height: calc(100vh - 40px) !important;
+    z-index: 1000 !important;
+  }
+}
