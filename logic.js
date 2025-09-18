@@ -2702,17 +2702,30 @@ function computePart1LifetimeData(summaryData) {
   const payYearsMain = Math.max(0, Math.min(paymentTerm, globalTimelineYears));
 
   // Chuẩn bị STBH base cho MDP3
-  let mdp3StbhBase = 0;
-  if (mdpEnabled) {
-    try {
-      for (let pid in window.personFees) {
-        mdp3StbhBase += (window.personFees[pid].mainBase || 0) + (window.personFees[pid].supp || 0);
-      }
-      if (mdpTargetId && mdpTargetId !== 'other' && window.personFees[mdpTargetId]) {
-        mdp3StbhBase -= (window.personFees[mdpTargetId].supp || 0);
-      }
-    } catch(e){}
-  }
+    // === PATCH MDP3 lifetime base ===
+    let mdp3StbhBase = 0;
+    if (mdpEnabled) {
+      try {
+        const feesModel = (typeof appState !== 'undefined') ? appState.fees : null;
+        for (let pid in window.personFees) {
+          if (!Object.prototype.hasOwnProperty.call(window.personFees, pid)) continue;
+          if (pid === 'mdp3_other') continue; // bỏ node chỉ chứa phí mdp3
+          const pf = window.personFees[pid];
+          const suppDetails = feesModel?.byPerson?.[pid]?.suppDetails || {};
+          const mdp3Part = suppDetails.mdp3 || 0;
+          const suppNet = (pf.supp || 0) - mdp3Part;
+          mdp3StbhBase += (pf.mainBase || 0) + Math.max(0, suppNet);
+        }
+        if (mdpTargetId && mdpTargetId !== 'other' && window.personFees[mdpTargetId]) {
+          const suppDetails = feesModel?.byPerson?.[mdpTargetId]?.suppDetails || {};
+          const mdp3Part = suppDetails.mdp3 || 0;
+          const suppNet = (window.personFees[mdpTargetId].supp || 0) - mdp3Part;
+          mdp3StbhBase -= Math.max(0, suppNet);
+        }
+        if (mdp3StbhBase < 0) mdp3StbhBase = 0;
+      } catch(e){}
+    }
+
   function calcMdp3PremiumIssue(age, gender) { // chỉ dùng tuổi phát hành
     if (!mdpEnabled || !mdp3StbhBase) return 0;
     const row = product_data.mdp3_rates.find(r => age >= r.ageMin && age <= r.ageMax);
