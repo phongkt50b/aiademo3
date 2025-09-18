@@ -2354,6 +2354,7 @@ function buildSummaryData() {
     const form = document.getElementById('person-container-mdp3-other');
     let ageOther = mainInfo.age;
     let nameOther = 'Người khác (Miễn đóng phí 3.0)';
+    let genderOther = 'Nam';  
     if (form) {
       const info = collectPersonData(form, false);
       if (info.age) ageOther = info.age;
