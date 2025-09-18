@@ -2358,12 +2358,13 @@ function buildSummaryData() {
       const info = collectPersonData(form, false);
       if (info.age) ageOther = info.age;
       if (info.name) nameOther = info.name;
+      if (info.gender) genderOther = info.gender;
     }
     persons.push({
       id:'mdp3_other',
       isMain:false,
       name: nameOther,
-      gender:'Nam',
+      gender:genderOther,
       age: ageOther,
       supplements:{}
     });
