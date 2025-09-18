@@ -1910,13 +1910,34 @@ window.MDP3 = (function () {
             if(feeEl) feeEl.textContent = '';
             return 0;
         }
+        // === PATCH MDP3: loại phí mdp3 ra khỏi base & bỏ node 'mdp3_other' ===
         let stbhBase = 0;
+        const feesModel = (typeof appState !== 'undefined') ? appState.fees : null;
+        
         for (let pid in window.personFees) {
-            stbhBase += (window.personFees[pid].mainBase || 0) + (window.personFees[pid].supp || 0);
+          if (!Object.prototype.hasOwnProperty.call(window.personFees, pid)) continue;
+        
+          // Bỏ hẳn node tạo riêng cho "người khác"
+          if (pid === 'mdp3_other') continue;
+        
+          const pf = window.personFees[pid];
+          const suppDetails = feesModel?.byPerson?.[pid]?.suppDetails || {};
+          const mdp3Part = suppDetails.mdp3 || 0;          // phần phí mdp3 của người này (nếu có)
+          const suppNet = (pf.supp || 0) - mdp3Part;       // phần bổ sung thực (loại mdp3)
+        
+          stbhBase += (pf.mainBase || 0) + Math.max(0, suppNet);
         }
-        if (selectedId !== 'other' && window.personFees[selectedId]) {
-            stbhBase -= window.personFees[selectedId].supp || 0;
+        
+        // Nếu chọn miễn cho 1 người cụ thể (không phải "other") thì trừ riders của người đó (đÃ loại mdp3)
+        if (selectedId && selectedId !== 'other' && window.personFees[selectedId]) {
+          const suppDetails = feesModel?.byPerson?.[selectedId]?.suppDetails || {};
+          const mdp3Part = suppDetails.mdp3 || 0;
+          const suppNet = (window.personFees[selectedId].supp || 0) - mdp3Part;
+          stbhBase -= Math.max(0, suppNet);
         }
+        
+        if (stbhBase < 0) stbhBase = 0;
+
         let age, gender;
          if (selectedId === 'other') {
           const form = document.getElementById('person-container-mdp3-other');
