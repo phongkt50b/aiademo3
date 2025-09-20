@@ -237,6 +237,14 @@
       text-align: right;
     }
   </style>
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.20.0",
+    "marked": "https://aistudiocdn.com/marked@^16.3.0"
+  }
+}
+</script>
 </head>
 <body>
   <header>
@@ -294,7 +302,7 @@
     }
 
     const fetchPromises = urls.map(url =>
-      fetch(url, { method: 'GET', cache: 'no-store', mode: 'cors' })
+      fetch(url, { method: 'HEAD', cache: 'no-store', mode: 'cors' })
         .then(res => res.ok ? url : null)
         .catch(() => null)
     );
@@ -303,18 +311,23 @@
     return results.filter(x => x !== null);
   }
 
-  function renderImageBlock(urls){
+  function renderImageBlock(urls, isFirstBlock = false){
     if(!urls.length) return null;
     const wrap=document.createElement('div');
     wrap.className='viewer-image-block';
 
     const fragment = document.createDocumentFragment();
-    urls.forEach(u=>{
+    urls.forEach((u, index)=>{
       const fig=document.createElement('figure');
       const img=document.createElement('img');
       img.src=u;
       img.alt='Ảnh minh họa';
-      img.loading = 'lazy';
+      
+      const isFirstImageOverall = isFirstBlock && index === 0;
+      if (!isFirstImageOverall) {
+        img.loading = 'lazy';
+      }
+
       img.addEventListener('load', () => {
         img.classList.add('loaded');
       });
@@ -434,7 +447,7 @@
 
     // 2. Chèn ảnh công ty TRƯỚC TOÀN BỘ bảng minh họa (trước container)
     const companyImgs = await collectParallelLimited('images/company','company',10);
-    const companyBlock = renderImageBlock(companyImgs);
+    const companyBlock = renderImageBlock(companyImgs, true);
     if(companyBlock){
       if(container.parentNode){
         container.parentNode.insertBefore(companyBlock, container);
