@@ -147,9 +147,6 @@ export const product_data = {
     ]
 };
 
-// ===================================================================================
-// ===== MODULE: INVESTMENT CALCULATION DATA (NEW)
-// ===================================================================================
 export const investment_data = {
     [cite_start]// Tỷ lệ Phí bảo hiểm rủi ro (trên 1.000đ STBH) [cite: 4, 5, 6, 7]
     cost_of_insurance_rates: [
