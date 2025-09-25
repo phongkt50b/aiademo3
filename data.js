@@ -148,3 +148,74 @@ export const product_data = {
         { ageMin: 60, ageMax: 60, nam: 71.71, nu: 40.52 }
     ]
 };
+// ===================================================================================
+// ===== MODULE: INVESTMENT CALCULATION DATA (NEW)
+// ===================================================================================
+export const investment_data = {
+    [cite_start]// Tỷ lệ Phí bảo hiểm rủi ro (trên 1.000đ STBH) [cite: 4, 5, 6, 7]
+    cost_of_insurance_rates: [
+        { age: 0, nam: 1.84, nu: 1.32 }, { age: 1, nam: 0.72, nu: 0.59 }, { age: 2, nam: 0.69, nu: 0.56 },
+        { age: 3, nam: 0.68, nu: 0.55 }, { age: 4, nam: 0.65, nu: 0.54 }, { age: 5, nam: 0.62, nu: 0.53 },
+        { age: 6, nam: 0.58, nu: 0.51 }, { age: 7, nam: 0.55, nu: 0.50 }, { age: 8, nam: 0.53, nu: 0.49 },
+        { age: 9, nam: 0.52, nu: 0.48 }, { age: 10, nam: 0.53, nu: 0.48 }, { age: 11, nam: 0.57, nu: 0.49 },
+        { age: 12, nam: 0.64, nu: 0.51 }, { age: 13, nam: 0.75, nu: 0.54 }, { age: 14, nam: 0.87, nu: 0.57 },
+        { age: 15, nam: 0.99, nu: 0.61 }, { age: 16, nam: 1.11, nu: 0.64 }, { age: 17, nam: 1.20, nu: 0.67 },
+        { age: 18, nam: 1.27, nu: 0.70 }, { age: 19, nam: 1.32, nu: 0.72 }, { age: 20, nam: 1.33, nu: 0.74 },
+        { age: 21, nam: 1.33, nu: 0.76 }, { age: 22, nam: 1.32, nu: 0.77 }, { age: 23, nam: 1.29, nu: 0.78 },
+        { age: 24, nam: 1.26, nu: 0.81 }, { age: 25, nam: 1.23, nu: 0.82 }, { age: 26, nam: 1.20, nu: 0.84 },
+        { age: 27, nam: 1.20, nu: 0.87 }, { age: 28, nam: 1.19, nu: 0.90 }, { age: 29, nam: 1.20, nu: 0.92 },
+        { age: 30, nam: 1.23, nu: 0.96 }, { age: 31, nam: 1.26, nu: 0.99 }, { age: 32, nam: 1.31, nu: 1.03 },
+        { age: 33, nam: 1.37, nu: 1.08 }, { age: 34, nam: 1.44, nu: 1.13 }, { age: 35, nam: 1.52, nu: 1.19 },
+        { age: 36, nam: 1.62, nu: 1.27 }, { age: 37, nam: 1.74, nu: 1.37 }, { age: 38, nam: 1.88, nu: 1.49 },
+        { age: 39, nam: 2.03, nu: 1.62 }, { age: 40, nam: 2.21, nu: 1.77 }, { age: 41, nam: 2.39, nu: 1.93 },
+        { age: 42, nam: 2.60, nu: 2.09 }, { age: 43, nam: 2.82, nu: 2.24 }, { age: 44, nam: 3.06, nu: 2.41 },
+        { age: 45, nam: 3.31, nu: 2.58 }, { age: 46, nam: 3.58, nu: 2.74 }, { age: 47, nam: 3.87, nu: 2.93 },
+        { age: 48, nam: 4.18, nu: 3.14 }, { age: 49, nam: 4.52, nu: 3.35 }, { age: 50, nam: 4.90, nu: 3.59 },
+        { age: 51, nam: 5.34, nu: 3.85 }, { age: 52, nam: 5.83, nu: 4.14 }, { age: 53, nam: 6.39, nu: 4.47 },
+        { age: 54, nam: 7.01, nu: 4.80 }, { age: 55, nam: 7.67, nu: 5.13 }, { age: 56, nam: 8.38, nu: 5.46 },
+        { age: 57, nam: 9.13, nu: 5.78 }, { age: 58, nam: 9.93, nu: 6.09 }, { age: 59, nam: 10.79, nu: 6.44 },
+        { age: 60, nam: 11.76, nu: 6.86 }, { age: 61, nam: 12.85, nu: 7.38 }, { age: 62, nam: 14.08, nu: 8.04 },
+        { age: 63, nam: 15.46, nu: 8.84 }, { age: 64, nam: 16.99, nu: 9.74 }, { age: 65, nam: 18.63, nu: 10.70 },
+        { age: 66, nam: 20.39, nu: 11.70 }, { age: 67, nam: 22.25, nu: 12.69 }, { age: 68, nam: 24.26, nu: 13.71 },
+        { age: 69, nam: 26.47, nu: 14.86 }, { age: 70, nam: 28.96, nu: 16.21 }, { age: 71, nam: 31.80, nu: 17.87 },
+        { age: 72, nam: 35.06, nu: 19.93 }, { age: 73, nam: 38.74, nu: 22.39 }, { age: 74, nam: 42.77, nu: 25.24 },
+        { age: 75, nam: 47.08, nu: 28.39 }, { age: 76, nam: 51.59, nu: 31.82 }, { age: 77, nam: 56.26, nu: 35.48 },
+        { age: 78, nam: 61.12, nu: 39.42 }, { age: 79, nam: 66.33, nu: 43.80 }, { age: 80, nam: 72.06, nu: 48.77 },
+        { age: 81, nam: 78.46, nu: 54.48 }, { age: 82, nam: 85.69, nu: 61.08 }, { age: 83, nam: 93.69, nu: 68.53 },
+        { age: 84, nam: 102.28, nu: 76.73 }, { age: 85, nam: 111.29, nu: 85.60 }, { age: 86, nam: 120.55, nu: 95.07 },
+        { age: 87, nam: 130.01, nu: 105.13 }, { age: 88, nam: 139.67, nu: 115.77 }, { age: 89, nam: 149.58, nu: 127.08 },
+        { age: 90, nam: 159.90, nu: 139.20 }, { age: 91, nam: 170.88, nu: 152.38 }, { age: 92, nam: 183.00, nu: 167.08 },
+        { age: 93, nam: 197.49, nu: 184.39 }, { age: 94, nam: 216.98, nu: 206.66 }, { age: 95, nam: 246.30, nu: 238.71 },
+        { age: 96, nam: 294.69, nu: 289.72 }, { age: 97, nam: 378.70, nu: 376.07 }, { age: 98, nam: 521.61, nu: 520.77 },
+        { age: 99, nam: 700.00, nu: 700.00 }, { age: 100, nam: 700.00, nu: 700.00 }
+    ],
+
+    [cite_start]// Tỷ lệ Phí ban đầu (%) [cite: 8, 9]
+    initial_fees: {
+        PUL_TRON_DOI: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
+        PUL_15NAM: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
+        PUL_5NAM: { 1: 0.30, 2: 0.18, 3: 0.12, 4: 0.12, 5: 0.12, 6: 0.012, 7: 0.012, 8: 0.012, 9: 0.012, 10: 0.012 },
+        [cite_start]EXTRA: 0.015 // Phí đóng thêm [cite: 8]
+    },
+
+    [cite_start]// Lãi suất cam kết (%) [cite: 9]
+    guaranteed_interest_rates: {
+        1: 0.035, 2: 0.03, 3: 0.03, 4: 0.02, 5: 0.02, 6: 0.015, 7: 0.015, 8: 0.015, 9: 0.015, 10: 0.015,
+        11: 0.01, 12: 0.01, 13: 0.01, 14: 0.01, 15: 0.01,
+        default: 0.005 // Từ năm 16 trở đi
+    },
+
+    [cite_start]// Phí quản lý hợp đồng (theo năm) [cite: 10]
+    admin_fees: {
+        2025: 40000, 2026: 40000, 2027: 40000, 2028: 40000, 2029: 40000,
+        2030: 50000, 2031: 50000, 2032: 50000, 2033: 50000, 2034: 50000,
+        default: 60000 // Từ 2035 trở đi
+    },
+
+    [cite_start]// Thưởng duy trì hợp đồng [cite: 11, 12]
+    persistency_bonus: [
+        [cite_start]{ year: 10, rate: 0.50 }, // 50% phí chính [cite: 12]
+        [cite_start]{ year: 20, rate: 1.00 }, // 100% phí chính [cite: 12]
+        [cite_start]{ year: 30, rate: 2.00 }  // 200% phí chính [cite: 12]
+    ]
+};
