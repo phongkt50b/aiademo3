@@ -1,4 +1,4 @@
-import { product_data } from './data.js';
+import { product_data, investment_data } from './data.js';
 
 // ===================================================================================
 // ===== MODULE: CONFIG & BUSINESS RULES
