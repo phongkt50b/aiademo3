@@ -146,9 +146,8 @@ export const product_data = {
         { ageMin: 60, ageMax: 60, nam: 71.71, nu: 40.52 }
     ]
 };
-
 export const investment_data = {
-    [cite_start]// Tỷ lệ Phí bảo hiểm rủi ro (trên 1.000đ STBH) [cite: 4, 5, 6, 7]
+    [cite_start]
     cost_of_insurance_rates: [
         { age: 0, nam: 1.84, nu: 1.32 }, { age: 1, nam: 0.72, nu: 0.59 }, { age: 2, nam: 0.69, nu: 0.56 },
         { age: 3, nam: 0.68, nu: 0.55 }, { age: 4, nam: 0.65, nu: 0.54 }, { age: 5, nam: 0.62, nu: 0.53 },
@@ -186,32 +185,32 @@ export const investment_data = {
         { age: 99, nam: 700.00, nu: 700.00 }, { age: 100, nam: 700.00, nu: 700.00 }
     ],
 
-    [cite_start]// Tỷ lệ Phí ban đầu (%) [cite: 8, 9]
+    [cite_start]
     initial_fees: {
         PUL_TRON_DOI: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_15NAM: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_5NAM: { 1: 0.30, 2: 0.18, 3: 0.12, 4: 0.12, 5: 0.12, 6: 0.012, 7: 0.012, 8: 0.012, 9: 0.012, 10: 0.012 },
-        EXTRA: 0.015 // Phí đóng thêm
+        EXTRA: 0.015 
     },
 
-    [cite_start]// Lãi suất cam kết (%) [cite: 9]
+    [cite_start]
     guaranteed_interest_rates: {
         1: 0.035, 2: 0.03, 3: 0.03, 4: 0.02, 5: 0.02, 6: 0.015, 7: 0.015, 8: 0.015, 9: 0.015, 10: 0.015,
         11: 0.01, 12: 0.01, 13: 0.01, 14: 0.01, 15: 0.01,
-        default: 0.005 // Từ năm 16 trở đi
+        default: 0.005 
     },
 
-    [cite_start]// Phí quản lý hợp đồng (theo năm) [cite: 10]
+    [cite_start]
     admin_fees: {
         2025: 40000, 2026: 40000, 2027: 40000, 2028: 40000, 2029: 40000,
         2030: 50000, 2031: 50000, 2032: 50000, 2033: 50000, 2034: 50000,
-        default: 60000 // Từ 2035 trở đi
+        default: 60000 
     },
 
-    [cite_start]// Thưởng duy trì hợp đồng [cite: 11, 12]
+    [cite_start]
     persistency_bonus: [
-        { year: 10, rate: 0.50 }, // 50% phí chính
-        { year: 20, rate: 1.00 }, // 100% phí chính
-        { year: 30, rate: 2.00 }  // 200% phí chính
+        { year: 10, rate: 0.50 }, 
+        { year: 20, rate: 1.00 }, 
+        { year: 30, rate: 2.00 } 
     ]
 };
