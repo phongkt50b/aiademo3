@@ -3164,103 +3164,121 @@ function buildPart1Section(summaryData) {
  * RENDER: PART 2 (Bảng phí từng năm)
  ********************************************************************/
 // PATCH #6: Render Part 2 mới (Tổng quy năm / Tổng năm gốc / ẩn cột rider trống)
+// Thay thế TOÀN BỘ hàm buildPart2Section hiện có bằng hàm này
 function buildPart2Section(data) {
-  const { schedule, isAnnual, periods, persons } = data;
-  const rows = schedule.rows;
-  if (!rows.length) {
+    // --- BẮT ĐẦU PHẦN LOGIC MỚI ---
+    const KHOE_TRON_VEN_KEYS = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'];
+    const isKhoeTronVen = KHOE_TRON_VEN_KEYS.includes(data.productKey);
+
+    // Nếu không phải Khoẻ Trọn Vẹn, dùng logic render cũ
+    if (!isKhoeTronVen) {
+        // Đây là logic render bảng phí gốc cho các sản phẩm khác
+        const { schedule, isAnnual, periods, persons } = data;
+        const rows = schedule.rows;
+        if (!rows.length) {
+            return `<h3 class="text-lg font-bold mt-6 mb-2">Phần 3 · Bảng phí</h3><div class="p-3 border border-dashed rounded text-gray-500 text-sm">Không có dữ liệu.</div>`;
+        }
+        const activePersonIdx = persons.map((p, i) => rows.some(r => (r.perPersonSuppAnnualEq[i] || 0) > 0) ? i : -1).filter(i => i !== -1);
+        const header = ['<th class="p-2 border">Năm HĐ</th>', '<th class="p-2 border">Tuổi NĐBH chính</th>', '<th class="p-2 border">Phí chính</th>'];
+        if (rows.some(r => r.extraYearBase > 0)) { header.push('<th class="p-2 border">Phí đóng thêm</th>'); }
+        activePersonIdx.forEach(i => { header.push(`<th class="p-2 border">Phí bổ sung (${sanitizeHtml(persons[i].name)})</th>`); });
+        if (!isAnnual) header.push('<th class="p-2 border">Tổng quy năm</th>');
+        header.push('<th class="p-2 border">Tổng đóng theo năm </th>');
+        if (!isAnnual) header.push('<th class="p-2 border">Chênh lệch</th>');
+        
+        let sumMainBase=0, sumExtraBase=0, sumSuppAnnualEq=[], sumSuppBase=[], sumAnnualEq=0, sumBase=0, sumDiff=0;
+        activePersonIdx.forEach(()=> { sumSuppAnnualEq.push(0); sumSuppBase.push(0); });
+        
+        const body = rows.map(r => {
+            sumMainBase += r.mainYearBase; sumExtraBase += r.extraYearBase; sumAnnualEq += r.totalAnnualEq; sumBase += r.totalYearBase; sumDiff += r.diff;
+            activePersonIdx.forEach((idx,pos) => { sumSuppAnnualEq[pos] += r.perPersonSuppAnnualEq[idx]; sumSuppBase[pos] += r.perPersonSuppBase[idx]; });
+            return `<tr><td class="p-2 border text-center">${r.year}</td><td class="p-2 border text-center">${r.age}</td><td class="p-2 border text-right">${formatDisplayCurrency(r.mainYearBase)}</td>${rows.some(x=>x.extraYearBase>0) ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYearBase)}</td>` : ''}${activePersonIdx.map(i => `<td class="p-2 border text-right">${r.perPersonSuppAnnualEq[i]?formatDisplayCurrency(r.perPersonSuppAnnualEq[i]):'0'}</td>`).join('')}${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>` : ''}<td class="p-2 border text-right">${formatDisplayCurrency(r.totalYearBase)}</td>${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? `<span class="text-red-600 font-bold">${formatDisplayCurrency(r.diff)}</span>` : '0'}</td>` : ''}</tr>`;
+        });
+
+        const totalCells = [];
+        totalCells.push(`<td class="p-2 border font-semibold">Tổng</td>`, `<td class="p-2 border"></td>`, `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumMainBase)}</td>`);
+        if (rows.some(r=>r.extraYearBase>0)) { totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtraBase)}</td>`); }
+        totalCells.push(...activePersonIdx.map((_,pos)=>{ return `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumSuppAnnualEq[pos])}</td>`; }));
+        if (!isAnnual) { totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>`); }
+        totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumBase)}</td>`);
+        if (!isAnnual) { totalCells.push(`<td class="p-2 border text-right font-semibold">${sumDiff?`<span class="text-red-600 font-bold">${formatDisplayCurrency(sumDiff)}</span>`:'0'}</td>`); }
+
+        return `<h3 class="text-lg font-bold mt-6 mb-2">Phần 3 · Bảng phí</h3><div class="overflow-x-auto"><table class="w-full border-collapse text-sm"><thead><tr>${header.join('')}</tr></thead><tbody>${body.join('')}<tr class="bg-gray-50">${totalCells.join('')}</tr></tbody></table></div>`;
+    }
+
+    // Nếu là Khoẻ Trọn Vẹn, chạy logic mới để thêm các cột GTTK
+    const customRateInput = document.getElementById('custom-interest-rate-input')?.value;
+    const projection = calculateAccountValueProjection(
+        appState.mainPerson,
+        appState.mainProduct,
+        appState.fees.baseMain,
+        appState.mainProduct.extraPremium,
+        data.targetAge,
+        customRateInput
+    );
+    
+    const { schedule, isAnnual, persons } = data;
+    const rows = schedule.rows;
+    if (!rows.length) {
+        return `<h3 class="text-lg font-bold mt-6 mb-2">Phần 3 · Bảng phí & Minh họa tài khoản</h3><div class="p-3 border border-dashed rounded text-gray-500 text-sm">Không có dữ liệu.</div>`;
+    }
+
+    const activePersonIdx = persons.map((p, i) => rows.some(r => (r.perPersonSuppAnnualEq[i] || 0) > 0) ? i : -1).filter(i => i !== -1);
+    
+    const header = [
+        '<th class="p-2 border">Năm HĐ</th>', '<th class="p-2 border">Tuổi</th>', '<th class="p-2 border">Phí chính</th>',
+        (rows.some(r => r.extraYearBase > 0) ? '<th class="p-2 border">Phí đóng thêm</th>' : ''),
+        ...activePersonIdx.map(i => `<th class="p-2 border">Phí BS (${sanitizeHtml(persons[i].name)})</th>`),
+        (!isAnnual ? '<th class="p-2 border">Tổng quy năm</th>' : ''),
+        '<th class="p-2 border">Tổng đóng/năm</th>',
+        '<th class="p-2 border">GTTK (LS cam kết)</th>',
+        `<th class="p-2 border">GTTK (LS ${customRateInput || "minh họa"}% tới năm 20)</th>`,
+        `<th class="p-2 border">GTTK (LS ${customRateInput || "minh họa"}%)</th>`,
+    ].filter(Boolean);
+
+    let sumMainBase = 0, sumExtraBase = 0, sumSuppAnnualEq = [], sumAnnualEq = 0, sumBase = 0;
+    activePersonIdx.forEach(() => sumSuppAnnualEq.push(0));
+
+    const body = rows.map((r, index) => {
+        sumMainBase += r.mainYearBase; sumExtraBase += r.extraYearBase; sumAnnualEq += r.totalAnnualEq; sumBase += r.totalYearBase;
+        activePersonIdx.forEach((idx, pos) => { sumSuppAnnualEq[pos] += r.perPersonSuppAnnualEq[idx]; });
+
+        const gttk_guaranteed = projection.guaranteed[index] || 0;
+        const gttk_capped = projection.customCapped[index] || 0;
+        const gttk_full = projection.customFull[index] || 0;
+
+        return `<tr>
+            <td class="p-2 border text-center">${r.year}</td><td class="p-2 border text-center">${r.age}</td>
+            <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYearBase)}</td>
+            ${rows.some(x => x.extraYearBase > 0) ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYearBase)}</td>` : ''}
+            ${activePersonIdx.map(i => `<td class="p-2 border text-right">${formatDisplayCurrency(r.perPersonSuppAnnualEq[i] || 0)}</td>`).join('')}
+            ${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>` : ''}
+            <td class="p-2 border text-right font-semibold">${formatDisplayCurrency(r.totalYearBase)}</td>
+            <td class="p-2 border text-right">${formatDisplayCurrency(gttk_guaranteed)}</td>
+            <td class="p-2 border text-right">${formatDisplayCurrency(gttk_capped)}</td>
+            <td class="p-2 border text-right">${formatDisplayCurrency(gttk_full)}</td>
+        </tr>`;
+    }).join('');
+
+    const totalCells = [
+        `<td class="p-2 border font-semibold" colspan="2">Tổng</td>`,
+        `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumMainBase)}</td>`,
+        (rows.some(r => r.extraYearBase > 0) ? `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtraBase)}</td>` : ''),
+        ...activePersonIdx.map((_, pos) => `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumSuppAnnualEq[pos])}</td>`),
+        (!isAnnual ? `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>` : ''),
+        `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumBase)}</td>`,
+        `<td class="p-2 border"></td><td class="p-2 border"></td><td class="p-2 border"></td>`,
+    ].filter(Boolean);
+
     return `
-      <h3 class="text-lg font-bold mt-6 mb-2">Phần 2 · Bảng phí</h3>
-      <div class="p-3 border border-dashed rounded text-gray-500 text-sm">Không có dữ liệu.</div>
-    `;
-  }
-
-  // Xác định index người có rider (>=1 năm >0)
-  const activePersonIdx = persons
-    .map((p,i)=> rows.some(r => (r.perPersonSuppAnnualEq[i]||0) > 0) ? i : -1)
-    .filter(i => i !== -1);
-
-  const header = [];
-  header.push('<th class="p-2 border">Năm HĐ</th>');
-  header.push('<th class="p-2 border">Tuổi NĐBH chính</th>');
-  header.push('<th class="p-2 border">Phí chính</th>');
-  if (rows.some(r => r.extraYearBase > 0)) {
-    header.push('<th class="p-2 border">Phí đóng thêm</th>');
-  }
-  activePersonIdx.forEach(i => {
-    header.push(`<th class="p-2 border">Phí bổ sung (${sanitizeHtml(persons[i].name)})</th>`);
-  });
-  if (!isAnnual) header.push('<th class="p-2 border">Tổng quy năm</th>');
-  header.push('<th class="p-2 border">Tổng đóng theo năm </th>');
-  if (!isAnnual) header.push('<th class="p-2 border">Chênh lệch</th>');
-
-  let sumMainBase=0, sumExtraBase=0, sumSuppAnnualEq=[], sumSuppBase=[], sumAnnualEq=0, sumBase=0, sumDiff=0;
-  activePersonIdx.forEach(()=> {
-    sumSuppAnnualEq.push(0);
-    sumSuppBase.push(0);
-  });
-
-  const body = rows.map(r => {
-    sumMainBase += r.mainYearBase;
-    sumExtraBase += r.extraYearBase;
-    sumAnnualEq += r.totalAnnualEq;
-    sumBase += r.totalYearBase;
-    sumDiff += r.diff;
-
-    activePersonIdx.forEach((idx,pos) => {
-      sumSuppAnnualEq[pos] += r.perPersonSuppAnnualEq[idx];
-      sumSuppBase[pos]     += r.perPersonSuppBase[idx];
-    });
-
-    return `
-      <tr>
-        <td class="p-2 border text-center">${r.year}</td>
-        <td class="p-2 border text-center">${r.age}</td>
-        <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYearBase)}</td>
-        ${rows.some(x=>x.extraYearBase>0) ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.extraYearBase)}</td>` : ''}
-        ${activePersonIdx.map(i => {
-          const val = r.perPersonSuppAnnualEq[i];
-          return `<td class="p-2 border text-right">${val?formatDisplayCurrency(val):'0'}</td>`;
-        }).join('')}
-        ${!isAnnual ? `<td class="p-2 border text-right">${formatDisplayCurrency(r.totalAnnualEq)}</td>` : ''}
-        <td class="p-2 border text-right">${formatDisplayCurrency(r.totalYearBase)}</td>
-        ${!isAnnual ? `<td class="p-2 border text-right">${r.diff ? `<span class="text-red-600 font-bold">${formatDisplayCurrency(r.diff)}</span>` : '0'}</td>` : ''}
-      </tr>
-    `;
-  });
-
-  // Dòng tổng
-  const totalCells = [];
-  totalCells.push(`<td class="p-2 border font-semibold">Tổng</td>`);
-  totalCells.push(`<td class="p-2 border"></td>`);
-  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumMainBase)}</td>`);
-  if (rows.some(r=>r.extraYearBase>0)) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumExtraBase)}</td>`);
-  }
-  totalCells.push(...activePersonIdx.map((_,pos)=>{
-    return `<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumSuppAnnualEq[pos])}</td>`;
-  }));
-  if (!isAnnual) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumAnnualEq)}</td>`);
-  }    
-  totalCells.push(`<td class="p-2 border text-right font-semibold">${formatDisplayCurrency(sumBase)}</td>`);
-  if (!isAnnual) {
-    totalCells.push(`<td class="p-2 border text-right font-semibold">${sumDiff?`<span class="text-red-600 font-bold">${formatDisplayCurrency(sumDiff)}</span>`:'0'}</td>`);
-  }
-
-  return `
-    <h3 class="text-lg font-bold mt-6 mb-2">Phần 2 · Bảng phí</h3>
+    <h3 class="text-lg font-bold mt-6 mb-2">Phần 3 · Bảng phí & Minh họa giá trị tài khoản</h3>
     <div class="overflow-x-auto">
       <table class="w-full border-collapse text-sm">
         <thead><tr>${header.join('')}</tr></thead>
-        <tbody>
-          ${body.join('')}
-          <tr class="bg-gray-50">${totalCells.join('')}</tr>
-        </tbody>
+        <tbody>${body}<tr class="bg-gray-50">${totalCells.join('')}</tr></tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
-
 /********************************************************************
  * RENDER: FOOTER + EXPORT
  ********************************************************************/
