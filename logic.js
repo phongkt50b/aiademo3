@@ -532,7 +532,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
 
             // 4. Phí bảo hiểm rủi ro
             const sumAtRisk = Math.max(0, stbh - investmentAmount);
-            const costOfInsurance = (sumAtRisk * riskRate) / 1000;
+            const costOfInsurance = (sumAtRisk * riskRate) / 1000/12;
 
             // 5. Giá trị tài khoản mang đi đầu tư
             let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
