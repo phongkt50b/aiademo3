@@ -100,8 +100,6 @@ export const product_data = {
     hospital_fee_support_rates: [
         { ageMin: 1, ageMax: 4, rate: 181 }, { ageMin: 5, ageMax: 34, rate: 155 }, { ageMin: 35, ageMax: 39, rate: 189 }, { ageMin: 40, ageMax: 44, rate: 230 }, { ageMin: 45, ageMax: 55, rate: 398 }, { ageMin: 56, ageMax: 59, rate: 398 }
     ],
-
-    // Phí Miễn đóng phí 3.0 (trên 1.000 đồng STBH)
     mdp3_rates: [
         { ageMin: 18, ageMax: 18, nam: 40.22, nu: 26.77 },
         { ageMin: 19, ageMax: 19, nam: 41.39, nu: 27.18 },
@@ -146,7 +144,9 @@ export const product_data = {
         { ageMin: 58, ageMax: 58, nam: 70.59, nu: 39.75 },
         { ageMin: 59, ageMax: 59, nam: 69.24, nu: 39.01 },
         { ageMin: 60, ageMax: 60, nam: 71.71, nu: 40.52 }
-    ],
+    ]
+};
+
 // ===================================================================================
 // ===== MODULE: INVESTMENT CALCULATION DATA (NEW)
 // ===================================================================================
@@ -194,7 +194,7 @@ export const investment_data = {
         PUL_TRON_DOI: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_15NAM: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_5NAM: { 1: 0.30, 2: 0.18, 3: 0.12, 4: 0.12, 5: 0.12, 6: 0.012, 7: 0.012, 8: 0.012, 9: 0.012, 10: 0.012 },
-        [cite_start]EXTRA: 0.015 // Phí đóng thêm [cite: 8]
+        EXTRA: 0.015 // Phí đóng thêm
     },
 
     [cite_start]// Lãi suất cam kết (%) [cite: 9]
@@ -213,8 +213,8 @@ export const investment_data = {
 
     [cite_start]// Thưởng duy trì hợp đồng [cite: 11, 12]
     persistency_bonus: [
-        [cite_start]{ year: 10, rate: 0.50 }, // 50% phí chính [cite: 12]
-        [cite_start]{ year: 20, rate: 1.00 }, // 100% phí chính [cite: 12]
-        [cite_start]{ year: 30, rate: 2.00 }  // 200% phí chính [cite: 12]
+        { year: 10, rate: 0.50 }, // 50% phí chính
+        { year: 20, rate: 1.00 }, // 100% phí chính
+        { year: 30, rate: 2.00 }  // 200% phí chính
     ]
 };
