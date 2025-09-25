@@ -480,8 +480,6 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
     return roundDownTo1000(premiumRaw);
 }
 // Dán hàm mới này vào logic.js
-import { investment_data } from './data.js';
-
 function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
     const { gender, age: initialAge } = mainPerson;
     const { key: productKey, stbh, paymentTerm } = mainProduct;
