@@ -479,6 +479,103 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
     const premiumRaw = (stbh / 100) * rate;
     return roundDownTo1000(premiumRaw);
 }
+// Dán hàm mới này vào logic.js
+import { investment_data } from './data.js';
+
+function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
+    const { gender, age: initialAge } = mainPerson;
+    const { key: productKey, stbh, paymentTerm } = mainProduct;
+
+    // --- Lấy dữ liệu từ investment_data ---
+    const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
+
+    [cite_start]const totalYears = targetAge - initialAge + 1; [cite: 1]
+    [cite_start]const totalMonths = totalYears * 12; [cite: 2]
+    const customRate = (parseFloat(customInterestRate) || 0) / 100;
+
+    // --- Khởi tạo các biến cho 3 kịch bản ---
+    let scenarios = {
+        guaranteed: { accountValue: 0, yearEndValues: [] },
+        customCapped: { accountValue: 0, yearEndValues: [] },
+        customFull: { accountValue: 0, yearEndValues: [] },
+    };
+
+    const startYear = new Date().getFullYear();
+
+    for (let month = 1; month <= totalMonths; month++) {
+        const policyYear = Math.floor((month - 1) / 12) + 1;
+        [cite_start]const attainedAge = initialAge + policyYear - 1; [cite: 1]
+
+        // --- Lấy các tỷ lệ/phí cho tháng hiện tại ---
+        const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
+        const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
+        const riskRate = riskRateRecord ? riskRateRecord[genderKey] : 0;
+        
+        const calendarYear = startYear + policyYear - 1;
+        [cite_start]const adminFee = admin_fees[calendarYear] || admin_fees.default; [cite: 2]
+
+        // --- Tính toán cho từng kịch bản ---
+        for (const key in scenarios) {
+            let { accountValue } = scenarios[key];
+            let premiumIn = 0;
+            let initialFee = 0;
+
+            [cite_start]// 1. Phí cơ bản & Phí đóng thêm (chỉ vào tháng đầu năm) [cite: 1, 2]
+            if (month % 12 === 1 && policyYear <= paymentTerm) {
+                premiumIn = basePremium + extraPremium;
+                
+                [cite_start]// 2. Phí ban đầu [cite: 2]
+                const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
+                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * initial_fees.EXTRA);
+            }
+
+            [cite_start]// 3. Phí đem đi đầu tư [cite: 2]
+            const investmentAmount = accountValue + premiumIn - initialFee;
+
+            [cite_start]// 4. Phí bảo hiểm rủi ro [cite: 3]
+            const sumAtRisk = Math.max(0, stbh - investmentAmount);
+            const costOfInsurance = (sumAtRisk * riskRate) / 1000;
+
+            [cite_start]// 5. Giá trị tài khoản mang đi đầu tư [cite: 3]
+            let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
+
+            [cite_start]// 6. Lãi [cite: 3]
+            let interestRateYearly = 0;
+            const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
+            
+            if (key === 'guaranteed') {
+                interestRateYearly = guaranteedRate;
+            } else if (key === 'customCapped') {
+                [cite_start]interestRateYearly = (policyYear <= 20) ? customRate : guaranteedRate; [cite: 3]
+            } else { // customFull
+                [cite_start]interestRateYearly = customRate; [cite: 3]
+            }
+            
+            const interest = netInvestmentAmount * (interestRateYearly / 12);
+
+            [cite_start]// 7. Thưởng duy trì hợp đồng [cite: 3]
+            let bonus = 0;
+            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
+            if (bonusInfo && month % 12 === 0) { // Thưởng vào cuối năm
+                bonus = basePremium * bonusInfo.rate;
+            }
+            
+            [cite_start]// 8. Cập nhật giá trị tài khoản cuối tháng [cite: 3]
+            scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
+
+            [cite_start]// 9. Lưu giá trị cuối năm [cite: 3]
+            if (month % 12 === 0) {
+                scenarios[key].yearEndValues.push(scenarios[key].accountValue);
+            }
+        }
+    }
+
+    return {
+        guaranteed: scenarios.guaranteed.yearEndValues,
+        customCapped: scenarios.customCapped.yearEndValues,
+        customFull: scenarios.customFull.yearEndValues,
+    };
+}
 // ===================================================================================
 // ===== MODULE: UI (Rendering, DOM manipulation, Event Listeners)
 // ===================================================================================
