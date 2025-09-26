@@ -3234,11 +3234,11 @@ function buildPart2Section(data) {
     const body = rows.map((r, index) => {
         sumMainBase += r.mainYearBase; sumExtraBase += r.extraYearBase; sumAnnualEq += r.totalAnnualEq; sumBase += r.totalYearBase;
         activePersonIdx.forEach((idx, pos) => { sumSuppAnnualEq[pos] += r.perPersonSuppAnnualEq[idx]; });
-
-        const gttk_guaranteed = projection.guaranteed[index] || 0;
-        const gttk_capped = projection.customCapped[index] || 0;
-        const gttk_full = projection.customFull[index] || 0;
-
+        
+        const gttk_guaranteed = Math.round((projection.guaranteed[index] || 0) / 1000) * 1000;
+        const gttk_capped = Math.round((projection.customCapped[index] || 0) / 1000) * 1000;
+        const gttk_full = Math.round((projection.customFull[index] || 0) / 1000) * 1000;
+        
         return `<tr>
             <td class="p-2 border text-center">${r.year}</td><td class="p-2 border text-center">${r.age}</td>
             <td class="p-2 border text-right">${formatDisplayCurrency(r.mainYearBase)}</td>
