@@ -100,6 +100,8 @@ export const product_data = {
     hospital_fee_support_rates: [
         { ageMin: 1, ageMax: 4, rate: 181 }, { ageMin: 5, ageMax: 34, rate: 155 }, { ageMin: 35, ageMax: 39, rate: 189 }, { ageMin: 40, ageMax: 44, rate: 230 }, { ageMin: 45, ageMax: 55, rate: 398 }, { ageMin: 56, ageMax: 59, rate: 398 }
     ],
+
+    // Phí Miễn đóng phí 3.0 (trên 1.000 đồng STBH)
     mdp3_rates: [
         { ageMin: 18, ageMax: 18, nam: 40.22, nu: 26.77 },
         { ageMin: 19, ageMax: 19, nam: 41.39, nu: 27.18 },
