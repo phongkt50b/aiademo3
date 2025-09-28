@@ -777,12 +777,10 @@ async function exportHtmlWithEmbeddedImages() {
     }
   }
 
-  const innerHtml = clone.innerHTML;
+  const contentHtml = clone.outerHTML;
 
   const styles = Array.from(document.querySelectorAll('head style, head link[rel="stylesheet"]'))
     .map(node => node.outerHTML).join('\n');
-
-  const extraStyle = `...`; // Giữ nguyên style cũ
 
   const fullHtml = `
 <!DOCTYPE html>
@@ -791,10 +789,9 @@ async function exportHtmlWithEmbeddedImages() {
   <meta charset="UTF-8" />
   <title>Bảng Minh Họa - Xuất HTML</title>
   ${styles}
-  ${extraStyle}
 </head>
 <body>
-  ${innerHtml}
+  ${contentHtml}
 </body>
 </html>`;
 
