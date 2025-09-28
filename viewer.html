@@ -722,6 +722,13 @@ async function exportHtmlWithEmbeddedImages() {
 
   // Gỡ bỏ các spinner và các class/style tạm thời của placeholder
   clone.querySelectorAll('.image-placeholder').forEach(placeholder => {
+    // Nếu ảnh gốc không tải được (bị lỗi), placeholder của nó sẽ bị ẩn đi.
+    // Ta sẽ kiểm tra và loại bỏ nó khỏi file HTML xuất ra.
+    if (placeholder.style.display === 'none') {
+      placeholder.remove();
+      return;
+    }
+    
     const img = placeholder.querySelector('img');
     if (img) {
       // Thay thế placeholder bằng thẻ figure chứa ảnh đã load
@@ -737,6 +744,9 @@ async function exportHtmlWithEmbeddedImages() {
       img.style.borderRadius = '4px';
       figure.appendChild(img);
       placeholder.parentNode.replaceChild(figure, placeholder);
+    } else {
+      // Nếu không có ảnh bên trong, cũng xóa placeholder
+      placeholder.remove();
     }
   });
 
