@@ -4211,7 +4211,7 @@ window.openFullViewer = function openFullViewer() {
     const payload = buildViewerPayload();
     const jsonStr = JSON.stringify(payload);
     const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
-    const url = `viewer (1).html#v=${b64}`;
+    const url = `viewer.html#v=${b64}`;
 
     // 3. Tìm và hiển thị modal
     const viewerModal = document.getElementById('viewer-modal');
