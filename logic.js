@@ -1,3 +1,4 @@
+
 import { product_data, investment_data } from './data.js';
 
 // ===================================================================================
@@ -1665,7 +1666,6 @@ function formatNumberInput(input) {
 
 function initSummaryModal() {
   const modal = document.getElementById('summary-modal');
-  document.getElementById('view-summary-btn').addEventListener('click', (e)=>{ e.preventDefault(); try{ generateSummaryTable(); } catch(err){ const c = document.getElementById('summary-content-container'); if (c) c.innerHTML = `<div class="text-red-600 font-semibold">${sanitizeHtml(err && err.message ? err.message : String(err))}</div>`; document.getElementById('summary-modal')?.classList.remove('hidden'); }}, true);
   document.getElementById('close-summary-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.classList.add('hidden');
@@ -2365,27 +2365,6 @@ function generateSummaryTable() {
 }
   return true;
 }
-
-// (Tuỳ chọn) đảm bảo nút gọi đúng hàm mới — phòng trường hợp listener cũ vẫn trỏ tới bản cũ
-(function rebindSummaryButton(){
-  const btn = document.getElementById('view-summary-btn');
-  if (!btn) return;
-  // Xoá tất cả listener cũ bằng clone
-  const clone = btn.cloneNode(true);
-  btn.parentNode.replaceChild(clone, btn);
-  clone.addEventListener('click', (e)=>{
-    e.preventDefault();
-    try {
-      generateSummaryTable();
-    } catch(err) {
-      const c = document.getElementById('summary-content-container');
-      if (c) c.innerHTML = `<div class="text-red-600 font-semibold">${(err && err.message)? err.message : err}</div>`;
-      document.getElementById('summary-modal')?.classList.remove('hidden');
-    }
-  });
-})();
-
-console.info('[generateSummaryTable v3] integrated: Part2 (benefits) + Part3 (schedule).');
 
 /********************************************************************
  * DỮ LIỆU TÓM TẮT
@@ -3422,27 +3401,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }, {once:true});
 })();
 
-/* ====== PATCH: Bảng minh họa chi tiết V2 (đúng yêu cầu riders + kỳ đóng phí) ====== */
-(function(){
-  
-  // Bắt sự kiện trước listener cũ để override
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const btn = document.getElementById('view-summary-btn');
-    if (btn && !btn.dataset._v2bound){
-      btn.addEventListener('click', (e)=>{
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        try{ generateSummaryTable(); }catch(err){
-          const c = document.getElementById('summary-content-container');
-          if (c) c.innerHTML = `<div class="text-red-600">${sanitizeHtml(err && err.message ? err.message : String(err))}</div>`;
-          document.getElementById('summary-modal')?.classList.remove('hidden');
-        }
-      }, true); // capture
-      btn.dataset._v2bound = '1';
-    }
-  }, {once:true});
-})();
-
 function buildProductSummaryTable(data, periods, isAnnual, riderFactor) {
   const { mainInfo, targetAge, paymentTerm, productKey, allPersons } = data;
   const baseMain = appState.fees.baseMain;
@@ -4247,21 +4205,27 @@ function buildViewerPayload() {
     paymentTermFinal = parseInt(document.getElementById('abuv-term')?.value || '0', 10) || paymentTermFinal;
   }
 
-  // Riders người chính
+  // Thu thập riders từ tất cả mọi người
   const riderList = [];
-  const suppObj = mainPerson.supplements || {};
-  Object.keys(suppObj).forEach(rid => {
-    const data = suppObj[rid];
-    const premiumDetail = (appState.fees.byPerson?.[mainPerson.id]?.suppDetails?.[rid]) || 0;
-    riderList.push({
-      slug: rid,
-      selected: true,
-      stbh: data.stbh || (rid === 'health_scl' ? getHealthSclStbhByProgram(data.program) : 0),
-      program: data.program,
-      scope: data.scope,
-      outpatient: !!data.outpatient,
-      dental: !!data.dental,
-      premium: premiumDetail
+  const allPersons = [appState.mainPerson, ...appState.supplementaryPersons].filter(p => p);
+  allPersons.forEach(person => {
+    const suppObj = person.supplements || {};
+    Object.keys(suppObj).forEach(rid => {
+        // Chỉ thêm rider nếu nó chưa có trong danh sách
+        if(!riderList.some(r => r.slug === rid)){
+            const data = suppObj[rid];
+            const premiumDetail = (appState.fees.byPerson?.[person.id]?.suppDetails?.[rid]) || 0;
+            riderList.push({
+                slug: rid,
+                selected: true,
+                stbh: data.stbh || (rid === 'health_scl' ? getHealthSclStbhByProgram(data.program) : 0),
+                program: data.program,
+                scope: data.scope,
+                outpatient: !!data.outpatient,
+                dental: !!data.dental,
+                premium: premiumDetail
+            });
+        }
     });
   });
 
@@ -4288,7 +4252,9 @@ function buildViewerPayload() {
         }
       }
       mdp3Obj = { selectedId: selId, premium, selectedName, selectedAge };
-      riderList.push({ slug:'mdp3', selected:true, stbh:0, premium });
+      if (!riderList.some(r => r.slug === 'mdp3')) {
+        riderList.push({ slug:'mdp3', selected:true, stbh:0, premium });
+      }
     }
   }
 
@@ -4302,20 +4268,10 @@ function buildViewerPayload() {
   // Tạo summaryHtml nguyên văn
   const summaryHtml = __exportExactSummaryHtml();
 
-  const PRODUCT_SLUG = {
-    PUL_TRON_DOI:'khoe-tron-ven',
-    PUL_15NAM:'khoe-tron-ven',
-    PUL_5NAM:'khoe-tron-ven',
-    KHOE_BINH_AN:'khoe-binh-an',
-    VUNG_TUONG_LAI:'vung-tuong-lai',
-    TRON_TAM_AN:'tron-tam-an',
-    AN_BINH_UU_VIET:'an-binh-uu-viet'
-  };
-
   return {
     v:3,
     productKey: mainKey,
-    productSlug: PRODUCT_SLUG[mainKey] || (mainKey||'').toLowerCase(),
+    productSlug: PRODUCT_SLUG_MAP[mainKey] || (mainKey||'').toLowerCase(),
     mainPersonName: mainPerson.name || '',
     mainPersonDob: mainPerson.dob || '',
     mainPersonAge: mainPerson.age || 0,
@@ -4346,24 +4302,59 @@ function openFullViewer() {
     }
     const json = JSON.stringify(payload);
     const b64 = btoa(unescape(encodeURIComponent(json)));
+
     const viewerUrl = new URL('viewer.html', location.href);
-    viewerUrl.hash = `v=${b64}`;
+    viewerUrl.hash = `#v=${b64}`;
 
     const modal = document.getElementById('viewer-modal');
     const iframe = document.getElementById('viewer-iframe');
-    
-    if (modal && iframe) {
-      iframe.src = viewerUrl.toString();
-      modal.classList.add('visible');
-    } else {
-      console.error('Viewer modal or iframe not found. Fallback to new tab.');
-      window.open(viewerUrl.toString(), '_blank', 'noopener');
+    const closeBtn = document.getElementById('close-viewer-modal-btn');
+
+    if (!modal || !iframe || !closeBtn) {
+        console.error('Không tìm thấy các thành phần của modal viewer.');
+        // Fallback to new tab if modal components are missing
+        window.open(viewerUrl.toString(), '_blank', 'noopener');
+        return;
     }
+    
+    iframe.src = 'about:blank'; // Clear previous content
+    setTimeout(() => {
+        iframe.src = viewerUrl.toString();
+    }, 10); // Small delay to ensure clearing happens first
+
+    modal.classList.add('visible');
+    
+    // Function to close the modal
+    const closeModal = () => {
+      modal.classList.remove('visible');
+      iframe.src = 'about:blank'; // Clear src to stop video/audio etc.
+      document.removeEventListener('keydown', handleKeydown); // Clean up listener
+    };
+    
+    // Close button event
+    closeBtn.onclick = closeModal;
+    
+    // Escape key event
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
+    
+    // Optional: close on backdrop click
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+
   } catch (e) {
     console.error('[FullViewer] Lỗi tạo payload:', e);
-    alert('Không tạo được dữ liệu chia sẻ.');
+    alert('Không tạo được dữ liệu để mở bảng minh họa.');
   }
 }
+
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('btnFullViewer');
   if (btn && !btn.dataset._bindFullViewer) {
@@ -4388,24 +4379,6 @@ document.addEventListener('DOMContentLoaded', () => {
       openFullViewer();
     });
     btn.dataset._bindFullViewer = '1';
-  }
-    
-  // Logic to CLOSE the modal viewer
-  const modal = document.getElementById('viewer-modal');
-  const iframe = document.getElementById('viewer-iframe');
-  const closeBtn = document.getElementById('close-viewer-modal-btn');
-  if (modal && iframe && closeBtn) {
-    const closeViewerModal = () => {
-      modal.classList.remove('visible');
-      // Reset src to stop video/audio/heavy scripts in iframe from running in background
-      iframe.src = 'about:blank';
-    };
-    closeBtn.addEventListener('click', closeViewerModal);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('visible')) {
-        closeViewerModal();
-      }
-    });
   }
 });
 })();
