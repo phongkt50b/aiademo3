@@ -26,6 +26,16 @@ const CONFIG = {
         TRON_TAM_AN: { name: 'Trọn tâm an' },
         AN_BINH_UU_VIET: { name: 'An Bình Ưu Việt' },
     },
+    PRODUCT_GROUPS: {
+        PUL: ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'],
+        MUL: ['KHOE_BINH_AN', 'VUNG_TUONG_LAI'],
+        PUL_MUL: ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'],
+        BASE_PRODUCTS: [
+            'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM',
+            'KHOE_BINH_AN', 'VUNG_TUONG_LAI',
+            'AN_BINH_UU_VIET', 'TRON_TAM_AN'
+        ]
+    },
     supplementaryProducts: [
         {
             id: 'health_scl',
@@ -362,14 +372,14 @@ function calculateMainPremium(customer, productInfo, ageOverride = null) {
 
   if (!mainProduct) return 0;
 
-  if (mainProduct.startsWith('PUL') || mainProduct === 'AN_BINH_UU_VIET' || mainProduct === 'TRON_TAM_AN') {
+  if (CONFIG.PRODUCT_GROUPS.PUL.includes(mainProduct) || mainProduct === 'AN_BINH_UU_VIET' || mainProduct === 'TRON_TAM_AN') {
     let rate = 0;
     const effectiveStbh = (mainProduct === 'TRON_TAM_AN') ? 100000000 : stbh;
     if (effectiveStbh === 0) return 0;
     
     const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-    if (mainProduct.startsWith('PUL')) {
+    if (CONFIG.PRODUCT_GROUPS.PUL.includes(mainProduct)) {
         rate = product_data.pul_rates[mainProduct]?.find(r => r.age === ageToUse)?.[genderKey] || 0;
     } else if (mainProduct === 'AN_BINH_UU_VIET') {
         if (!abuvTerm) return 0;
@@ -379,7 +389,7 @@ function calculateMainPremium(customer, productInfo, ageOverride = null) {
     }
     premium = (effectiveStbh / 1000) * rate;
 
-  } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProduct)) {
+  } else if (CONFIG.PRODUCT_GROUPS.MUL.includes(mainProduct)) {
       premium = enteredPremium;
   }
 
@@ -438,47 +448,50 @@ function getHealthSclFeeComponents(customer, ageOverride = null) {
   }
 }
 
-function calculateBhnPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+/**
+ * Helper to calculate premiums for simple rate-based riders.
+ * @param {object} customer - The customer object.
+ * @param {object} config - The product configuration from CONFIG.supplementaryProducts.
+ * @param {function} rateFinder - A function that returns the premium rate.
+ * @param {number} divisor - The divisor for the STBH (e.g., 1000 or 100).
+ * @param {number|null} ageOverride - Optional age to use for calculation.
+ * @returns {number} The calculated premium.
+ */
+function calculateSimpleRiderPremium(customer, config, rateFinder, divisor, ageOverride = null) {
     const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='bhn');
     if (ageToUse > config.maxRenewalAge) return 0;
-    
-    const { gender } = customer;
-    const { stbh } = customer.supplements.bhn;
+
+    const { stbh } = customer.supplements[config.id] || {};
     if (!stbh) return 0;
 
-    const rate = product_data.bhn_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.[gender === 'Nữ' ? 'nu' : 'nam'] || 0;
-    const premiumRaw = (stbh / 1000) * rate;
+    const rate = rateFinder(customer, ageToUse);
+    if (!rate) return 0;
+
+    const premiumRaw = (stbh / divisor) * rate;
     return roundDownTo1000(premiumRaw);
+}
+
+function calculateBhnPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
+    const config = CONFIG.supplementaryProducts.find(p => p.id === 'bhn');
+    const rateFinder = (cust, age) => product_data.bhn_rates
+        .find(r => age >= r.ageMin && age <= r.ageMax)?.[cust.gender === 'Nữ' ? 'nu' : 'nam'] || 0;
+    return calculateSimpleRiderPremium(customer, config, rateFinder, 1000, ageOverride);
 }
 
 function calculateAccidentPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='accident');
-    if (ageToUse > config.maxRenewalAge) return 0;
-
-    const { riskGroup } = customer;
-    if (riskGroup === 0 || riskGroup > 4) return 0;
-    
-    const { stbh } = customer.supplements.accident;
-    if (!stbh) return 0;
-
-    const rate = product_data.accident_rates[riskGroup] || 0;
-    const premiumRaw = (stbh / 1000) * rate;
-    return roundDownTo1000(premiumRaw);
+    const config = CONFIG.supplementaryProducts.find(p => p.id === 'accident');
+    const rateFinder = (cust) => {
+        if (cust.riskGroup === 0 || cust.riskGroup > 4) return 0;
+        return product_data.accident_rates[cust.riskGroup] || 0;
+    };
+    return calculateSimpleRiderPremium(customer, config, rateFinder, 1000, ageOverride);
 }
 
 function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSupportStbh, ageOverride = null) {
-    const ageToUse = ageOverride ?? customer.age;
-    const config = CONFIG.supplementaryProducts.find(p=>p.id==='hospital_support');
-    if (ageToUse > config.maxRenewalAge) return 0;
-
-    const { stbh } = (customer && customer.supplements && customer.supplements.hospital_support) ? customer.supplements.hospital_support : {};
-    if (!stbh) return 0;
-
-    const rate = product_data.hospital_fee_support_rates.find(r => ageToUse >= r.ageMin && ageToUse <= r.ageMax)?.rate || 0;
-    const premiumRaw = (stbh / 100) * rate;
-    return roundDownTo1000(premiumRaw);
+    const config = CONFIG.supplementaryProducts.find(p => p.id === 'hospital_support');
+    const rateFinder = (cust, age) => product_data.hospital_fee_support_rates
+        .find(r => age >= r.ageMin && age <= r.ageMax)?.rate || 0;
+    return calculateSimpleRiderPremium(customer, config, rateFinder, 100, ageOverride);
 }
 // Dán hàm mới này vào logic.js
 function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
@@ -569,6 +582,47 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         customFull: scenarios.customFull.yearEndValues,
     };
 }
+
+/**
+ * Checks eligibility for PUL products based on STBH and premium.
+ * @param {number} stbh - The sum assured for the main product.
+ * @param {number} premium - The calculated base premium for the main product.
+ * @returns {object} An object with validation status and reasons.
+ */
+function getPulEligibilityState(stbh, premium) {
+    const { MAIN_PRODUCT_MIN_STBH, PUL_MIN_STBH_OR, PUL_MIN_PREMIUM_OR, MAIN_PRODUCT_MIN_PREMIUM } = CONFIG;
+
+    const result = {
+        stbhValid: true,
+        premiumValid: true,
+        stbhReason: '',
+        premiumReason: '',
+        ridersEnabled: true,
+        ridersReason: ''
+    };
+
+    if (stbh > 0 && stbh < MAIN_PRODUCT_MIN_STBH) {
+        result.stbhValid = false;
+        result.stbhReason = `STBH tối thiểu: ${MAIN_PRODUCT_MIN_STBH.toLocaleString('vi-VN')} đ`;
+        result.ridersEnabled = false;
+        result.ridersReason = `Cần STBH ≥ ${MAIN_PRODUCT_MIN_STBH.toLocaleString('vi-VN')} đ (hiện tại: ${stbh.toLocaleString('vi-VN')} đ)`;
+    } else if (stbh >= MAIN_PRODUCT_MIN_STBH && stbh < PUL_MIN_STBH_OR) {
+        if (premium > 0 && premium < PUL_MIN_PREMIUM_OR) {
+            result.premiumValid = false;
+            result.premiumReason = `Phí tối thiểu: ${PUL_MIN_PREMIUM_OR.toLocaleString('vi-VN')} đ`;
+            result.ridersEnabled = false;
+            result.ridersReason = `Cần phí chính ≥ ${PUL_MIN_PREMIUM_OR.toLocaleString('vi-VN')} đ (STBH < ${PUL_MIN_STBH_OR.toLocaleString('vi-VN')} đ)`;
+        }
+    } else if (stbh >= PUL_MIN_STBH_OR) {
+        if (premium > 0 && premium < MAIN_PRODUCT_MIN_PREMIUM) {
+            result.premiumValid = false;
+            result.premiumReason = `Phí tối thiểu: ${MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ`;
+            result.ridersEnabled = false;
+            result.ridersReason = `Cần phí chính ≥ ${MAIN_PRODUCT_MIN_PREMIUM.toLocaleString('vi-VN')} đ`;
+        }
+    }
+    return result;
+}
 // ===================================================================================
 // ===== MODULE: UI (Rendering, DOM manipulation, Event Listeners)
 // ===================================================================================
@@ -589,7 +643,6 @@ function renderUI() {
         if (cont) cont.classList.remove('hidden');
         if (btn)  btn.classList.remove('hidden');
       }
-      if (typeof updateSupplementaryAddButtonState === 'function') updateSupplementaryAddButtonState();
     } catch (e) {}
 
     clearAllErrors();
@@ -604,16 +657,26 @@ function renderUI() {
 
     renderMainProductSection(appState.mainPerson, appState.mainProduct.key);
     
+    // Calculate validity ONCE and use it to control all dependent UI parts
+    const isMainProductValid = runAllValidations(appState);
+
     allPersons.forEach(p => {
         const suppContainer = p.isMain
             ? document.querySelector('#main-supp-container .supplementary-products-container')
             : p.container.querySelector('.supplementary-products-container');
         if (suppContainer) {
-            renderSupplementaryProductsForPerson(p, appState.mainProduct.key, appState.fees.baseMain, suppContainer);
+            renderSupplementaryProductsForPerson(p, appState.mainProduct.key, appState.fees.baseMain, suppContainer, isMainProductValid);
         }
     });
     
-    const isValid = runAllValidations(appState);
+    // NEW: Disable related sections if main product is invalid
+    updateSupplementaryAddButtonState(isMainProductValid);
+    const mdp3Section = document.getElementById('mdp3-section');
+    if (mdp3Section) {
+        const isDisabled = !isMainProductValid || (document.getElementById('main-product')?.value === 'TRON_TAM_AN');
+        mdp3Section.classList.toggle('opacity-50', isDisabled);
+        mdp3Section.classList.toggle('pointer-events-none', isDisabled);
+    }
 
     const fees = appState.fees;
     const summaryTotalEl = document.getElementById('summary-total');
@@ -621,18 +684,17 @@ function renderUI() {
     const extraFeeEl = document.getElementById('main-insured-extra-fee');
     const suppFeeEl = document.getElementById('summary-supp-fee');
 
-    if (!isValid) {
-        // Vẫn hiển thị phí chính & phí đóng thêm
+    if (!isMainProductValid) {
+        // Still show main product fees for user feedback
         if (mainFeeEl)  mainFeeEl.textContent  = formatDisplayCurrency(fees.baseMain);
         if (extraFeeEl) extraFeeEl.textContent = formatDisplayCurrency(fees.extra);
-        // Tổng & phí bổ sung để 0 vì chưa đủ điều kiện hợp lệ
+        // Reset totals and supplementary fees as they are not applicable yet
         if (summaryTotalEl) summaryTotalEl.textContent = "0";
         if (suppFeeEl)      suppFeeEl.textContent      = "0";
-        // Khối hiển thị dưới form sản phẩm chính
+        
         updateMainProductFeeDisplay(fees.baseMain, fees.extra);
-        // Tùy chọn: vẫn cập nhật khả dụng kỳ đóng phí
         updatePaymentFrequencyOptions(fees.baseMain);
-        updateSummaryUI(fees); // Nếu không muốn hiển thị breakdown khi invalid, có thể bỏ hàng này
+        updateSummaryUI(fees, false); // Pass invalid state to summary
         if (window.renderSection6V2) window.renderSection6V2();
         return;
     }
@@ -644,7 +706,7 @@ function renderUI() {
 
     updateMainProductFeeDisplay(fees.baseMain, fees.extra);
     updatePaymentFrequencyOptions(fees.baseMain);
-    updateSummaryUI(fees);
+    updateSummaryUI(fees, true);
     if (window.renderSection6V2) window.renderSection6V2();
 }
 
@@ -658,8 +720,7 @@ function renderMainProductSection(customer, mainProductKey) {
         if (!productKey) return;
         let isEligible = true;
         const { age, daysFromBirth, gender, riskGroup } = customer;
-        const PUL_MUL = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM', 'KHOE_BINH_AN', 'VUNG_TUONG_LAI'];
-        if (PUL_MUL.includes(productKey)) {
+        if (CONFIG.PRODUCT_GROUPS.PUL_MUL.includes(productKey)) {
             isEligible = (daysFromBirth >= 30) && (age <= 70);
         } else if (productKey === 'TRON_TAM_AN') {
             const withinAge = (gender === 'Nam') ? (age >= 12 && age <= 60) : (age >= 28 && age <= 60);
@@ -716,13 +777,13 @@ function renderMainProductSection(customer, mainProductKey) {
           <select id="abuv-term" class="form-select"><option value="" selected>-- Chọn --</option>${termOptions}</select>
           <p class="text-sm text-gray-500 mt-1">Thời hạn đóng phí bằng thời hạn hợp đồng.</p>
         </div>`;
-    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProductKey)) {
+    } else if (CONFIG.PRODUCT_GROUPS.PUL_MUL.includes(mainProductKey)) {
       optionsHtml = `
         <div>
           <label for="main-stbh" class="font-medium text-gray-700 block mb-1">Số tiền bảo hiểm (STBH) <span class="text-red-600">*</span></label>
           <input type="text" id="main-stbh" class="form-input" value="${currentStbh}" placeholder="VD: 1.000.000.000">
         </div>`;
-      if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProductKey)) {
+      if (CONFIG.PRODUCT_GROUPS.MUL.includes(mainProductKey)) {
         optionsHtml += `
           <div>
             <label for="main-premium-input" class="font-medium text-gray-700 block mb-1">Phí sản phẩm chính</label>
@@ -746,53 +807,23 @@ function renderMainProductSection(customer, mainProductKey) {
     
     container.innerHTML = optionsHtml;
     
-    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProductKey)) {
+    if (CONFIG.PRODUCT_GROUPS.PUL_MUL.includes(mainProductKey)) {
       setPaymentTermHint(mainProductKey, customer.age);
     }
     attachTermListenersForTargetAge();
 }
-function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container) {
+
+function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPremium, container, isMainProductValid) {
     const { age, riskGroup, daysFromBirth } = customer;
     
-    const isBaseProduct = [
-        'PUL_TRON_DOI',
-        'PUL_15NAM',
-        'PUL_5NAM',
-        'KHOE_BINH_AN',
-        'VUNG_TUONG_LAI',
-        'AN_BINH_UU_VIET',
-        'TRON_TAM_AN'
-    ].includes(mainProductKey);
+    const isBaseProduct = CONFIG.PRODUCT_GROUPS.BASE_PRODUCTS.includes(mainProductKey);
     const isTTA = mainProductKey === 'TRON_TAM_AN';
-    const isPul = ['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProductKey);
 
-    let ridersDisabled = false;
-    let ridersReason = '';
+    // UNIFIED LOGIC: Disable all supplementary products if the main product is invalid.
+    const ridersDisabled = !isMainProductValid;
+    const ridersReason = ridersDisabled ? 'Vui lòng hoàn tất thông tin sản phẩm chính.' : '';
 
-    if (!isTTA && isPul) {
-        const mainStbhMin    = CONFIG.MAIN_PRODUCT_MIN_STBH || 0;
-        const pulStbhMin     = CONFIG.PUL_MIN_STBH_OR || mainStbhMin;
-        const pulPremiumMin  = CONFIG.PUL_MIN_PREMIUM_OR || 0;
-        const mainPremiumMin = CONFIG.MAIN_PRODUCT_MIN_PREMIUM || 0;
-        const curStbh = appState.mainProduct.stbh || 0;
-
-        if (curStbh > 0 && curStbh < mainStbhMin) {
-            ridersDisabled = true;
-            ridersReason = `Cần STBH ≥ ${mainStbhMin.toLocaleString('vi-VN')} đ (hiện tại: ${curStbh.toLocaleString('vi-VN')} đ)`;
-        } else if (curStbh >= mainStbhMin && curStbh < pulStbhMin) {
-            if (mainPremium > 0 && mainPremium < pulPremiumMin) {
-                ridersDisabled = true;
-                ridersReason = `Cần phí chính ≥ ${pulPremiumMin.toLocaleString('vi-VN')} đ (STBH < ${pulStbhMin.toLocaleString('vi-VN')} đ)`;
-            }
-        } else if (curStbh >= pulStbhMin) {
-            if (mainPremium > 0 && mainPremium < mainPremiumMin) {
-                ridersDisabled = true;
-                ridersReason = `Cần phí chính ≥ ${mainPremiumMin.toLocaleString('vi-VN')} đ`;
-            }
-        }
-    }
-
-    let anyUncheckedByThreshold = false;
+    let anyUncheckedByRule = false;
 
     CONFIG.supplementaryProducts.forEach(prod => {
         const section = container.querySelector(`.${prod.id}-section`);
@@ -810,13 +841,17 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         if (!checkbox) return;
 
         if (!isEligible) {
-            if (checkbox.checked) checkbox.checked = false;
-        }
-
-        if (isEligible && ridersDisabled) {
             if (checkbox.checked) {
                 checkbox.checked = false;
-                anyUncheckedByThreshold = true;
+                anyUncheckedByRule = true;
+            }
+        }
+        
+        // Apply global disabling rule
+        if (ridersDisabled) {
+            if (checkbox.checked) {
+                checkbox.checked = false;
+                anyUncheckedByRule = true;
             }
             checkbox.disabled = true;
             section.classList.add('opacity-50');
@@ -846,7 +881,6 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
             feeDisplay.textContent = fee > 0 ? `Phí: ${formatCurrency(fee)}` : '';
         }
 
-        // === CẬP NHẬT PHÍ TÙY CHỌN CHO SỨC KHỎE BÙNG GIA LỰC ===
         if (prod.id === 'health_scl' && section.querySelector('.health_scl-checkbox')?.checked) {
             const comps = getHealthSclFeeComponents(customer);
             const outpatientCb = section.querySelector('.health-scl-outpatient');
@@ -867,11 +901,10 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
         }
     });
 
-    if (anyUncheckedByThreshold && typeof runWorkflowDebounced === 'function') {
+    if (anyUncheckedByRule && typeof runWorkflowDebounced === 'function') {
         runWorkflowDebounced();
     }
 
-    // Giữ nguyên phần logic SCL nâng cấp chương trình ở dưới
     const sclSection = container.querySelector('.health_scl-section');
     if (sclSection && !sclSection.classList.contains('hidden')) {
         const programSelect = sclSection.querySelector('.health-scl-program');
@@ -920,39 +953,42 @@ function renderSupplementaryProductsForPerson(customer, mainProductKey, mainPrem
     }
 }
 
-function updateSummaryUI(fees) {
+function updateSummaryUI(fees, isValid = true) {
   const f = fees || { baseMain:0, extra:0, totalSupp:0, total:0 };
   const fmt = (n)=> formatDisplayCurrency(Math.round((Number(n)||0)/1000)*1000);
 
-  // Các phần chính
+  // If not valid, reset supplementary and total fees to 0 for display
+  const displayTotal = isValid ? f.total : 0;
+  const displayTotalSupp = isValid ? f.totalSupp : 0;
+
+  // Main sections
   const totalEl = document.getElementById('summary-total');
   const mainEl  = document.getElementById('main-insured-main-fee');
   const extraEl = document.getElementById('main-insured-extra-fee');
   const suppEl  = document.getElementById('summary-supp-fee');
-  if (totalEl) totalEl.textContent = fmt(f.total);
+  if (totalEl) totalEl.textContent = fmt(displayTotal);
   if (mainEl)  mainEl.textContent  = fmt(f.baseMain);
   if (extraEl) extraEl.textContent = fmt(f.extra);
-  if (suppEl)  suppEl.textContent  = fmt(f.totalSupp);
+  if (suppEl)  suppEl.textContent  = fmt(displayTotalSupp);
 
-  // Kỳ đóng phí
+  // Payment frequency
   const freqSel = document.getElementById('payment-frequency');
   const freqBox = document.getElementById('frequency-breakdown');
   const v = freqSel ? freqSel.value : 'year';
   const periods = v==='half' ? 2 : (v==='quarter' ? 4 : 1);
-  const factor  = periods===2 ? 1.02 : (periods===4 ? 1.04 : 1); // rider factor
+  const factor  = periods===2 ? 1.02 : (periods===4 ? 1.04 : 1);
 
   if (freqBox) freqBox.classList.toggle('hidden', periods===1);
 
-  // Phí theo kỳ
-  const perMain  = periods===1 ? 0 : Math.round((f.baseMain||0)/periods/1000)*1000;
-  const perExtra = periods===1 ? 0 : Math.round((f.extra||0)/periods/1000)*1000;
-  // Riders áp dụng factor
-  const perSupp  = periods===1 ? 0 : roundDownTo1000(((f.totalSupp||0)*factor)/periods);
+  // Fees per period
+  const perMain  = periods===1 ? 0 : roundDownTo1000((f.baseMain||0)/periods);
+  const perExtra = periods===1 ? 0 : roundDownTo1000((f.extra||0)/periods);
+  const perSupp  = periods===1 ? 0 : roundDownTo1000(((displayTotalSupp||0)*factor)/periods);
 
   const perTotal = periods===1 ? 0 : (perMain + perExtra + perSupp);
-  const annualEquivalent = periods===1 ? f.total : (perTotal * periods);         // Tổng quy năm (đã nhân factor riders)
-  const annualOriginal   = f.total;                                              // Tổng năm gốc (chưa nhân factor rider theo kỳ)
-  const diff             = annualEquivalent - annualOriginal;                    // Chênh lệch
+  const annualEquivalent = periods===1 ? displayTotal : (perTotal * periods);
+  const annualOriginal   = displayTotal;
+  const diff             = annualEquivalent - annualOriginal;
 
   const set = (id, val)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(val); };
   set('freq-main', perMain);
@@ -961,12 +997,13 @@ function updateSummaryUI(fees) {
   set('freq-total-period', perTotal);
   set('freq-total-year', annualOriginal);
   set('freq-diff', diff);
-  set('freq-total-year-equivalent', annualEquivalent); // DÒNG MỚI: Tổng quy năm
+  set('freq-total-year-equivalent', annualEquivalent);
 
-  // Ẩn dòng nếu là năm (periods===1)
-  const annualEqEl = document.getElementById('freq-total-year-equivalent');
-  if (annualEqEl && periods===1) annualEqEl.textContent = ''; // hoặc giữ nguyên tùy ý
+  if (document.getElementById('freq-total-year-equivalent') && periods===1) {
+      document.getElementById('freq-total-year-equivalent').textContent = '';
+  }
 }
+
 function updateMainProductFeeDisplay(basePremium, extraPremium) {
     const el = document.getElementById('main-product-fee-display');
     if (!el) return;
@@ -1015,17 +1052,18 @@ function runAllValidations(state) {
     if (!validateMainPersonInputs(state.mainPerson)) isValid = false;
     if (!validateMainProductInputs(state.mainPerson, state.mainProduct, state.fees.baseMain)) isValid = false;
     if (!validateExtraPremium(state.fees.baseMain, state.mainProduct.extraPremium)) isValid = false;
-    if (!validateTargetAge(state.mainPerson, state.mainProduct)) isValid = false; // NEW
+    if (!validateTargetAge(state.mainPerson, state.mainProduct)) isValid = false;
+    
     const allPersons = [state.mainPerson, ...state.supplementaryPersons].filter(p=>p);
     let totalHospitalSupportStbh = 0;
     
     allPersons.forEach(p => {
         if (!p.isMain) {
-            // Chỉ cảnh báo, KHÔNG chặn hiển thị phí
-            validateDobField(p.container.querySelector('.dob-input'));
+            // Validate supplementary person inputs but DO NOT change isValid.
+            // These are warnings for the user to fix, not hard stops for calculation.
+            validateSupplementaryPersonInputs(p);
         }
         for (const prodId in p.supplements) {
-            // Cảnh báo tại chỗ nếu sai nhưng không chặn phần tóm tắt phí
             validateSupplementaryProduct(p, prodId, state.fees.baseMain, totalHospitalSupportStbh);
             if (prodId === 'hospital_support') {
                 totalHospitalSupportStbh += p.supplements[prodId].stbh;
@@ -1055,6 +1093,27 @@ function validateMainPersonInputs(person) {
     return ok;
 }
 
+function validateSupplementaryPersonInputs(person) {
+    const container = person.container;
+    if (!container) return;
+
+    const nameInput = container.querySelector('.name-input');
+    if (nameInput && !(nameInput.value || '').trim()) {
+        setFieldError(nameInput, 'Vui lòng nhập họ và tên');
+    } else {
+        clearFieldError(nameInput);
+    }
+
+    validateDobField(container.querySelector('.dob-input'));
+
+    const occupationInput = container.querySelector('.occupation-input');
+    const group = parseInt(occupationInput?.dataset.group, 10);
+    if (occupationInput && (!group || group < 1 || group > 4)) {
+        setFieldError(occupationInput, 'Chọn nghề nghiệp từ danh sách');
+    } else {
+        clearFieldError(occupationInput);
+    }
+}
 
 function validateMainProductInputs(customer, productInfo, basePremium) {
     let ok = true;
@@ -1063,101 +1122,47 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
     const termEl = document.getElementById('payment-term');
     const abuvTermEl = document.getElementById('abuv-term');
 
-    // 1) STBH & phí chính ngưỡng tối thiểu (giữ nguyên logic cũ)
-    // ============== PUL: LOGIC TẦNG MỚI ==============
-    if (['PUL_TRON_DOI', 'PUL_5NAM', 'PUL_15NAM'].includes(mainProduct)) {
-        const mainStbhMin      = CONFIG.MAIN_PRODUCT_MIN_STBH || 0;
-        const pulStbhMin       = CONFIG.PUL_MIN_STBH_OR || mainStbhMin;
-        const pulPremiumMin    = CONFIG.PUL_MIN_PREMIUM_OR || 0;
-        const mainPremiumMin   = CONFIG.MAIN_PRODUCT_MIN_PREMIUM || 0;
-    
-        // Reset lỗi trước
-        clearFieldError(stbhEl);
-        const feeInputForPul = stbhEl; // vì không có input phí chính riêng PUL
-    
-        if (stbh > 0 && stbh < mainStbhMin) {
-            // TẦNG 1: STBH chưa đạt min của sản phẩm chính
-            setFieldError(stbhEl, `STBH tối thiểu: ${mainStbhMin.toLocaleString('vi-VN')} đ`);
+    if (CONFIG.PRODUCT_GROUPS.PUL.includes(mainProduct)) {
+        const pulState = getPulEligibilityState(stbh, basePremium);
+        const feeInputForPul = stbhEl;
+        if (!pulState.stbhValid) {
+            setFieldError(stbhEl, pulState.stbhReason);
             ok = false;
-    
-        } else if (stbh >= mainStbhMin && stbh < pulStbhMin) {
-            // TẦNG 2: STBH đạt min chung nhưng chưa tới min PUL → dùng ngưỡng phí PUL
-            clearFieldError(stbhEl);
-    
-            if (basePremium > 0 && basePremium < pulPremiumMin) {
-                setFieldError(
-                  feeInputForPul,
-                  `Phí tối thiểu: ${pulPremiumMin.toLocaleString('vi-VN')} đ`
-                );
-                ok = false;
-            } else if (basePremium >= pulPremiumMin) {
-                clearFieldError(feeInputForPul);
-            } else {
-                // basePremium == 0 => chưa tính phí, chưa cảnh báo
-            }
-    
-        } else if (stbh >= pulStbhMin) {
-            // TẦNG 3: STBH đã ≥ ngưỡng PUL → dùng ngưỡng phí chung MAIN
-            clearFieldError(stbhEl);
-    
-            if (basePremium > 0 && basePremium < mainPremiumMin) {
-                setFieldError(
-                  feeInputForPul,
-                  `Phí tối thiểu: ${mainPremiumMin.toLocaleString('vi-VN')} đ`
-                );
-                ok = false;
-            } else if (basePremium >= mainPremiumMin) {
-                clearFieldError(feeInputForPul);
-            } else {
-                // basePremium == 0 => chưa tính phí, chưa cảnh báo
-            }
-        } else {
-            // stbh == 0: chưa nhập / chưa tính → không báo lỗi
-            clearFieldError(stbhEl);
+        } else { clearFieldError(stbhEl); }
+        if (!pulState.premiumValid) {
+            setFieldError(feeInputForPul, pulState.premiumReason);
+            ok = false;
+        } else if (pulState.stbhValid) {
+            clearFieldError(feeInputForPul);
         }
-    
-    } else {
-
-        // (Tùy chọn) ẩn hint nếu không phải PUL:
-        // updatePulHint({ hide: true });
-    
-        // Các sản phẩm KHÁC PUL (trừ Trọn Tâm An có STBH cố định không cần kiểm tra)
-        if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
-            if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
-                setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH,'')}`);
-                ok = false;
-            } else {
-                clearFieldError(stbhEl);
-            }
+    } else if (mainProduct && mainProduct !== 'TRON_TAM_AN') {
+        if (stbh > 0 && stbh < CONFIG.MAIN_PRODUCT_MIN_STBH) {
+            setFieldError(stbhEl, `STBH tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_STBH,'')}`);
+            ok = false;
+        } else {
+            clearFieldError(stbhEl);
         }
     }
     
-    // Phí chính tối thiểu (không áp dụng cho Trọn Tâm An vì phí tính cố định theo STBH)
     if (
         mainProduct &&
-        mainProduct !== 'TRON_TAM_AN' &&
+        !['TRON_TAM_AN'].includes(mainProduct) &&
+        !CONFIG.PRODUCT_GROUPS.PUL.includes(mainProduct) &&
+        !CONFIG.PRODUCT_GROUPS.MUL.includes(mainProduct) &&
         basePremium > 0 &&
-        basePremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM &&
-        !['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProduct) // (PUL đã có điều kiện OR riêng ở trên)
+        basePremium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM
     ) {
         const feeInput = document.getElementById('main-premium-input') || stbhEl;
         setFieldError(feeInput, `Phí chính tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM,'')}`);
         ok = false;
-    } else {
-        const feeInput = document.getElementById('main-premium-input');
-        if (feeInput && !['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(mainProduct)) {
-            clearFieldError(feeInput);
-        }
     }
-    // 2) Kiểm tra thời hạn đóng phí theo từng sản phẩm
+    
     const age = customer?.age || 0;
     const bounds = getPaymentTermBounds(age);
     let minTerm = 4;
     if (mainProduct === 'PUL_5NAM') minTerm = 5;
     if (mainProduct === 'PUL_15NAM') minTerm = 15;
-    if (mainProduct === 'TRON_TAM_AN') minTerm = 10; // cố định (auto), không có input
     if (mainProduct === 'AN_BINH_UU_VIET') {
-        // ABƯV: bắt buộc chọn 5/10/15 theo tuổi
         const allowed = [];
         if (age <= 65) allowed.push(5);
         if (age <= 60) allowed.push(10);
@@ -1166,41 +1171,49 @@ function validateMainProductInputs(customer, productInfo, basePremium) {
         if (!allowed.includes(v)) {
             setFieldError(abuvTermEl, 'Chọn 5 / 10 / 15 năm phù hợp với độ tuổi');
             ok = false;
-        } else {
-            clearFieldError(abuvTermEl);
-        }
-    } else if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI', 'PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'].includes(mainProduct)) {
+        } else { clearFieldError(abuvTermEl); }
+    } else if (CONFIG.PRODUCT_GROUPS.PUL_MUL.includes(mainProduct)) {
         const v = parseInt(termEl?.value || "0", 10);
         const maxTerm = bounds.max;
         if (!(v >= minTerm && v <= maxTerm)) {
             setFieldError(termEl, `Nhập từ ${minTerm} đến ${maxTerm} năm`);
             ok = false;
-        } else {
-            clearFieldError(termEl);
-        }
+        } else { clearFieldError(termEl); }
     }
 
-    // 3) MUL range khi có STBH + độ tuổi (giữ nguyên logic cũ)
-    if (['KHOE_BINH_AN', 'VUNG_TUONG_LAI'].includes(mainProduct)) {
+    if (CONFIG.PRODUCT_GROUPS.MUL.includes(mainProduct)) {
         const feeInput = document.getElementById('main-premium-input');
+        let mulError = false;
+
+        if (premium > 0 && premium < CONFIG.MAIN_PRODUCT_MIN_PREMIUM) {
+            setFieldError(feeInput, `Phí tối thiểu ${formatCurrency(CONFIG.MAIN_PRODUCT_MIN_PREMIUM, '')}`);
+            ok = false;
+            mulError = true;
+        }
+
         const factorRow = product_data.mul_factors.find(f => customer.age >= f.ageMin && customer.age <= f.ageMax);
         const rangeEl = document.getElementById('mul-fee-range');
         if (factorRow && stbh > 0) {
             const minFee = stbh / factorRow.maxFactor;
             const maxFee = stbh / factorRow.minFactor;
             if(rangeEl) rangeEl.textContent = `Phí hợp lệ từ ${formatCurrency(minFee, '')} đến ${formatCurrency(maxFee, '')}.`;
-            if (premium >= 0 && (premium < minFee || premium > maxFee)) {
-                setFieldError(feeInput, 'Phí không hợp lệ');
+            if (premium > 0 && (premium < minFee || premium > maxFee)) {
+                if (!mulError) {
+                    setFieldError(feeInput, 'Phí không hợp lệ so với STBH');
+                }
                 ok = false;
-            } else { clearFieldError(feeInput);}
+                mulError = true;
+            }
         } else if (rangeEl) {
             rangeEl.textContent = '';
         }
-    }
 
+        if (!mulError) {
+            clearFieldError(feeInput);
+        }
+    }
     return ok;
 }
-
 
 function validateExtraPremium(basePremium, extraPremium) {
     const el = document.getElementById('extra-premium-input');
@@ -1226,7 +1239,6 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
 
     let ok = true;
 
-    // Hospital support: giữ logic đặc thù
     if (prodId === 'hospital_support' && stbh > 0) {
         const validationEl = section.querySelector('.hospital-support-validation');
         const maxSupportTotal = Math.floor(mainPremium / 4000000) * 100000;
@@ -1246,7 +1258,6 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
             clearFieldError(input);
         }
     } else if (stbh > 0) {
-        // Gom min / max cho các sản phẩm thường
         const violateMin = config.minStbh && stbh < config.minStbh;
         const violateMax = config.maxStbh && stbh > config.maxStbh;
         if (violateMin || violateMax) {
@@ -1264,7 +1275,6 @@ function validateSupplementaryProduct(person, prodId, mainPremium, totalHospital
             clearFieldError(input);
         }
     } else {
-        // stbh = 0 hoặc chưa nhập: không báo lỗi
         clearFieldError(input);
     }
 
@@ -1274,7 +1284,6 @@ function validateTargetAge(mainPerson, mainProductInfo) {
   const input = document.getElementById('target-age-input');
   if (!input) return true;
 
-  // Nếu bị disable (TTA hoặc ABƯV), coi như hợp lệ
   if (input.disabled) {
     clearFieldError(input);
     return true;
@@ -1283,7 +1292,6 @@ function validateTargetAge(mainPerson, mainProductInfo) {
   const val = parseInt((input.value || '').trim(), 10);
   const age = mainPerson?.age || 0;
 
-  // Xác định paymentTerm thực tế
   let term = mainProductInfo?.paymentTerm || 0;
   const key = mainProductInfo?.key || '';
 
@@ -1293,7 +1301,6 @@ function validateTargetAge(mainPerson, mainProductInfo) {
     term = parseInt(document.getElementById('abuv-term')?.value || '0', 10) || 0;
   }
 
-  // Nếu chưa có tuổi hoặc chưa có term hợp lệ thì chưa báo lỗi (đợi người dùng nhập xong)
   if (!age || !term) {
     clearFieldError(input);
     return true;
@@ -1358,17 +1365,30 @@ document.addEventListener('DOMContentLoaded', () => {
     initSupplementaryButton();
     initSummaryModal();
     attachGlobalListeners();
-    updateSupplementaryAddButtonState();
+    updateSupplementaryAddButtonState(false); // Initial state is invalid
     runWorkflow();
     if (window.MDP3) MDP3.init();
+    if (window.renderSection6V2) window.renderSection6V2();
+
+    const diffEl = document.getElementById('freq-diff');
+    if (diffEl) {
+        diffEl.classList.add('text-red-600', 'font-bold');
+    }
+    const container = document.getElementById('results-container');
+    if (container) {
+        container.querySelectorAll('h2, .text-2xl, .text-lg, .text-sm, span, li').forEach(el => {
+            if (getComputedStyle(el).fontSize && parseFloat(getComputedStyle(el).fontSize) < 12) {
+                el.style.fontSize = '12px';
+            }
+        });
+    }
 });
 function runWorkflow() {
   updateStateFromUI();
   const calculatedFees = performCalculations(appState);
   appState.fees = calculatedFees;
   renderUI();
-  // Cập nhật danh sách "Xem từng người" realtime
-  try { renderSuppList(); } catch(e) { /* an toàn, tránh gãy luồng */ }
+  try { renderSuppList(); } catch(e) {}
 }
 
 const runWorkflowDebounced = debounce(runWorkflow, 40);
@@ -1376,9 +1396,9 @@ const runWorkflowDebounced = debounce(runWorkflow, 40);
 
 function attachGlobalListeners() {
     document.body.addEventListener('change', (e) => {
-        hideGlobalErrors(); // NEW
+        hideGlobalErrors();
         if (e.target.id === 'main-product') {
-            lastRenderedProductKey = null; // Force re-render of options
+            lastRenderedProductKey = null;
             if (window.MDP3) MDP3.reset();
         }
         runWorkflow();
@@ -1389,15 +1409,15 @@ function attachGlobalListeners() {
     });
 
     document.body.addEventListener('input', (e) => {
-        hideGlobalErrors(); // NEW
+        hideGlobalErrors();
         if (e.target.matches('input[type="text"]') && !e.target.classList.contains('dob-input') && !e.target.classList.contains('name-input') && !e.target.classList.contains('occupation-input')) {
             formatNumberInput(e.target);
         }
-        runWorkflow();
+        runWorkflowDebounced();
     });
 
     document.body.addEventListener('focusout', (e) => {
-        hideGlobalErrors(); // NEW
+        hideGlobalErrors();
         if (e.target.matches('input[type="text"]')) {
             roundInputToThousand(e.target);
             if (e.target.classList.contains('dob-input')) validateDobField(e.target);
@@ -1437,12 +1457,10 @@ function initSupplementaryButton() {
         newPersonDiv.querySelector('.remove-supp-btn').addEventListener('click', () => {
             newPersonDiv.remove();
             if (window.MDP3) MDP3.reset();
-            updateSupplementaryAddButtonState();
             runWorkflow();
         });
         
         initPerson(newPersonDiv, false);
-        updateSupplementaryAddButtonState();
         if (window.MDP3) MDP3.reset();
         runWorkflow();
     });
@@ -1487,18 +1505,19 @@ function generateSupplementaryPersonHtml(personId, count) {
   `;
 }
 
-function updateSupplementaryAddButtonState() {
+function updateSupplementaryAddButtonState(isMainProductValid) {
     const btn = document.getElementById('add-supp-insured-btn');
     if (!btn) return;
     const mainProductKey = document.getElementById('main-product')?.value || '';
     const count = document.querySelectorAll('#supplementary-insured-container .person-container').length;
     const isTTA = (mainProductKey === 'TRON_TAM_AN');
-    const disabled = isTTA || (count >= CONFIG.MAX_SUPPLEMENTARY_INSURED);
+    const disabled = isTTA || (count >= CONFIG.MAX_SUPPLEMENTARY_INSURED) || !isMainProductValid;
     btn.disabled = disabled;
     btn.classList.toggle('opacity-50', disabled);
     btn.classList.toggle('cursor-not-allowed', disabled);
     btn.classList.toggle('hidden', isTTA);
 }
+
 function generateSupplementaryProductsHtml() {
     return CONFIG.supplementaryProducts.map(prod => {
         let optionsHtml = '';
@@ -1688,24 +1707,20 @@ function updateTargetAge() {
 
     const labelEl = document.querySelector('label[for="target-age-input"]');
     const hintEl  = document.getElementById('target-age-hint'); // giả sử có, nếu không có cũng không sao
-    const isPulMul = ['PUL_TRON_DOI','PUL_15NAM','PUL_5NAM','KHOE_BINH_AN','VUNG_TUONG_LAI'].includes(mainProduct);
+    const isPulMul = CONFIG.PRODUCT_GROUPS.PUL_MUL.includes(mainProduct);
 
-    // Reset hint trước
     if (hintEl) hintEl.textContent = '';
-    // Nếu không phải nhóm PUL/MUL thì trả label về mặc định (nếu từng đổi)
     if (labelEl && !isPulMul) {
         labelEl.textContent = 'Minh họa phí đến năm (tuổi NĐBH chính)';
     }
 
-    // Trọn Tâm An: cố định 10 năm, không hiển thị hint
     if (mainProduct === 'TRON_TAM_AN') {
         targetAgeInput.disabled = true;
         targetAgeInput.value = mainPersonInfo.age + 10 - 1;
-        if (hintEl) hintEl.textContent = ''; // đảm bảo trống
+        if (hintEl) hintEl.textContent = '';
         return;
     }
 
-    // An Bình Ưu Việt: cố định theo kỳ hạn chọn, không hiển thị hint
     if (mainProduct === 'AN_BINH_UU_VIET') {
         const term = parseInt(document.getElementById('abuv-term')?.value || '15', 10);
         targetAgeInput.disabled = true;
@@ -1714,13 +1729,11 @@ function updateTargetAge() {
         return;
     }
 
-    // Các sản phẩm còn lại (có thể sửa) — bao gồm PUL/MUL
     targetAgeInput.disabled = false;
 
     const paymentTerm = parseInt(document.getElementById('payment-term')?.value, 10) || 0;
 
     if (!paymentTerm || paymentTerm <= 0) {
-        // Chưa nhập thời gian đóng phí
         targetAgeInput.removeAttribute('min');
         targetAgeInput.removeAttribute('max');
         if (isPulMul && hintEl) {
@@ -1730,7 +1743,7 @@ function updateTargetAge() {
     }
 
     const minAge = mainPersonInfo.age + paymentTerm - 1;
-    const maxAge = 100; // Nếu có rule riêng từng sản phẩm, có thể thay bằng mapping.
+    const maxAge = 100; 
 
     targetAgeInput.min = String(minAge);
     targetAgeInput.max = String(maxAge);
@@ -1742,14 +1755,12 @@ function updateTargetAge() {
         targetAgeInput.value = maxAge;
     }
 
-    // Chỉ hiển thị hint cho nhóm PUL/MUL
     if (isPulMul) {
         if (labelEl) labelEl.textContent = 'Minh họa phí đến năm (tuổi NĐBH chính)';
         if (hintEl) {
             hintEl.innerHTML = `Khoảng hợp lệ: <strong>${minAge}</strong> – <strong>${maxAge}</strong>.`;
         }
     } else {
-        // Sản phẩm khác: không hiển thị gì thêm
         if (hintEl) hintEl.textContent = '';
     }
 }
@@ -2140,32 +2151,6 @@ window.MDP3 = (function () {
 })();
 
 
-(function(){
-  try{window.renderSection6V2 && window.renderSection6V2();}catch(e){}
-})();
-
-(function() {
-  const $$ = (sel, root=document) => root.querySelector(sel);
-  const toInt = (s) => {
-    if (s == null) return 0;
-    const n = String(s).replace(/[^\d]/g, "");
-    return n ? parseInt(n, 10) : 0;
-  };
-  const fmt = (n) => {
-    try {
-      return Number(n).toLocaleString("vi-VN");
-    } catch (e) {
-      const s = String(n);
-      return s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    }
-  };
-  const setText = (id, val) => {
-    const el = typeof id === "string" ? $$(id) : id;
-    if (!el) return;
-    const target = fmt(Math.max(0, Math.round(val)));
-    if (el.textContent !== target) el.textContent = target;
-  };
-})();
 // === LITE MIN: Gom lỗi chỉ bổ sung những nhóm CHƯA có inline ===
 function collectSimpleErrors() {
   const rawErrors = [];
@@ -3138,8 +3123,7 @@ function buildPart1Section(summaryData) {
 // Thay thế TOÀN BỘ hàm buildPart2Section hiện có bằng hàm này
 function buildPart2Section(data) {
     // --- BẮT ĐẦU PHẦN LOGIC MỚI ---
-    const KHOE_TRON_VEN_KEYS = ['PUL_TRON_DOI', 'PUL_15NAM', 'PUL_5NAM'];
-    const isKhoeTronVen = KHOE_TRON_VEN_KEYS.includes(data.productKey);
+    const isKhoeTronVen = CONFIG.PRODUCT_GROUPS.PUL.includes(data.productKey);
 
     // Nếu không phải Khoẻ Trọn Vẹn, dùng logic render cũ
     if (!isKhoeTronVen) {
@@ -3380,121 +3364,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btn._bound = true;
   }
 });
-
-
-;
-
-/* ====== PATCH: Đồng nhất UI tóm tắt và tô đỏ chênh lệch ====== */
-(function(){
-  document.addEventListener('DOMContentLoaded', ()=>{
-    const diffEl = document.getElementById('freq-diff');
-    if (diffEl) { diffEl.classList.add('text-red-600','font-bold'); }
-    const container = document.getElementById('results-container');
-    if (container) {
-      container.querySelectorAll('h2, .text-2xl, .text-lg, .text-sm, span, li').forEach(el=>{
-        // không đổi kích thước, chỉ đảm bảo không quá nhỏ; có thể tùy chỉnh thêm nếu cần
-        if (getComputedStyle(el).fontSize && parseFloat(getComputedStyle(el).fontSize) < 12) {
-          el.style.fontSize = '12px';
-        }
-      });
-    }
-  }, {once:true});
-})();
-
-function buildProductSummaryTable(data, periods, isAnnual, riderFactor) {
-  const { mainInfo, targetAge, paymentTerm, productKey, allPersons } = data;
-  const baseMain = appState.fees.baseMain;
-  const extra = appState.fees.extra;
-  const yearsForMain = () => {
-    if (productKey === 'TRON_TAM_AN') return 10;
-    if (productKey === 'AN_BINH_UU_VIET') return parseInt(document.getElementById('abuv-term')?.value || '10', 10);
-    return appState.mainProduct.paymentTerm || 0;
-  };
-  const riderAnnual = (v) => Math.round(v * riderFactor / 1000) * 1000;
-  const riderPerPeriod = (v) => Math.round((v * riderFactor / periods) / 1000) * 1000;
-  let html = `
-    <h3 class="text-lg font-bold mb-2">Phần 1 · Tóm tắt sản phẩm</h3>
-    <table>
-      <thead>
-        <tr><th>Người</th><th>Sản phẩm</th><th>STBH</th><th>Số năm đóng phí</th><th>Phí (kỳ)</th><th>Phí quy năm</th><th>Chênh lệch</th></tr>
-      </thead>
-      <tbody>`;
-  let _grandPer=0, _grandAnnualBase=0, _grandAnnualEq=0, _grandDiff=0;
-  for (const person of allPersons) {
-    const feeRow = appState.fees.byPerson[person.id] || { main:0, supp:0 };
-    const mainYears = person.isMain ? yearsForMain() : 0;
-    if (person.isMain) {
-      const myAnnual = baseMain + extra + feeRow.supp;
-      const myPerPeriod = Math.round((baseMain/periods)/1000)*1000 + Math.round((extra/periods)/1000)*1000 + riderPerPeriod(feeRow.supp);
-      const annualEq = Math.round(myPerPeriod * periods);
-      const diff = annualEq - (baseMain + extra + feeRow.supp);
-      html += `
-        <tr>
-          <td><b>${sanitizeHtml(person.name)}</b></td>
-          <td><b>Tổng (SP chính + Đóng thêm + SP bổ sung)</b></td>
-          <td class="text-right"><b>${formatDisplayCurrency(appState.mainProduct.stbh || 0)}</b></td>
-          <td class="text-center"><b>${mainYears || '-'}</b></td>
-          <td class="text-right"><b>${formatDisplayCurrency(myPerPeriod)}</b></td>
-          <td class="text-right"><b>${formatDisplayCurrency(myAnnual)}</b></td>
-          <td class="text-right">${formatDisplayCurrency(diff)}</td>
-        </tr>`;
-    }
-    for (const prod of CONFIG.supplementaryProducts) {
-      const supp = person.supplements?.[prod.id];
-      if (!supp) continue;
-      const stbh = supp.stbh || getHealthSclStbhByProgram(supp.program) || 0;
-      const years = Math.max(0, Math.min(targetAge, prod.maxRenewalAge) - (person.age || 0));
-      const fee = (appState.fees.byPerson[person.id]?.suppDetails?.[prod.id]) || 0;
-      if (fee > 0) {
-        html += `
-          <tr>
-            <td>${sanitizeHtml(person.name)}</td>
-            <td>${sanitizeHtml(prod.name)}</td>
-            <td class="text-right">${formatDisplayCurrency(stbh)}</td>
-            <td class="text-center">${years}</td>
-            <td class="text-right">${formatDisplayCurrency(riderPerPeriod(fee))}</td>
-            <td class="text-right">${formatDisplayCurrency(riderAnnual(fee))}</td>
-            <td class="text-right"></td>
-          </tr>`;
-      }
-    }
-  }
-    {
-    const fees = appState.fees || {baseMain:0, extra:0, totalSupp:0};
-    const perMain = Math.round((fees.baseMain/periods)/1000)*1000;
-    const perExtra = Math.round((fees.extra/periods)/1000)*1000;
-    const perSupp  = Math.round(((fees.totalSupp * riderFactor)/periods)/1000)*1000;
-    const perTotal = isAnnual?0:(perMain+perExtra+perSupp);
-    const annualBase = fees.baseMain + fees.extra + Math.round(fees.totalSupp * riderFactor/1000)*1000;
-    const annualEq = isAnnual?annualBase:(perTotal*periods);
-    const diff = isAnnual?0:(annualEq - (fees.baseMain + fees.extra + fees.totalSupp));
-    html += `<tr class="bg-gray-100 font-bold"><td colspan="3">Tổng tất cả</td><td></td>` + (!isAnnual?`<td class=\"text-right\">${formatDisplayCurrency(perTotal)}</td><td class=\"text-right\">${formatDisplayCurrency(annualEq)}</td>`:`<td class=\"text-right\">${formatDisplayCurrency(annualBase)}</td>`) + (!isAnnual?`<td class=\"text-right\"><span class=\"text-red-600 font-bold\">${formatDisplayCurrency(diff)}</span></td>`:'') + `</tr>`;
-  }
-  html += `</tbody></table>`;
-  return html;
-}
-
-function buildFeeScheduleTable(data, periods, isAnnual, riderFactor) {
-  const fees = appState.fees;
-  const perMain = Math.round((fees.baseMain / periods) / 1000) * 1000;
-  const perExtra = Math.round((fees.extra / periods) / 1000) * 1000;
-  const perSupp  = Math.round(((fees.totalSupp * riderFactor) / periods) / 1000) * 1000;
-  const perTotal = perMain + perExtra + perSupp;
-  const annualEq = perTotal * periods;
-  const diff = annualEq - (fees.baseMain + fees.extra + fees.totalSupp);
-  return `
-    <h3 class="text-lg font-bold mt-6 mb-2">Phần 2 · Lịch đóng phí theo kỳ</h3>
-    <table>
-      <thead><tr><th>Mục</th><th>Hàng kỳ</th><th>Quy năm</th></tr></thead>
-      <tbody>
-        <tr><td>Phí sản phẩm chính</td><td class="text-right">${formatDisplayCurrency(perMain)}</td><td class="text-right">${formatDisplayCurrency(fees.baseMain)}</td></tr>
-        <tr><td>Phí đóng thêm</td><td class="text-right">${formatDisplayCurrency(perExtra)}</td><td class="text-right">${formatDisplayCurrency(fees.extra)}</td></tr>
-        <tr><td>Tổng phí SP bổ sung</td><td class="text-right">${formatDisplayCurrency(perSupp)}</td><td class="text-right">${formatDisplayCurrency(fees.totalSupp)}</td></tr>
-        <tr><td><b>Tổng</b></td><td class="text-right"><b>${formatDisplayCurrency(perTotal)}</b></td><td class="text-right"><b>${formatDisplayCurrency(fees.total)}</b></td></tr>
-        <tr><td>Chênh lệch (quy năm – tổng)</td><td class="text-right"></td><td class="text-right">${formatDisplayCurrency(diff)}</td></tr>
-      </tbody>
-    </table>`;
-}
 
 function attachExportHandlers(container) {
   const buildDoc = () => {
@@ -3806,7 +3675,7 @@ function bm_findSchema(productKey){
   if (productKey==='AN_BINH_UU_VIET') return BM_SCHEMAS.find(s=>s.key==='AN_BINH_UU_VIET');
   if (['KHOE_BINH_AN'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='KHOE_BINH_AN');
   if (['VUNG_TUONG_LAI'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='VUNG_TUONG_LAI');
-  if (['PUL_TRON_DOI','PUL_5NAM','PUL_15NAM'].includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='PUL_FAMILY');
+  if (CONFIG.PRODUCT_GROUPS.PUL.includes(productKey)) return BM_SCHEMAS.find(s=>s.key==='PUL_FAMILY');
   if (productKey==='health_scl') return BM_SCHEMAS.find(s=>s.key==='HEALTH_SCL');
   if (productKey==='bhn') return BM_SCHEMAS.find(s=>s.key==='BHN_2_0');
   if (productKey==='hospital_support') return BM_SCHEMAS.find(s=>s.key==='HOSPITAL_SUPPORT');
@@ -4148,47 +4017,47 @@ if (typeof buildPart2Section === 'function'){
 }
 
 console.info('[BenefitMatrixPatch] v3.2 applied.');
-    /* ====== SHARE VIEWER PAYLOAD (Phương án C2) ====== */
-(function(){
-  // Mapping sản phẩm chính -> slug thư mục ảnh sản phẩm
-  const PRODUCT_SLUG_MAP = {
-    PUL_TRON_DOI: 'khoe-tron-ven',
-    PUL_15NAM: 'khoe-tron-ven',
-    PUL_5NAM: 'khoe-tron-ven',
-    KHOE_BINH_AN: 'khoe-binh-an',
-    VUNG_TUONG_LAI: 'vung-tuong-lai',
-    TRON_TAM_AN: 'tron-tam-an',
-    AN_BINH_UU_VIET: 'an-binh-uu-viet'
-  };
-  // Mapping rider -> slug thư mục ảnh
-  const RIDER_SLUG_MAP = {
-    health_scl: 'bung-gia-luc',
-    bhn: 'benh-hiem-ngheo-20',
-    accident: 'tai-nan',
-    hospital_support: 'ho-tro-vien-phi'
-  };
-    function __exportExactSummaryHtml() {
-      try {
-        if (typeof runWorkflow === 'function') runWorkflow();
-        if (typeof buildSummaryData !== 'function') return '';
-        const data = buildSummaryData();
-        const introHtml  = (typeof buildIntroSection === 'function') ? buildIntroSection(data) : '';
-        const part1Html  = (typeof buildPart1Section === 'function') ? buildPart1Section(data) : '';
-        const part2Html  = (typeof buildPart2BenefitsSection === 'function') ? buildPart2BenefitsSection(data) : '';
-        // Phần 3 có thể là buildPart3ScheduleSection hoặc buildPart2Section tuỳ patch
-        let part3Html = '';
-        if (typeof buildPart3ScheduleSection === 'function') {
-          part3Html = buildPart3ScheduleSection(data);
-        } else if (typeof buildPart2Section === 'function') {
-          part3Html = buildPart2Section(data).replace(/Phần\s*2\s*·\s*Bảng phí/i,'Phần 3 · Bảng phí');
-        }
-        const footerHtml = (typeof buildFooterSection === 'function') ? buildFooterSection(data) : '';
-        return introHtml + part1Html + part2Html + part3Html + footerHtml;
-      } catch(e){
-        console.error('[__exportExactSummaryHtml] lỗi:', e);
-        return '<div style="color:red">Lỗi dựng summaryHtml</div>';
-      }
+/* ====== SHARE VIEWER PAYLOAD (Phương án C2) ====== */
+const PRODUCT_SLUG_MAP = {
+  PUL_TRON_DOI: 'khoe-tron-ven',
+  PUL_15NAM: 'khoe-tron-ven',
+  PUL_5NAM: 'khoe-tron-ven',
+  KHOE_BINH_AN: 'khoe-binh-an',
+  VUNG_TUONG_LAI: 'vung-tuong-lai',
+  TRON_TAM_AN: 'tron-tam-an',
+  AN_BINH_UU_VIET: 'an-binh-uu-viet'
+};
+// Mapping rider -> slug thư mục ảnh
+const RIDER_SLUG_MAP = {
+  health_scl: 'bung-gia-luc',
+  bhn: 'benh-hiem-ngheo-20',
+  accident: 'tai-nan',
+  hospital_support: 'ho-tro-vien-phi'
+};
+
+function __exportExactSummaryHtml() {
+  try {
+    if (typeof runWorkflow === 'function') runWorkflow();
+    if (typeof buildSummaryData !== 'function') return '';
+    const data = buildSummaryData();
+    const introHtml = (typeof buildIntroSection === 'function') ? buildIntroSection(data) : '';
+    const part1Html = (typeof buildPart1Section === 'function') ? buildPart1Section(data) : '';
+    const part2Html = (typeof buildPart2BenefitsSection === 'function') ? buildPart2BenefitsSection(data) : '';
+    // Phần 3 có thể là buildPart3ScheduleSection hoặc buildPart2Section tuỳ patch
+    let part3Html = '';
+    if (typeof buildPart3ScheduleSection === 'function') {
+      part3Html = buildPart3ScheduleSection(data);
+    } else if (typeof buildPart2Section === 'function') {
+      part3Html = buildPart2Section(data).replace(/Phần\s*2\s*·\s*Bảng phí/i, 'Phần 3 · Bảng phí');
     }
+    const footerHtml = (typeof buildFooterSection === 'function') ? buildFooterSection(data) : '';
+    return introHtml + part1Html + part2Html + part3Html + footerHtml;
+  } catch (e) {
+    console.error('[__exportExactSummaryHtml] lỗi:', e);
+    return '<div style="color:red">Lỗi dựng summaryHtml</div>';
+  }
+}
+
 function buildViewerPayload() {
   if (typeof updateStateFromUI === 'function') updateStateFromUI();
   if (typeof performCalculations === 'function') {
@@ -4211,21 +4080,21 @@ function buildViewerPayload() {
   allPersons.forEach(person => {
     const suppObj = person.supplements || {};
     Object.keys(suppObj).forEach(rid => {
-        // Chỉ thêm rider nếu nó chưa có trong danh sách
-        if(!riderList.some(r => r.slug === rid)){
-            const data = suppObj[rid];
-            const premiumDetail = (appState.fees.byPerson?.[person.id]?.suppDetails?.[rid]) || 0;
-            riderList.push({
-                slug: rid,
-                selected: true,
-                stbh: data.stbh || (rid === 'health_scl' ? getHealthSclStbhByProgram(data.program) : 0),
-                program: data.program,
-                scope: data.scope,
-                outpatient: !!data.outpatient,
-                dental: !!data.dental,
-                premium: premiumDetail
-            });
-        }
+      // Chỉ thêm rider nếu nó chưa có trong danh sách
+      if (!riderList.some(r => r.slug === rid)) {
+        const data = suppObj[rid];
+        const premiumDetail = (appState.fees.byPerson?.[person.id]?.suppDetails?.[rid]) || 0;
+        riderList.push({
+          slug: rid,
+          selected: true,
+          stbh: data.stbh || (rid === 'health_scl' ? getHealthSclStbhByProgram(data.program) : 0),
+          program: data.program,
+          scope: data.scope,
+          outpatient: !!data.outpatient,
+          dental: !!data.dental,
+          premium: premiumDetail
+        });
+      }
     });
   });
 
@@ -4235,47 +4104,48 @@ function buildViewerPayload() {
     const premium = MDP3.getPremium ? MDP3.getPremium() : 0;
     const selId = MDP3.getSelectedId ? MDP3.getSelectedId() : null;
     if (premium > 0 && selId) {
-      let selectedName = '', selectedAge = '';
+      let selectedName = '',
+        selectedAge = '';
       if (selId === 'other') {
         const form = document.getElementById('person-container-mdp3-other');
         if (form) {
           const info = collectPersonData(form, false);
           selectedName = info?.name || 'Người khác';
-          selectedAge  = info?.age || '';
+          selectedAge = info?.age || '';
         }
       } else {
         const cont = document.getElementById(selId);
         if (cont) {
           const info = collectPersonData(cont, false);
           selectedName = info?.name || 'NĐBH bổ sung';
-          selectedAge  = info?.age || '';
+          selectedAge = info?.age || '';
         }
       }
       mdp3Obj = { selectedId: selId, premium, selectedName, selectedAge };
       if (!riderList.some(r => r.slug === 'mdp3')) {
-        riderList.push({ slug:'mdp3', selected:true, stbh:0, premium });
+        riderList.push({ slug: 'mdp3', selected: true, stbh: 0, premium });
       }
     }
   }
 
   // Phí
   const baseMain = appState.fees.baseMain || 0;
-  const extra    = appState.fees.extra || 0;
-  const totalSupp= appState.fees.totalSupp || 0;
+  const extra = appState.fees.extra || 0;
+  const totalSupp = appState.fees.totalSupp || 0;
   const targetAgeInputVal = parseInt(document.getElementById('target-age-input')?.value || '0', 10);
-  const targetAge = targetAgeInputVal || ((mainPerson.age||0) + paymentTermFinal - 1);
+  const targetAge = targetAgeInputVal || ((mainPerson.age || 0) + paymentTermFinal - 1);
 
   // Tạo summaryHtml nguyên văn
   const summaryHtml = __exportExactSummaryHtml();
 
   return {
-    v:3,
+    v: 3,
     productKey: mainKey,
-    productSlug: PRODUCT_SLUG_MAP[mainKey] || (mainKey||'').toLowerCase(),
+    productSlug: PRODUCT_SLUG_MAP[mainKey] || (mainKey || '').toLowerCase(),
     mainPersonName: mainPerson.name || '',
     mainPersonDob: mainPerson.dob || '',
     mainPersonAge: mainPerson.age || 0,
-    mainPersonGender: mainPerson.gender === 'Nữ' ? 'F':'M',
+    mainPersonGender: mainPerson.gender === 'Nữ' ? 'F' : 'M',
     mainPersonRiskGroup: mainPerson.riskGroup,
     sumAssured: (mainKey === 'TRON_TAM_AN') ? 100000000 : (appState.mainProduct.stbh || 0),
     paymentFrequency: appState.paymentFrequency,
@@ -4311,42 +4181,42 @@ function openFullViewer() {
     const closeBtn = document.getElementById('close-viewer-modal-btn');
 
     if (!modal || !iframe || !closeBtn) {
-        console.error('Không tìm thấy các thành phần của modal viewer.');
-        // Fallback to new tab if modal components are missing
-        window.open(viewerUrl.toString(), '_blank', 'noopener');
-        return;
+      console.error('Không tìm thấy các thành phần của modal viewer.');
+      // Fallback to new tab if modal components are missing
+      window.open(viewerUrl.toString(), '_blank', 'noopener');
+      return;
     }
-    
+
     iframe.src = 'about:blank'; // Clear previous content
     setTimeout(() => {
-        iframe.src = viewerUrl.toString();
+      iframe.src = viewerUrl.toString();
     }, 10); // Small delay to ensure clearing happens first
 
     modal.classList.add('visible');
-    
+
     // Function to close the modal
     const closeModal = () => {
       modal.classList.remove('visible');
       iframe.src = 'about:blank'; // Clear src to stop video/audio etc.
       document.removeEventListener('keydown', handleKeydown); // Clean up listener
     };
-    
+
     // Close button event
     closeBtn.onclick = closeModal;
-    
+
     // Escape key event
     const handleKeydown = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-        }
+      if (e.key === 'Escape') {
+        closeModal();
+      }
     };
     document.addEventListener('keydown', handleKeydown);
-    
+
     // Optional: close on backdrop click
     modal.onclick = (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
+      if (e.target === modal) {
+        closeModal();
+      }
     };
 
   } catch (e) {
@@ -4381,4 +4251,3 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.dataset._bindFullViewer = '1';
   }
 });
-})();
