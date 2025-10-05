@@ -510,11 +510,16 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
     };
 
     const startYear = new Date().getFullYear();
+    const startDate = CONFIG.REFERENCE_DATE;
+    const startMonth = startDate.getMonth() + 1;  // Tháng từ 1-12
 
     for (let month = 1; month <= totalMonths; month++) {
         const policyYear = Math.floor((month - 1) / 12) + 1;
         const attainedAge = initialAge + policyYear - 1;
         const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
+
+        const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
+        const calendarYear = startYear + Math.floor((startMonth - 1 + elapsedMonths) / 12);
 
         for (const key in scenarios) {
             let currentAccountValue = scenarios[key].accountValue;
@@ -529,7 +534,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
 
             const investmentAmount = currentAccountValue + premiumIn - initialFee;
 
-            const calendarYear = startYear + policyYear - 1;
             const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
             const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
@@ -545,9 +549,9 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             if (key === 'guaranteed') {
                 interestRateYearly = guaranteedRate;
             } else if (key === 'customCapped') {
-                interestRateYearly = (policyYear <= 20) ? customRate : guaranteedRate;
+                interestRateYearly = (policyYear <= 20) ? Math.max(customRate, guaranteedRate) : guaranteedRate;
             } else {
-                interestRateYearly = customRate;
+                interestRateYearly = Math.max(customRate, guaranteedRate);
             }
             const interest = netInvestmentAmount * (interestRateYearly / 12);
 
