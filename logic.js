@@ -519,7 +519,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
         const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
-        const calendarYear = startYear + Math.floor((startMonth - 1 + elapsedMonths) / 12);
+        const calendarYear = startYear + Math.floor((startMonth - 1 + month) / 12)-1;
 
         for (const key in scenarios) {
             let currentAccountValue = scenarios[key].accountValue;
