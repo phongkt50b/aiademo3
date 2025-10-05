@@ -541,7 +541,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
             // Sửa lỗi #1: Khôi phục cơ chế dự phòng để Phí rủi ro không bao giờ bằng 0
-            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
+            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge) || { nam: 2, nu: 1.5 };
             const riskRate = riskRateRecord[genderKey];
             const sumAtRisk = Math.max(0, stbh - investmentAmount);
             
