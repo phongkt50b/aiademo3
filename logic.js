@@ -495,96 +495,107 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
 }
 // Dán hàm mới này vào logic.js
 function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
-    const { gender, age: initialAge } = mainPerson;
-    const { key: productKey, stbh, paymentTerm } = mainProduct;
-    const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
+    const { gender, age: initialAge } = mainPerson;
+    const { key: productKey, stbh, paymentTerm } = mainProduct;
+    const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
 
-    const totalYears = targetAge - initialAge + 1;
-    const totalMonths = totalYears * 12;
-    const customRate = (parseFloat(customInterestRate) || 0) / 100;
+    const totalYears = targetAge - initialAge + 1;
+    const totalMonths = totalYears * 12;
+    const customRate = (parseFloat(customInterestRate) || 0) / 100;
 
-    let scenarios = {
-        guaranteed: { accountValue: 0, yearEndValues: [] },
-        customCapped: { accountValue: 0, yearEndValues: [] },
-        customFull: { accountValue: 0, yearEndValues: [] },
-    };
+    let scenarios = {
+        guaranteed: { accountValue: 0, yearEndValues: [] },
+        customCapped: { accountValue: 0, yearEndValues: [] },
+        customFull: { accountValue: 0, yearEndValues: [] },
+    };
 
-    const startYear = new Date().getFullYear();
-    const startDate = CONFIG.REFERENCE_DATE;
-    const startMonth = startDate.getMonth() + 1;  // Tháng từ 1-12
+    const startYear = new Date().getFullYear();
+    const startDate = CONFIG.REFERENCE_DATE;
+    const startMonth = startDate.getMonth() + 1;  // Tháng từ 1-12
 
-    for (let month = 1; month <= totalMonths; month++) {
-        const policyYear = Math.floor((month - 1) / 12) + 1;
-        const attainedAge = initialAge + policyYear - 1;
-        const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
+    for (let month = 1; month <= totalMonths; month++) {
+        const policyYear = Math.floor((month - 1) / 12) + 1;
+        const attainedAge = initialAge + policyYear - 1;
+        const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-        const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
-        const calendarYear = startYear + Math.floor((startMonth - 2 + month) / 12);
+        const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
+        const calendarYear = startYear + Math.floor((startMonth - 2 + month) / 12);
 
-        for (const key in scenarios) {
-            let currentAccountValue = scenarios[key].accountValue;
-            let premiumIn = 0;
-            let initialFee = 0;
+        for (const key in scenarios) {
+            let currentAccountValue = scenarios[key].accountValue;
+            let premiumIn = 0;
+            let initialFee = 0;
 
-            if (month % 12 === 1 && policyYear <= paymentTerm) {
-                premiumIn = basePremium + extraPremium;
-                const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
-                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * initial_fees.EXTRA);
-            }
+            if (month % 12 === 1 && policyYear <= paymentTerm) {
+                premiumIn = basePremium + extraPremium;
+                // làm tròn premium trước khi dùng
+                premiumIn = Math.round(premiumIn);
 
-            const investmentAmount = currentAccountValue + premiumIn - initialFee;
+                const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
+                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * (initial_fees.EXTRA || 0));
+                initialFee = Math.round(initialFee);
+            }
 
-            const adminFee = admin_fees[calendarYear] || admin_fees.default;
+            const investmentAmount = currentAccountValue + premiumIn - initialFee;
 
-            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
-            const riskRate = riskRateRecord ? riskRateRecord[genderKey] : 0;
-            const sumAtRisk = Math.max(0, stbh - investmentAmount);
-            
-            const costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
+            // Lấy admin fee theo năm dương lịch (calendarYear)
+            let adminFee = admin_fees[calendarYear] || admin_fees.default || 0;
+            adminFee = Math.round(adminFee);
 
-            let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
+            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
+            const riskRate = riskRateRecord ? riskRateRecord[genderKey] : 0;
+            const sumAtRisk = Math.max(0, stbh - investmentAmount);
 
-            let interestRateYearly = 0;
-            const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
-            if (key === 'guaranteed') {
-                interestRateYearly = guaranteedRate;
-            } else if (key === 'customCapped') {
-                interestRateYearly = (policyYear <= 20) ? Math.max(customRate, guaranteedRate) : guaranteedRate;
-            } else {
-                interestRateYearly = Math.max(customRate, guaranteedRate);
-            }
-            const interest = netInvestmentAmount * (interestRateYearly / 12);
+            let costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
+            costOfInsurance = Math.round(costOfInsurance);
 
-            // ==========================================================
-            // ===== LOGIC THƯỞNG ĐÃ ĐƯỢC CẬP NHẬT =====
-            // ==========================================================
-            let bonus = 0;
-            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
-            if (bonusInfo && month % 12 === 0) {
-                const bonusYear = bonusInfo.year;
-                // Chỉ áp dụng thưởng nếu thời gian đóng phí đủ dài
-                if (bonusYear === 10 && paymentTerm >= 10) {
-                    bonus = basePremium * bonusInfo.rate;
-                } else if (bonusYear === 20 && paymentTerm >= 20) {
-                    bonus = basePremium * bonusInfo.rate;
-                } else if (bonusYear === 30 && paymentTerm >= 30) {
-                    bonus = basePremium * bonusInfo.rate;
-                }
-            }
-            
-            scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
+            let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
+            netInvestmentAmount = Math.round(netInvestmentAmount);
 
-            if (month % 12 === 0) {
-                scenarios[key].yearEndValues.push(scenarios[key].accountValue);
-            }
-        }
-    }
+            let interestRateYearly = 0;
+            const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
+            if (key === 'guaranteed') {
+                interestRateYearly = guaranteedRate;
+            } else if (key === 'customCapped') {
+                interestRateYearly = (policyYear <= 20) ? Math.max(customRate, guaranteedRate) : guaranteedRate;
+            } else {
+                interestRateYearly = Math.max(customRate, guaranteedRate);
+            }
 
-    return {
-        guaranteed: scenarios.guaranteed.yearEndValues,
-        customCapped: scenarios.customCapped.yearEndValues,
-        customFull: scenarios.customFull.yearEndValues,
-    };
+            let interest = netInvestmentAmount * (interestRateYearly / 12);
+            interest = Math.round(interest);
+
+            // ==========================================================
+            // ===== LOGIC THƯỞNG ĐÃ ĐƯỢC CẬP NHẬT =====
+            // ==========================================================
+            let bonus = 0;
+            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
+            if (bonusInfo && month % 12 === 0) {
+                const bonusYear = bonusInfo.year;
+                if (bonusYear === 10 && paymentTerm >= 10) {
+                    bonus = basePremium * bonusInfo.rate;
+                } else if (bonusYear === 20 && paymentTerm >= 20) {
+                    bonus = basePremium * bonusInfo.rate;
+                } else if (bonusYear === 30 && paymentTerm >= 30) {
+                    bonus = basePremium * bonusInfo.rate;
+                }
+                bonus = Math.round(bonus);
+            }
+
+            // Cập nhật giá trị tài khoản sau tháng này (làm tròn cuối cùng)
+            scenarios[key].accountValue = Math.round(netInvestmentAmount + interest + bonus);
+
+            if (month % 12 === 0) {
+                scenarios[key].yearEndValues.push(scenarios[key].accountValue);
+            }
+        }
+    }
+
+    return {
+        guaranteed: scenarios.guaranteed.yearEndValues,
+        customCapped: scenarios.customCapped.yearEndValues,
+        customFull: scenarios.customFull.yearEndValues,
+    };
 }
 /**
  * Checks eligibility for PUL products based on STBH and premium.
