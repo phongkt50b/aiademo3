@@ -593,9 +593,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         customFull: scenarios.customFull.yearEndValues,
     };
 }
-}
-
-
 /**
  * Checks eligibility for PUL products based on STBH and premium.
  * @param {number} stbh - The sum assured for the main product.
