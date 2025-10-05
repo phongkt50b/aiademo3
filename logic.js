@@ -3179,7 +3179,8 @@ function buildPart2Section(data) {
         appState.fees.baseMain,
         appState.mainProduct.extraPremium,
         data.targetAge,
-        customRateInput
+        customRateInput,
+        new Date()
     );
     
     const { schedule, isAnnual, persons } = data;
