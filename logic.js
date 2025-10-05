@@ -509,6 +509,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
     const totalMonths = totalYears * 12;
     const customRate = (parseFloat(customInterestRate) || 0) / 100;
 
+    // Lấy mốc thời gian ban đầu từ tham số startDate
     const startMonth = startDate.getMonth();
     const startYear = startDate.getFullYear();
 
@@ -523,7 +524,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         const attainedAge = initialAge + policyYear - 1;
         const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-        // Tính năm dương lịch chính xác cho từng tháng
+        // Tính năm dương lịch chính xác cho từng tháng dựa trên startDate
         const monthsSinceStart = month - 1;
         const currentDate = new Date(startYear, startMonth + monthsSinceStart, 1);
         const calendarYear = currentDate.getFullYear();
@@ -543,14 +544,12 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             const investmentAmount = currentAccountValue + premiumIn - initialFee;
             const adminFee = admin_fees[calendarYear] || admin_fees.default || 0;
 
-            // Phiên bản "siêu bền" xử lý dữ liệu lỗi và báo cho bạn biết
             let riskRate = 0;
             const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
             
             if (riskRateRecord && typeof riskRateRecord[genderKey] === 'number') {
                 riskRate = riskRateRecord[genderKey];
             } else {
-                // Nếu không tìm thấy hoặc dữ liệu sai, dùng giá trị mặc định và báo lỗi trong Console (F12)
                 riskRate = (genderKey === 'nam') ? 2.0 : 1.5;
                 console.warn(`DỮ LIỆU LỖI: Không tìm thấy tỷ lệ phí hợp lệ cho tuổi ${attainedAge}. Đang dùng tỷ lệ mặc định.`);
             }
@@ -563,7 +562,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             let interestRateYearly = 0;
             const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default || 0;
 
-            // Luôn lấy lãi suất cao hơn giữa lãi suất minh họa và lãi suất cam kết
             if (key === 'guaranteed') {
                 interestRateYearly = guaranteedRate;
             } else if (key === 'customCapped') {
