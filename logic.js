@@ -499,12 +499,10 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
     const { key: productKey, stbh, paymentTerm } = mainProduct;
     const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
 
-    // Sửa lỗi #4: Tính đúng số năm minh họa
     const totalYears = targetAge - initialAge;
     const totalMonths = totalYears * 12;
     const customRate = (parseFloat(customInterestRate) || 0) / 100;
 
-    // Khôi phục logic tính toán năm dương lịch chính xác
     const startMonth = startDate.getMonth(); // 0-11
     const startYear = startDate.getFullYear();
 
@@ -519,7 +517,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         const attainedAge = initialAge + policyYear - 1;
         const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-        // Tính năm dương lịch chính xác cho mỗi tháng để tra cứu phí quản lý
         const monthsSinceStart = month - 1;
         const currentDate = new Date(startYear, startMonth + monthsSinceStart, 1);
         const calendarYear = currentDate.getFullYear();
@@ -529,7 +526,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             let premiumIn = 0;
             let initialFee = 0;
 
-            // Đóng phí vào đầu năm hợp đồng (tháng 1, 13, 25...)
             if ((month - 1) % 12 === 0 && policyYear <= paymentTerm) {
                 premiumIn = basePremium + extraPremium;
                 const initialFeeRateBase = (initial_fees[productKey]?.[policyYear] ?? initial_fees[productKey]?.[Object.keys(initial_fees[productKey]).pop()]) || 0;
@@ -540,7 +536,8 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
 
             const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
-            // Sửa lỗi #1: Khôi phục cơ chế dự phòng để Phí rủi ro không bao giờ bằng 0
+            // ===== SỬA LỖI QUAN TRỌNG NHẤT NẰM Ở ĐÂY =====
+            // Thêm lại `|| { nam: 2, nu: 1.5 }` để chương trình không bị crash
             const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge) || { nam: 2, nu: 1.5 };
             const riskRate = riskRateRecord[genderKey];
             const sumAtRisk = Math.max(0, stbh - investmentAmount);
@@ -552,7 +549,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             let interestRateYearly = 0;
             const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
 
-            // Sửa lỗi #2: Khôi phục logic Math.max để đảm bảo quyền lợi lãi suất cho khách hàng
             if (key === 'guaranteed') {
                 interestRateYearly = guaranteedRate;
             } else if (key === 'customCapped') {
@@ -564,7 +560,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
 
             let bonus = 0;
             const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
-            if (bonusInfo && month % 12 === 0) { // Thưởng được trả vào cuối năm hợp đồng
+            if (bonusInfo && month % 12 === 0) {
                 const bonusYear = bonusInfo.year;
                 if (bonusYear === 10 && paymentTerm >= 10) {
                     bonus = basePremium * bonusInfo.rate;
@@ -578,7 +574,6 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
 
             if (month % 12 === 0) {
-                // Sửa lỗi #3: Trả về một đối tượng chứa cả tuổi và giá trị
                 scenarios[key].yearEndValues.push({
                   age: attainedAge + 1,
                   value: scenarios[key].accountValue
