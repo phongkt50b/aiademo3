@@ -503,7 +503,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
     const totalMonths = totalYears * 12;
     const customRate = (parseFloat(customInterestRate) || 0) / 100;
 
-    const startMonth = startDate.getMonth(); // 0-11
+    const startMonth = startDate.getMonth();
     const startYear = startDate.getFullYear();
 
     let scenarios = {
@@ -533,15 +533,13 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             }
 
             const investmentAmount = currentAccountValue + premiumIn - initialFee;
-
             const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
-            // ===== SỬA LỖI QUAN TRỌNG NHẤT NẰM Ở ĐÂY =====
-            // Thêm lại `|| { nam: 2, nu: 1.5 }` để chương trình không bị crash
+            // ĐÂY LÀ PHẦN SỬA LỖI QUAN TRỌNG NHẤT
             const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge) || { nam: 2, nu: 1.5 };
             const riskRate = riskRateRecord[genderKey];
-            const sumAtRisk = Math.max(0, stbh - investmentAmount);
             
+            const sumAtRisk = Math.max(0, stbh - investmentAmount);
             const costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
 
             let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
