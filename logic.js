@@ -494,107 +494,97 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
     return calculateSimpleRiderPremium(customer, config, rateFinder, 100, ageOverride);
 }
 // Dán hàm mới này vào logic.js
-function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate, startDate) {
-    const { gender, age: initialAge } = mainPerson;
-    const { key: productKey, stbh, paymentTerm } = mainProduct;
-    const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
+function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
+    const { gender, age: initialAge } = mainPerson;
+    const { key: productKey, stbh, paymentTerm } = mainProduct;
+    const { cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
 
-    // Kiểm tra dữ liệu đầu vào để tránh lỗi
-    if (!cost_of_insurance_rates || !initial_fees || !guaranteed_interest_rates || !admin_fees || !persistency_bonus) {
-        console.error("LỖI DỮ LIỆU: investment_data không được tải hoặc bị trống. Vui lòng kiểm tra file data.js");
-        return { guaranteed: [], customCapped: [], customFull: [] };
-    }
+    const totalYears = targetAge - initialAge + 1;
+    const totalMonths = totalYears * 12;
+    const customRate = (parseFloat(customInterestRate) || 0) / 100;
 
-    const totalYears = targetAge - initialAge;
-    const totalMonths = totalYears * 12;
-    const customRate = (parseFloat(customInterestRate) || 0) / 100;
+    let scenarios = {
+        guaranteed: { accountValue: 0, yearEndValues: [] },
+        customCapped: { accountValue: 0, yearEndValues: [] },
+        customFull: { accountValue: 0, yearEndValues: [] },
+    };
 
-    // Lấy mốc thời gian ban đầu từ tham số startDate
-    const startMonth = startDate.getMonth();
-    const startYear = startDate.getFullYear();
+    const startYear = new Date().getFullYear();
+    const startDate = CONFIG.REFERENCE_DATE;
+    const startMonth = startDate.getMonth() + 1;  // Tháng từ 1-12
 
-    let scenarios = {
-        guaranteed: { accountValue: 0, yearEndValues: [] },
-        customCapped: { accountValue: 0, yearEndValues: [] },
-        customFull: { accountValue: 0, yearEndValues: [] },
-    };
+    for (let month = 1; month <= totalMonths; month++) {
+        const policyYear = Math.floor((month - 1) / 12) + 1;
+        const attainedAge = initialAge + policyYear - 1;
+        const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-    for (let month = 1; month <= totalMonths; month++) {
-        const policyYear = Math.floor((month - 1) / 12) + 1;
-        const attainedAge = initialAge + policyYear - 1;
-        const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
+        const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
+        const calendarYear = startYear + Math.floor((startMonth - 2 + month) / 12);
 
-        // Tính năm dương lịch chính xác cho từng tháng dựa trên startDate
-        const monthsSinceStart = month - 1;
-        const currentDate = new Date(startYear, startMonth + monthsSinceStart, 1);
-        const calendarYear = currentDate.getFullYear();
-        
-        for (const key in scenarios) {
-            let currentAccountValue = scenarios[key].accountValue;
-            let premiumIn = 0;
-            let initialFee = 0;
+        for (const key in scenarios) {
+            let currentAccountValue = scenarios[key].accountValue;
+            let premiumIn = 0;
+            let initialFee = 0;
 
-            if ((month - 1) % 12 === 0 && policyYear <= paymentTerm) {
-                premiumIn = basePremium + extraPremium;
-                const feeRatesForProduct = initial_fees[productKey] || {};
-                const initialFeeRateBase = feeRatesForProduct[policyYear] ?? feeRatesForProduct[Object.keys(feeRatesForProduct).pop()] ?? 0;
-                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * (initial_fees.EXTRA || 0));
-            }
+            if (month % 12 === 1 && policyYear <= paymentTerm) {
+                premiumIn = basePremium + extraPremium;
+                const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
+                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * initial_fees.EXTRA);
+            }
 
-            const investmentAmount = currentAccountValue + premiumIn - initialFee;
-            const adminFee = admin_fees[calendarYear] || admin_fees.default || 0;
+            const investmentAmount = currentAccountValue + premiumIn - initialFee;
 
-            let riskRate = 0;
-            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
-            
-            if (riskRateRecord && typeof riskRateRecord[genderKey] === 'number') {
-                riskRate = riskRateRecord[genderKey];
-            } else {
-                riskRate = (genderKey === 'nam') ? 2.0 : 1.5;
-                console.warn(`DỮ LIỆU LỖI: Không tìm thấy tỷ lệ phí hợp lệ cho tuổi ${attainedAge}. Đang dùng tỷ lệ mặc định.`);
-            }
-            
-            const sumAtRisk = Math.max(0, stbh - investmentAmount);
-            const costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
+            const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
-            let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
+            const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
+            const riskRate = riskRateRecord ? riskRateRecord[genderKey] : 0;
+            const sumAtRisk = Math.max(0, stbh - investmentAmount);
+            
+            const costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
 
-            let interestRateYearly = 0;
-            const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default || 0;
+            let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
 
-            if (key === 'guaranteed') {
-                interestRateYearly = guaranteedRate;
-            } else if (key === 'customCapped') {
-                interestRateYearly = (policyYear <= 20) ? Math.max(customRate, guaranteedRate) : guaranteedRate;
-            } else { // customFull
-                interestRateYearly = Math.max(customRate, guaranteedRate);
-            }
-            const interest = netInvestmentAmount * (interestRateYearly / 12);
+            let interestRateYearly = 0;
+            const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
+            if (key === 'guaranteed') {
+                interestRateYearly = guaranteedRate;
+            } else if (key === 'customCapped') {
+                interestRateYearly = (policyYear <= 20) ? Math.max(customRate, guaranteedRate) : guaranteedRate;
+            } else {
+                interestRateYearly = Math.max(customRate, guaranteedRate);
+            }
+            const interest = netInvestmentAmount * (interestRateYearly / 12);
 
-            let bonus = 0;
-            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
-            if (bonusInfo && month % 12 === 0) {
-                 if (bonusInfo.year <= paymentTerm) {
-                    bonus = basePremium * (bonusInfo.rate || 0);
-                }
-            }
-            
-            scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
+            // ==========================================================
+            // ===== LOGIC THƯỞNG ĐÃ ĐƯỢC CẬP NHẬT =====
+            // ==========================================================
+            let bonus = 0;
+            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
+            if (bonusInfo && month % 12 === 0) {
+                const bonusYear = bonusInfo.year;
+                // Chỉ áp dụng thưởng nếu thời gian đóng phí đủ dài
+                if (bonusYear === 10 && paymentTerm >= 10) {
+                    bonus = basePremium * bonusInfo.rate;
+                } else if (bonusYear === 20 && paymentTerm >= 20) {
+                    bonus = basePremium * bonusInfo.rate;
+                } else if (bonusYear === 30 && paymentTerm >= 30) {
+                    bonus = basePremium * bonusInfo.rate;
+                }
+            }
+            
+            scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
 
-            if (month % 12 === 0) {
-                scenarios[key].yearEndValues.push({
-                  age: attainedAge + 1,
-                  value: scenarios[key].accountValue
-                });
-            }
-        }
-    }
+            if (month % 12 === 0) {
+                scenarios[key].yearEndValues.push(scenarios[key].accountValue);
+            }
+        }
+    }
 
-    return {
-        guaranteed: scenarios.guaranteed.yearEndValues,
-        customCapped: scenarios.customCapped.yearEndValues,
-        customFull: scenarios.customFull.yearEndValues,
-    };
+    return {
+        guaranteed: scenarios.guaranteed.yearEndValues,
+        customCapped: scenarios.customCapped.yearEndValues,
+        customFull: scenarios.customFull.yearEndValues,
+    };
 }
 /**
  * Checks eligibility for PUL products based on STBH and premium.
