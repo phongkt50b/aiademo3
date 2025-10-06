@@ -1817,7 +1817,7 @@ function updateTargetAge() {
 
     const curVal = parseInt(targetAgeInput.value || '0', 10);
     if (!curVal || curVal < minAge) {
-        targetAgeInput.value = minAge;
+        targetAgeInput.value = 99;
     } else if (curVal > maxAge) {
         targetAgeInput.value = maxAge;
     }
