@@ -509,16 +509,17 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         customFull: { accountValue: 0, yearEndValues: [] },
     };
 
-    const startYear = new Date().getFullYear();
-    const startDate = CONFIG.REFERENCE_DATE;
-    const startMonth = startDate.getMonth() + 1;  // Tháng từ 1-12
+    // Lấy ngày bắt đầu từ global config
+    const startDate = CONFIG.REFERENCE_DATE || new Date();
+    const startYear = startDate.getFullYear();
+    const startMonth = startDate.getMonth() + 1; // Tháng từ 1-12
 
     for (let month = 1; month <= totalMonths; month++) {
         const policyYear = Math.floor((month - 1) / 12) + 1;
         const attainedAge = initialAge + policyYear - 1;
         const genderKey = gender === 'Nữ' ? 'nu' : 'nam';
 
-        const elapsedMonths = (policyYear - 1) * 12 + (month - 1);  // Số tháng elapsed từ start (bắt đầu từ 0)
+        // Tính năm theo lịch
         const calendarYear = startYear + Math.floor((startMonth - 2 + month) / 12);
 
         for (const key in scenarios) {
@@ -527,31 +528,34 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             let initialFee = 0;
 
             if (month % 12 === 1 && policyYear <= paymentTerm) {
-                premiumIn = basePremium + extraPremium;
-                // làm tròn premium trước khi dùng
-                premiumIn = Math.round(premiumIn);
-
-                const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
-                initialFee = (basePremium * initialFeeRateBase) + (extraPremium * (initial_fees.EXTRA || 0));
-                initialFee = Math.round(initialFee);
+                // --- MUL thì chỉ tính basePremium ---
+                if (CONFIG.PRODUCT_GROUPS.MUL.includes(productKey)) {
+                    premiumIn = basePremium;
+                    const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
+                    initialFee = basePremium * initialFeeRateBase;
+                } else {
+                    // --- PUL thì cộng cả extraPremium ---
+                    premiumIn = basePremium + extraPremium;
+                    const initialFeeRateBase = (initial_fees[productKey] || {})[policyYear] || 0;
+                    initialFee = (basePremium * initialFeeRateBase) + (extraPremium * initial_fees.EXTRA);
+                }
             }
 
             const investmentAmount = currentAccountValue + premiumIn - initialFee;
 
-            // Lấy admin fee theo năm dương lịch (calendarYear)
-            let adminFee = admin_fees[calendarYear] || admin_fees.default || 0;
-            adminFee = Math.round(adminFee);
+            // Phí quản lý theo năm lịch
+            const adminFee = admin_fees[calendarYear] || admin_fees.default;
 
+            // Phí bảo hiểm rủi ro
             const riskRateRecord = cost_of_insurance_rates.find(r => r.age === attainedAge);
             const riskRate = riskRateRecord ? riskRateRecord[genderKey] : 0;
             const sumAtRisk = Math.max(0, stbh - investmentAmount);
+            const costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
 
-            let costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
-            costOfInsurance = Math.round(costOfInsurance);
-
+            // Số tiền thực đầu tư
             let netInvestmentAmount = Math.max(0, investmentAmount - adminFee - costOfInsurance);
-            netInvestmentAmount = Math.round(netInvestmentAmount);
 
+            // Lãi suất
             let interestRateYearly = 0;
             const guaranteedRate = guaranteed_interest_rates[policyYear] || guaranteed_interest_rates.default;
             if (key === 'guaranteed') {
@@ -561,29 +565,32 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             } else {
                 interestRateYearly = Math.max(customRate, guaranteedRate);
             }
+            const interest = netInvestmentAmount * (interestRateYearly / 12);
 
-            let interest = netInvestmentAmount * (interestRateYearly / 12);
-            interest = Math.round(interest);
-
-            // ==========================================================
-            // ===== LOGIC THƯỞNG ĐÃ ĐƯỢC CẬP NHẬT =====
-            // ==========================================================
+            // Thưởng duy trì hợp đồng
             let bonus = 0;
-            const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
-            if (bonusInfo && month % 12 === 0) {
-                const bonusYear = bonusInfo.year;
-                if (bonusYear === 10 && paymentTerm >= 10) {
-                    bonus = basePremium * bonusInfo.rate;
-                } else if (bonusYear === 20 && paymentTerm >= 20) {
-                    bonus = basePremium * bonusInfo.rate;
-                } else if (bonusYear === 30 && paymentTerm >= 30) {
-                    bonus = basePremium * bonusInfo.rate;
+            if (CONFIG.PRODUCT_GROUPS.MUL.includes(productKey)) {
+                // MUL: từ năm thứ 5 trở đi, nếu còn đóng phí thì thưởng 3% basePremium mỗi năm
+                if (policyYear >= 5 && policyYear <= paymentTerm && month % 12 === 0) {
+                    bonus = basePremium * 0.03;
                 }
-                bonus = Math.round(bonus);
+            } else {
+                // PUL: theo bảng persistency_bonus
+                const bonusInfo = persistency_bonus.find(b => b.year === policyYear);
+                if (bonusInfo && month % 12 === 0) {
+                    const bonusYear = bonusInfo.year;
+                    if (bonusYear === 10 && paymentTerm >= 10) {
+                        bonus = basePremium * bonusInfo.rate;
+                    } else if (bonusYear === 20 && paymentTerm >= 20) {
+                        bonus = basePremium * bonusInfo.rate;
+                    } else if (bonusYear === 30 && paymentTerm >= 30) {
+                        bonus = basePremium * bonusInfo.rate;
+                    }
+                }
             }
 
-            // Cập nhật giá trị tài khoản sau tháng này (làm tròn cuối cùng)
-            scenarios[key].accountValue = Math.round(netInvestmentAmount + interest + bonus);
+            // Cập nhật giá trị tài khoản
+            scenarios[key].accountValue = netInvestmentAmount + interest + bonus;
 
             if (month % 12 === 0) {
                 scenarios[key].yearEndValues.push(scenarios[key].accountValue);
@@ -597,6 +604,7 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         customFull: scenarios.customFull.yearEndValues,
     };
 }
+
 /**
  * Checks eligibility for PUL products based on STBH and premium.
  * @param {number} stbh - The sum assured for the main product.
