@@ -3145,7 +3145,8 @@ function buildPart1Section(summaryData) {
 // Thay thế TOÀN BỘ hàm buildPart2Section hiện có bằng hàm này
 function buildPart2Section(data) {
     // --- BẮT ĐẦU PHẦN LOGIC MỚI ---
-    const isKhoeTronVen = CONFIG.PRODUCT_GROUPS.PUL.includes(data.productKey);
+    const isKhoeTronVen = CONFIG.PRODUCT_GROUPS.PUL.includes(data.productKey)
+    || (CONFIG.PRODUCT_GROUPS.MUL && CONFIG.PRODUCT_GROUPS.MUL.includes(data.productKey));
 
     // Nếu không phải Khoẻ Trọn Vẹn, dùng logic render cũ
     if (!isKhoeTronVen) {
