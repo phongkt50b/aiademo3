@@ -149,7 +149,7 @@ export const product_data = {
     ]
 };
 export const investment_data = {
-    cost_of_insurance_rates: [
+    pul_cost_of_insurance_rates: [
         { age: 0, nam: 1.84, nu: 1.32 }, { age: 1, nam: 0.72, nu: 0.59 }, { age: 2, nam: 0.69, nu: 0.56 },
         { age: 3, nam: 0.68, nu: 0.55 }, { age: 4, nam: 0.65, nu: 0.54 }, { age: 5, nam: 0.62, nu: 0.53 },
         { age: 6, nam: 0.58, nu: 0.51 }, { age: 7, nam: 0.55, nu: 0.50 }, { age: 8, nam: 0.53, nu: 0.49 },
@@ -185,10 +185,39 @@ export const investment_data = {
         { age: 96, nam: 294.69, nu: 289.72 }, { age: 97, nam: 378.70, nu: 376.07 }, { age: 98, nam: 521.61, nu: 520.77 },
         { age: 99, nam: 700.00, nu: 700.00 }, { age: 100, nam: 700.00, nu: 700.00 }
     ],
+    mul_cost_of_insurance_rates: [
+        { age: 0, nam: 2.1, nu: 1.51 }, { age: 1, nam: 0.82, nu: 0.67 }, { age: 2, nam: 0.79, nu: 0.64 }, { age: 3, nam: 0.78, nu: 0.63 }, 
+        { age: 4, nam: 0.74, nu: 0.62 }, { age: 5, nam: 0.71, nu: 0.61 }, { age: 6, nam: 0.66, nu: 0.58 }, { age: 7, nam: 0.63, nu: 0.57 }, 
+        { age: 8, nam: 0.61, nu: 0.56 }, { age: 9, nam: 0.59, nu: 0.55 }, { age: 10, nam: 0.61, nu: 0.55 }, { age: 11, nam: 0.65, nu: 0.56 }, 
+        { age: 12, nam: 0.73, nu: 0.58 }, { age: 13, nam: 0.86, nu: 0.62 }, { age: 14, nam: 0.99, nu: 0.65 }, { age: 15, nam: 1.13, nu: 0.7 }, 
+        { age: 16, nam: 1.27, nu: 0.73 }, { age: 17, nam: 1.37, nu: 0.77 }, { age: 18, nam: 1.45, nu: 0.8 }, { age: 19, nam: 1.51, nu: 0.82 }, 
+        { age: 20, nam: 1.52, nu: 0.85 }, { age: 21, nam: 1.52, nu: 0.87 }, { age: 22, nam: 1.51, nu: 0.88 }, { age: 23, nam: 1.47, nu: 0.89 }, 
+        { age: 24, nam: 1.44, nu: 0.93 }, { age: 25, nam: 1.41, nu: 0.94 }, { age: 26, nam: 1.37, nu: 0.96 }, { age: 27, nam: 1.37, nu: 0.99 }, 
+        { age: 28, nam: 1.36, nu: 1.03 }, { age: 29, nam: 1.37, nu: 1.05 }, { age: 30, nam: 1.41, nu: 1.1 }, { age: 31, nam: 1.44, nu: 1.13 }, 
+        { age: 32, nam: 1.5, nu: 1.18 }, { age: 33, nam: 1.57, nu: 1.23 }, { age: 34, nam: 1.65, nu: 1.29 }, { age: 35, nam: 1.74, nu: 1.36 }, 
+        { age: 36, nam: 1.85, nu: 1.45 }, { age: 37, nam: 1.99, nu: 1.57 }, { age: 38, nam: 2.15, nu: 1.7 }, { age: 39, nam: 2.32, nu: 1.85 }, 
+        { age: 40, nam: 2.53, nu: 2.02 }, { age: 41, nam: 2.73, nu: 2.21 }, { age: 42, nam: 2.97, nu: 2.39 }, { age: 43, nam: 3.22, nu: 2.56 }, 
+        { age: 44, nam: 3.5, nu: 2.75 }, { age: 45, nam: 3.78, nu: 2.95 }, { age: 46, nam: 4.09, nu: 3.13 }, { age: 47, nam: 4.42, nu: 3.35 }, 
+        { age: 48, nam: 4.78, nu: 3.59 }, { age: 49, nam: 5.17, nu: 3.83 }, { age: 50, nam: 5.6, nu: 4.1 }, { age: 51, nam: 6.1, nu: 4.4 }, 
+        { age: 52, nam: 6.66, nu: 4.73 }, { age: 53, nam: 7.3, nu: 5.11 }, { age: 54, nam: 8.01, nu: 5.49 }, { age: 55, nam: 8.77, nu: 5.86 }, 
+        { age: 56, nam: 9.58, nu: 6.24 }, { age: 57, nam: 10.43, nu: 6.61 }, { age: 58, nam: 11.35, nu: 6.96 }, { age: 59, nam: 12.33, nu: 7.36 }, 
+        { age: 60, nam: 13.44, nu: 7.84 }, { age: 61, nam: 14.69, nu: 8.43 }, { age: 62, nam: 16.09, nu: 9.19 }, { age: 63, nam: 17.67, nu: 10.1 }, 
+        { age: 64, nam: 19.42, nu: 11.13 }, { age: 65, nam: 21.29, nu: 12.23 }, { age: 66, nam: 23.3, nu: 13.37 }, { age: 67, nam: 25.43, nu: 14.5 }, 
+        { age: 68, nam: 27.73, nu: 15.67 }, { age: 69, nam: 30.25, nu: 16.98 }, { age: 70, nam: 33.1, nu: 18.53 }, { age: 71, nam: 36.34, nu: 20.42 }, 
+        { age: 72, nam: 40.07, nu: 22.78 }, { age: 73, nam: 44.27, nu: 25.59 }, { age: 74, nam: 48.88, nu: 28.85 }, { age: 75, nam: 53.81, nu: 32.45 }, 
+        { age: 76, nam: 58.96, nu: 36.37 }, { age: 77, nam: 64.3, nu: 40.55 }, { age: 78, nam: 69.85, nu: 45.05 }, { age: 79, nam: 75.81, nu: 50.06 }, 
+        { age: 80, nam: 82.35, nu: 55.74 }, { age: 81, nam: 89.67, nu: 62.26 }, { age: 82, nam: 97.93, nu: 69.81 }, { age: 83, nam: 107.07, nu: 78.32 }, 
+        { age: 84, nam: 116.89, nu: 87.69 }, { age: 85, nam: 127.19, nu: 97.83 }, { age: 86, nam: 137.77, nu: 108.65 }, { age: 87, nam: 148.58, nu: 120.15 }, 
+        { age: 88, nam: 159.62, nu: 132.31 }, { age: 89, nam: 170.95, nu: 145.23 }, { age: 90, nam: 182.74, nu: 159.09 }, { age: 91, nam: 195.29, nu: 174.15 }, 
+        { age: 92, nam: 209.14, nu: 190.95 }, { age: 93, nam: 225.7, nu: 210.73 }, { age: 94, nam: 247.98, nu: 236.18 }, { age: 95, nam: 281.49, nu: 272.81 }, 
+        { age: 96, nam: 336.79, nu: 331.11 }, { age: 97, nam: 432.8, nu: 429.79 }, { age: 98, nam: 596.13, nu: 595.17 }, { age: 99, nam: 800, nu: 800 }, { age: 100, nam: 800, nu: 800 }
+    ],
     initial_fees: {
         PUL_TRON_DOI: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_15NAM: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         PUL_5NAM: { 1: 0.30, 2: 0.18, 3: 0.12, 4: 0.12, 5: 0.12, 6: 0.012, 7: 0.012, 8: 0.012, 9: 0.012, 10: 0.012 },
+        KHOE_BINH_AN: { 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
+        VUNG_TUONG_LAI:{ 1: 0.50, 2: 0.30, 3: 0.20, 4: 0.20, 5: 0.20, 6: 0.02, 7: 0.02, 8: 0.02, 9: 0.02, 10: 0.02 },
         EXTRA: 0.015 
     },
     guaranteed_interest_rates: {
