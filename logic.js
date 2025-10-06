@@ -497,7 +497,15 @@ function calculateHospitalSupportPremium(customer, mainPremium, totalHospitalSup
 function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, extraPremium, targetAge, customInterestRate) {
     const { gender, age: initialAge } = mainPerson;
     const { key: productKey, stbh: stbhInitial = 0, paymentTerm } = mainProduct;
-    const { pul_cost_of_insurance_rates,mul_cost_of_insurance_rates, initial_fees, guaranteed_interest_rates, admin_fees, persistency_bonus } = investment_data;
+    
+    const { 
+        pul_cost_of_insurance_rates, 
+        mul_cost_of_insurance_rates, 
+        initial_fees, 
+        guaranteed_interest_rates, 
+        admin_fees, 
+        persistency_bonus 
+    } = investment_data;
 
     const totalYears = targetAge - initialAge + 1;
     const totalMonths = totalYears * 12;
@@ -513,7 +521,8 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
         customFull: { accountValue: 0, yearEndValues: [] },
     };
 
-    const startDate = (typeof CONFIG !== 'undefined' && CONFIG.REFERENCE_DATE) ? CONFIG.REFERENCE_DATE : (referenceDate || new Date());
+    // --- SỬA ĐỔI: Đơn giản hóa logic lấy ngày bắt đầu ---
+    const startDate = (typeof CONFIG !== 'undefined' && CONFIG.REFERENCE_DATE) ? CONFIG.REFERENCE_DATE : new Date();
     const startYear = startDate.getFullYear();
     const startMonth = startDate.getMonth() + 1;
 
@@ -560,12 +569,10 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
 
             if (month % 12 === 1 && policyYear <= paymentTerm) {
                 if (isMulProduct) {
-                    // MUL: chỉ dùng basePremium
                     premiumIn = roundVND(Number(basePremium || 0));
                     const initialFeeRateBase = ((initial_fees && initial_fees[productKey]) || {})[policyYear] || 0;
                     initialFee = roundVND(Number(basePremium || 0) * Number(initialFeeRateBase || 0));
                 } else {
-                    // PUL: base + extra
                     premiumIn = roundVND(Number(basePremium || 0) + Number(extraPremium || 0));
                     const initialFeeRateBase = ((initial_fees && initial_fees[productKey]) || {})[policyYear] || 0;
                     const extraInitRate = (initial_fees && initial_fees.EXTRA) ? initial_fees.EXTRA : 0;
@@ -575,13 +582,13 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
             }
 
             const investmentAmount = currentAccountValue + premiumIn - initialFee;
-
             let adminFee = getAdminFeeForYear(calendarYear);
             adminFee = roundVND(adminFee);
 
-            const riskRateRecord = (cost_of_insurance_rates || []).find(r => Number(r.age) === Number(attainedAge));
-            const riskRate = riskRateRecord ? (riskRateRecord[genderKey] || 0) : 0;
             const stbhCurrent = getStbhForPolicyYear(policyYear);
+            const riskRates = isMulProduct ? (mul_cost_of_insurance_rates || []) : (pul_cost_of_insurance_rates || []);
+            const riskRateRecord = riskRates.find(r => Number(r.age) === Number(attainedAge));
+            const riskRate = riskRateRecord ? (riskRateRecord[genderKey] || 0) : 0;
             const sumAtRisk = Math.max(0, stbhCurrent - investmentAmount);
 
             let costOfInsurance = (sumAtRisk * riskRate) / 1000 / 12;
