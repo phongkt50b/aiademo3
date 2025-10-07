@@ -4128,11 +4128,6 @@ function __exportExactSummaryHtml() {
 }
 
 function buildViewerPayload() {
-  if (typeof updateStateFromUI === 'function') updateStateFromUI();
-  if (typeof performCalculations === 'function') {
-    appState.fees = performCalculations(appState);
-  }
-
   const mainKey = appState.mainProduct.key;
   const mainPerson = appState.mainPerson || {};
 
