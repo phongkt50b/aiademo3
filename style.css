@@ -361,3 +361,9 @@ input[type="number"] { -moz-appearance: textfield; }
     transition:none !important;
   }
 }
+/* Thêm đoạn này vào file CSS của bạn */
+.modal-container.loading #viewer-iframe {
+    /* Tạm thời làm mờ iframe khi đang tải */
+    opacity: 0.5;
+    /* Có thể thêm một spinner ở đây nếu muốn */
+}
