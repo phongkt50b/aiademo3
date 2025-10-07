@@ -4300,6 +4300,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
 
+      // BƯỚC 1: Luôn chạy workflow để cập nhật appState lên phiên bản mới nhất
+      if (typeof runWorkflow === 'function') {
+        runWorkflow();
+      }
+
+      // BƯỚC 2: Kiểm tra lỗi dựa trên appState đã được cập nhật
       const errors = (typeof collectSimpleErrors === 'function') ? collectSimpleErrors() : [];
       if (errors.length) {
         if (typeof showGlobalErrors === 'function') {
@@ -4315,6 +4321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showGlobalErrors([]);
       }
 
+      // BƯỚC 3: Mở bảng minh họa với appState đã chính xác
       openFullViewer();
     });
     btn.dataset._bindFullViewer = '1';
