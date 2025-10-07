@@ -4245,29 +4245,37 @@ function openFullViewer() {
 
     if (!modal || !iframe || !closeBtn) {
       console.error('Không tìm thấy các thành phần của modal viewer.');
-      // Fallback to new tab if modal components are missing
       window.open(viewerUrl.toString(), '_blank', 'noopener');
       return;
     }
+    
+    // --- BẮT ĐẦU PHẦN SỬA LỖI ---
 
-    iframe.src = 'about:blank'; // Clear previous content
-    setTimeout(() => {
-      iframe.src = viewerUrl.toString();
-    }, 10); // Small delay to ensure clearing happens first
+    // 1. Hiển thị modal ở trạng thái loading (nếu có CSS) và xóa nội dung cũ
+    iframe.src = 'about:blank';
+    modal.classList.add('loading'); // Thêm class loading
+    modal.classList.add('visible'); // Hiển thị modal ngay lập tức
 
-    modal.classList.add('visible');
+    // 2. Gán sự kiện onload ĐỂ CHẠY KHI IFRAME TẢI XONG
+    iframe.onload = () => {
+        // Khi iframe đã tải xong, xóa trạng thái loading
+        modal.classList.remove('loading');
+    };
+    
+    // 3. Đặt nguồn cho iframe để bắt đầu tải. 
+    // Trình duyệt sẽ chạy sự kiện onload ở trên khi việc này hoàn tất.
+    iframe.src = viewerUrl.toString();
 
-    // Function to close the modal
+    // 4. Các hàm xử lý đóng modal vẫn giữ nguyên
     const closeModal = () => {
       modal.classList.remove('visible');
-      iframe.src = 'about:blank'; // Clear src to stop video/audio etc.
-      document.removeEventListener('keydown', handleKeydown); // Clean up listener
+      modal.classList.remove('loading'); // Dọn dẹp class loading
+      iframe.src = 'about:blank';
+      document.removeEventListener('keydown', handleKeydown);
     };
 
-    // Close button event
     closeBtn.onclick = closeModal;
 
-    // Escape key event
     const handleKeydown = (e) => {
       if (e.key === 'Escape') {
         closeModal();
@@ -4275,19 +4283,19 @@ function openFullViewer() {
     };
     document.addEventListener('keydown', handleKeydown);
 
-    // Optional: close on backdrop click
     modal.onclick = (e) => {
       if (e.target === modal) {
         closeModal();
       }
     };
 
+    // --- KẾT THÚC PHẦN SỬA LỖI ---
+
   } catch (e) {
     console.error('[FullViewer] Lỗi tạo payload:', e);
     alert('Không tạo được dữ liệu để mở bảng minh họa.');
   }
 }
-
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('btnFullViewer');
   if (btn && !btn.dataset._bindFullViewer) {
