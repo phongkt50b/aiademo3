@@ -367,3 +367,15 @@ input[type="number"] { -moz-appearance: textfield; }
     opacity: 0.5;
     /* Có thể thêm một spinner ở đây nếu muốn */
 }
+/* SỬA LỖI HIỂN THỊ NÚT ĐÓNG MODAL TRÊN MOBILE */
+#close-viewer-modal-btn {
+  /* Buộc nút phải nằm ở lớp trên cùng, cao hơn cả iframe */
+  z-index: 110; 
+
+  /* Đảm bảo trình duyệt mobile không hiểu sai về vị trí */
+  position: absolute; 
+
+  /* Fix một số lỗi cảm ứng trên iOS, giúp nút dễ bấm hơn */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
