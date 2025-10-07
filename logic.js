@@ -4106,7 +4106,6 @@ const RIDER_SLUG_MAP = {
 
 function __exportExactSummaryHtml() {
   try {
-    if (typeof runWorkflow === 'function') runWorkflow();
     if (typeof buildSummaryData !== 'function') return '';
     const data = buildSummaryData();
     const introHtml = (typeof buildIntroSection === 'function') ? buildIntroSection(data) : '';
