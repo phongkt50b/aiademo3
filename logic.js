@@ -612,7 +612,11 @@ function calculateAccountValueProjection(mainPerson, mainProduct, basePremium, e
                 interestRateYearly = Math.max(customRate, guaranteedRate);
             }
 
-            let interest = netInvestmentAmount * (interestRateYearly / 12);
+            //    Công thức suy ra là: x = (1+Y)^(1/12) - 1
+            const monthlyInterestRate = Math.pow(1 + interestRateYearly, 1 / 12) - 1;
+
+            // 2. Áp dụng lãi suất tháng đã tính, không chia cho 12 nữa
+            let interest = netInvestmentAmount * monthlyInterestRate;
             interest = roundVND(interest);
 
             let bonus = 0;
